@@ -323,7 +323,8 @@ struct ColorAttachmentState{
 };
 
 typedef struct ModifiablePipelineState{
-    std::vector<AttributeAndResidence> vertexAttributes;
+    AttributeAndResidence* vertexAttributes;
+    uint32_t vertexAttributeCount;
     PrimitiveType primitiveType;
     RenderSettings settings;
     ColorAttachmentState colorAttachmentState;
@@ -334,6 +335,10 @@ typedef struct ModifiablePipelineState{
         return false;
     }
 }ModifiablePipelineState;
+
+static inline bool ModifiablePipelineState_eq(const ModifiablePipelineState* msp1, const ModifiablePipelineState* msp2){
+    return true;
+}
 
 //typedef struct PipelineState{
 //    ModifiablePipelineState modifiablePart;

@@ -238,36 +238,40 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
 void negotiateSurfaceFormatAndPresentMode(WGPUAdapter adapter, const void* SurfaceHandle){
     WGPUSurface surface = (WGPUSurface)SurfaceHandle;
     uint32_t presentModeCount = 0;
-
-    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter->physicalDevice, surface->surface, &presentModeCount, nullptr);
-    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter->physicalDevice, surface->surface, &presentModeCount, presentModes.data());
+    WGPUSurfaceCapabilities surfaceCapabilities = {0};
+    wgpuSurfaceGetCapabilities(surface, adapter, &surfaceCapabilities);
     
-    if(std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_FIFO_RELAXED_KHR) != presentModes.end()){
-        g_renderstate.throttled_PresentMode = WGPUPresentMode_FifoRelaxed;
+    for(uint32_t i = 0;i < surfaceCapabilities.presentModeCount;i++){
+        if(surfaceCapabilities.presentModes[i] == WGPUPresentMode_FifoRelaxed){
+            g_renderstate.throttled_PresentMode = WGPUPresentMode_FifoRelaxed;
+        }
     }
-    else{
+    if(g_renderstate.throttled_PresentMode == WGPUPresentMode_Undefined){
         g_renderstate.throttled_PresentMode = WGPUPresentMode_Fifo;
     }
-    if(std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != presentModes.end()){
-        g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Mailbox;
+
+    for(uint32_t i = 0;i < surfaceCapabilities.presentModeCount;i++){
+        if(surfaceCapabilities.presentModes[i] == WGPUPresentMode_Mailbox){
+            g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Mailbox;
+        }
     }
-    else if(std::find(presentModes.begin(), presentModes.end(), VK_PRESENT_MODE_IMMEDIATE_KHR) != presentModes.end()){
-        g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Immediate;
+    if(g_renderstate.unthrottled_PresentMode == WGPUPresentMode_Undefined){
+        for(uint32_t i = 0;i < surfaceCapabilities.presentModeCount;i++){
+            if(surfaceCapabilities.presentModes[i] == WGPUPresentMode_Immediate){
+                g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Immediate;
+            }
+        }
     }
-    else{
+    if(g_renderstate.unthrottled_PresentMode == WGPUPresentMode_Undefined){
         g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Fifo;
     }
-    uint32_t surfaceFormatCount = 0;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(adapter->physicalDevice, surface->surface, &surfaceFormatCount, nullptr);
-    std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(adapter->physicalDevice, surface->surface, &surfaceFormatCount, surfaceFormats.data());
-    for(uint32_t i = 0;i < surfaceFormats.size();i++){
-        VkSurfaceFormatKHR fmt = surfaceFormats[i];
-        //TRACELOG(LOG_INFO, "Supported surface formats: %d, %d, ", fmt.format, fmt.colorSpace);
+    for(uint32_t i = 0;i < surfaceCapabilities.formatCount;i++){
+        if(surfaceCapabilities.formats[i] == WGPUTextureFormat_BGRA8Unorm){
+            g_renderstate.frameBufferFormat = BGRA8;
+            return;
+        }
     }
-    
-    g_renderstate.frameBufferFormat = BGRA8;
+    g_renderstate.frameBufferFormat = fromWGPUPixelFormat(surfaceCapabilities.formats[0]);
 }
 void* GetInstance(){
     return g_vulkanstate.instance;
@@ -1144,7 +1148,6 @@ extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t 
     FullSurface ret = {
         .surface = (WGPUSurface)nsurface
     };
-    ret.surface = (WGPUSurface)nsurface;
     WGPUAdapter adapter = g_vulkanstate.physicalDevice;
     negotiateSurfaceFormatAndPresentMode(adapter, nsurface);
     WGPUSurfaceCapabilities capa{};
