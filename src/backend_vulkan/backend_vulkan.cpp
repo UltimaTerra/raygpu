@@ -1140,8 +1140,10 @@ void InitBackend(){
     createRenderPass();
 }
 
-extern "C" FullSurface CreateSurface(void* nsurface, uint32_t width, uint32_t height){
-    FullSurface ret{};
+extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
+    FullSurface ret = {
+        .surface = (WGPUSurface)nsurface
+    };
     ret.surface = (WGPUSurface)nsurface;
     WGPUAdapter adapter = g_vulkanstate.physicalDevice;
     negotiateSurfaceFormatAndPresentMode(adapter, nsurface);

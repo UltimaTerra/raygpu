@@ -1,4 +1,4 @@
-#include <filesystem>
+#include <fs.h>
 #include <raygpu.h>
 #include <unordered_set>
 #include <iostream>
@@ -202,11 +202,11 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         SetTraceLogFile(stderr);
     }
     TRACELOG(LOG_INFO, "Hello!");
-    std::string working_dir = std::filesystem::absolute(std::filesystem::current_path()).string();
-    if(!working_dir.ends_with('/')){
-        working_dir += '/';
-    }
-    TRACELOG(LOG_INFO, "Working directory: %s", working_dir.c_str());
+    cfs_path workingDirectory = {0};
+    cfs_get_working_directory(&workingDirectory);
+    
+    
+    TRACELOG(LOG_INFO, "Working directory: %s", cfs_path_c_str(&workingDirectory));
     g_renderstate.last_timestamps[0] = (int64_t)NanoTime();
     
     InitBackend();
@@ -222,7 +222,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     Matrix identity = MatrixIdentity();
     g_renderstate.identityMatrix = GenStorageBuffer(&identity, sizeof(Matrix));
 
-    g_renderstate.grst = (GIFRecordState*)calloc(1, 160);
+    g_renderstate.grst = (GIFRecordState*)RL_CALLOC(1, 160);
 
 
 
@@ -243,18 +243,15 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         SubWindow createdWindow = InitWindow_SDL2(width, height, title);
         #endif
         
-        void* wgpu_or_wgpu_surface = CreateSurfaceForWindow(createdWindow);
-        
-        WGPUSurface wSurface = (WGPUSurface)wgpu_or_wgpu_surface;
-        createdWindow.surface = CreateSurface(wSurface, width, height);
+        WGPUSurface wSurface = (WGPUSurface)CreateSurfaceForWindow(createdWindow);
+        createdWindow.surface = CompleteSurface(wSurface, width, height);
         
         g_renderstate.createdSubwindows[createdWindow.handle] = createdWindow;
 
         g_renderstate.window = (GLFWwindow*)createdWindow.handle;
         auto it = g_renderstate.createdSubwindows.find(g_renderstate.window);
         if(it == g_renderstate.createdSubwindows.end()){
-            std::cerr << "Window creation error\n";
-            abort();
+            TRACELOG(LOG_FATAL, "Window creation error");
         }
         g_renderstate.mainWindow = &it->second;
         //g_wgpustate.surface = wgpu::Surface((WGPUSurface)g_wgpustate.createdSubwindows[glfwWin.handle].surface.surface);

@@ -825,15 +825,15 @@ EXTERN_C_BEGIN
     RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int/* unused */, int/* unused */);
     RGAPI void SetWindowShouldClose(cwoid);
     RGAPI bool WindowShouldClose(cwoid);
-    RGAPI SubWindow OpenSubWindow(uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow InitWindow_SDL2(uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow InitWindow_SDL3(uint32_t width, uint32_t height, const char* title);
-    RGAPI void CloseSubWindow(SubWindow subWindow);
-    RGAPI FullSurface CreateSurface (void* nsurface, uint32_t width, uint32_t height);
+    RGAPI SubWindow OpenSubWindow          (uint32_t width, uint32_t height, const char* title);
+    RGAPI SubWindow InitWindow_SDL2        (uint32_t width, uint32_t height, const char* title);
+    RGAPI SubWindow InitWindow_SDL3        (uint32_t width, uint32_t height, const char* title);
+    RGAPI void CloseSubWindow              (SubWindow subWindow);
+    RGAPI FullSurface CompleteSurface      (void* nsurface, uint32_t width, uint32_t height);
     RGAPI FullSurface CreateHeadlessSurface(uint32_t width, uint32_t height, PixelFormat format);
-    RGAPI void ResizeSurface (FullSurface* fsurface, uint32_t width, uint32_t height);
-    RGAPI void GetNewTexture (FullSurface* fsurface);
-    RGAPI void PresentSurface(FullSurface* fsurface);
+    RGAPI void ResizeSurface               (FullSurface* fsurface, uint32_t width, uint32_t height);
+    RGAPI void GetNewTexture               (FullSurface* fsurface);
+    RGAPI void PresentSurface              (FullSurface* fsurface);
     RGAPI void DummySubmitOnQueue(cwoid);
 
     RGAPI int GetScreenWidth  (cwoid);                     //Window width
