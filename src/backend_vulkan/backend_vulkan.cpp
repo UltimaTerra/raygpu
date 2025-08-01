@@ -56,7 +56,7 @@ extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t he
 
 extern "C" void BeginComputepassEx(DescribedComputepass* computePass){
     computePass->cmdEncoder = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), nullptr);
-    computePass->cpEncoder = wgpuCommandEncoderBeginComputePass((WGPUCommandEncoder)computePass->cmdEncoder);
+    computePass->cpEncoder = wgpuCommandEncoderBeginComputePass((WGPUCommandEncoder)computePass->cmdEncoder, NULL);
 }
 
 extern "C" void EndComputepassEx(DescribedComputepass* computePass){
@@ -1106,7 +1106,7 @@ void InitBackend(){
     }
 
     WGPUInstanceLayerSelection instanceLayers zeroinit;
-    instanceLayers.chain.sType = WGPUSType_InstanceValidationLayerSelection;
+    instanceLayers.chain.sType = WGPUSType_InstanceLayerSelection;
     
     instanceLayers.instanceLayers = validationLayers.data();
     instanceLayers.instanceLayerCount = validationLayers.size();

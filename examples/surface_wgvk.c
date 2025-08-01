@@ -101,7 +101,7 @@ int main(){
     WGPUInstanceLayerSelection lsel = {
         .chain = {
             .next = NULL,
-            .sType = WGPUSType_InstanceValidationLayerSelection
+            .sType = WGPUSType_InstanceLayerSelection
         }
     };
     const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};

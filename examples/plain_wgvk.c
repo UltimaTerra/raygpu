@@ -2,7 +2,8 @@
 #include <external/volk.h>
 #include <stdio.h>
 #include <external/incbin.h>
-
+#include <stdlib.h>
+#include <string.h>
 INCBIN(default_vert, "../resources/default.vert.spv");
 INCBIN(default_frag, "../resources/default.frag.spv");
 INCBIN(compute_wgsl, "../resources/simple_compute.wgsl");
@@ -53,7 +54,7 @@ int main(){
     WGPUInstanceLayerSelection lsel = {
         .chain = {
             .next = NULL,
-            .sType = WGPUSType_InstanceValidationLayerSelection
+            .sType = WGPUSType_InstanceLayerSelection
         }
     };
     const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};
