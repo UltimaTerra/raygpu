@@ -26,6 +26,7 @@
 //#include <ctre.hpp>
 
 
+#include "src/tint/utils/result.h"
 #include <raygpu.h>
 #include <internals.hpp>
 #include <vector>
@@ -78,8 +79,7 @@ const std::unordered_map<std::string, std::unordered_map<std::string, WGPUVertex
 DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     
     DescribedShaderModule ret zeroinit;
-    #if SUPPORT_WGPU_BACKEND == 1
-    WGPUShaderModuleWGSLDescriptor shaderCodeDesc zeroinit;
+    #if SUPPORT_WGPU_BACKEND == 1 || SUPPORT_WGPU_BACKEND == 0
 
     rassert(sources.language == sourceTypeWGSL, "Source language must be wgsl for this function");
     
@@ -217,8 +217,14 @@ std::pair<std::vector<uint32_t>, WGPUShaderStage> wgsl_to_spirv_single(const cha
     tint::spirv::writer::Options options{};
 
 
-    auto spirvOutput = tint::spirv::writer::Generate(module.Get(), options);
-    
+    tint::Result<tint::spirv::writer::Output> spirvOutput = tint::spirv::writer::Generate(module.Get(), options);
+    if(spirvOutput == tint::Success){
+
+    }
+    else{
+        std::cerr << spirvOutput.Failure().reason;
+        std::cerr << "oooooof\n";
+    }
 
     ret.first = spirvOutput.Get().spirv;
     

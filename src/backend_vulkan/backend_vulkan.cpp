@@ -1,3 +1,4 @@
+#include "internals.hpp"
 #include <wgvk.h>
 #include <config.h>
 #define Font rlFont
@@ -1332,7 +1333,7 @@ extern "C" void BeginRenderpassEx(DescribedRenderpass *renderPass){
 extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
     pipeline->state.primitiveType = drawMode;
     pipeline->state.settings = settings;
-    pipeline->activePipeline = pipeline->pipelineCache.getOrCreate(pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
+    pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, pipeline->activePipeline);
     wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, NULL);
 }

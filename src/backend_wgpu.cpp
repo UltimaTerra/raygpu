@@ -338,7 +338,7 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
 extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
     pipeline->state.primitiveType = drawMode;
     pipeline->state.settings = settings;
-    pipeline->activePipeline = pipeline->pipelineCache.getOrCreate(pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
+    PipelineHashMap_getOrCreate(&pipeline->pipelineCache,pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
     wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, nullptr);
 }
@@ -560,7 +560,7 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* unifo
 
 
 
-extern "C" FullSurface CreateSurface(void* nsurface, uint32_t width, uint32_t height){
+extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
     FullSurface ret{};
     ret.surface = (WGPUSurface)nsurface;
     negotiateSurfaceFormatAndPresentMode(nsurface);
@@ -972,8 +972,9 @@ void InitBackend(){
     // Create the instance
     TRACELOG(LOG_INFO, "Creating instance");
     wgpu::InstanceDescriptor instanceDescriptor = {};
-    instanceDescriptor.nextInChain = togglesChain;
-    instanceDescriptor.capabilities.timedWaitAnyEnable = true;
+    const wgpu::InstanceFeatureName timedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
+    instanceDescriptor.requiredFeatures = &timedWaitAny;
+    instanceDescriptor.requiredFeatureCount = 1;
     
     sample->instance = wgpu::CreateInstance(&instanceDescriptor);
     #endif  // __EMSCRIPTEN__
@@ -1969,10 +1970,11 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
 
     vertexState.module = (WGPUShaderModule)shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
 
-    VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes.data(), mst.vertexAttributes.size());
+    VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes, mst.vertexAttributeCount);
     vertexState.bufferCount = vlayout_complete.number_of_buffers;
 
     std::vector<WGPUVertexBufferLayout> layouts_converted;
+    layouts_converted.reserve(vlayout_complete.number_of_buffers);
     for(uint32_t i = 0;i < vlayout_complete.number_of_buffers;i++){
         layouts_converted.push_back(WGPUVertexBufferLayout{
             .nextInChain    = nullptr,
@@ -2051,7 +2053,7 @@ extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, Vertex
     
     DescribedShaderModule module = LoadShaderModule(sources);
     
-    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes.data(), vao->attributes.size(), uniforms, uniformCount, settings);
+    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
     //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
     PreparePipeline(pl, vao);
     return pl;
@@ -2092,10 +2094,6 @@ extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const A
     //UpdatePipeline(retp);
     //TRACELOG(LOG_INFO, "Pipeline with %d attributes and %d uniforms was loaded", attribCount, uniformCount);
     return retp;
-}
-
-std::vector<AttributeAndResidence> GetAttributesAndResidences(const VertexArray* va){
-    return va->attributes;
 }
 
 WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage){

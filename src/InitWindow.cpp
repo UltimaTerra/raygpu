@@ -1,4 +1,4 @@
-#include <fs.h>
+#include <c_fs_utils.h>
 #include <raygpu.h>
 #include <unordered_set>
 #include <iostream>
@@ -457,7 +457,7 @@ extern "C" SubWindow OpenSubWindow(uint32_t width, uint32_t height, const char* 
     void* wgpu_or_wgpu_surface = CreateSurfaceForWindow(createdWindow);
     #if SUPPORT_WGPU_BACKEND == 1
     WGPUSurface wSurface = (WGPUSurface)wgpu_or_wgpu_surface;
-    g_renderstate.createdSubwindows[createdWindow.handle].surface = CreateSurface(wSurface, width, height);
+    g_renderstate.createdSubwindows[createdWindow.handle].surface = CompleteSurface(wSurface, width, height);
     #else
     WGPUSurface vSurface = (WGPUSurface)wgpu_or_wgpu_surface;
     WGPUSurfaceConfiguration config{};

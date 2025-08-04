@@ -27,6 +27,7 @@
 
 #ifndef INTERNALS_HPP_INCLUDED
 #define INTERNALS_HPP_INCLUDED
+#include <cstring>
 #if SUPPORT_VULKAN_BACKEND == 1
 #include <wgvk.h>
 #endif
@@ -100,32 +101,22 @@ struct xorshiftstate{
         x64 ^= x64 << 17;
     }
 };
-namespace std{
-    template<>
-    struct hash<AttributeAndResidence>{
-        size_t operator()(const AttributeAndResidence& res)const noexcept{
-            uint64_t attrh = ROT_BYTES(res.attr.shaderLocation * uint64_t(41), 31) ^ ROT_BYTES(res.attr.offset, 11);
-            attrh *= 111;
-            attrh ^= ROT_BYTES(res.attr.format, 48) * uint64_t(44497);
-            uint64_t v = ROT_BYTES(res.bufferSlot * uint64_t(756839), 13) ^ ROT_BYTES(attrh * uint64_t(1171), 47);
-            v ^= ROT_BYTES(res.enabled * uint64_t(2976221), 23);
-            return v;
-        }
-    };
-    template<>
-    struct hash<std::vector<AttributeAndResidence>>{
-        size_t operator()(const std::vector<AttributeAndResidence>& res)const noexcept{
-            uint64_t hv = 0;
-            for(const auto& aar: res){
-                hv ^= hash<AttributeAndResidence>{}(aar);
-                hv = ROT_BYTES(hv, 7);
-            }
-            return hv;
-        }
-    };
+static inline size_t hashAttributeAndResidence(const AttributeAndResidence* res){
+    uint64_t attrh = ROT_BYTES(res->attr.shaderLocation * uint64_t(41), 31) ^ ROT_BYTES(res->attr.offset, 11);
+    attrh *= 111;
+    attrh ^= ROT_BYTES(res->attr.format, 48) * uint64_t(44497);
+    uint64_t v = ROT_BYTES(res->bufferSlot * uint64_t(756839), 13) ^ ROT_BYTES(attrh * uint64_t(1171), 47);
+    v ^= ROT_BYTES(res->enabled * uint64_t(2976221), 23);
+    return v;
 }
-
-
+static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResidence* attribs, uint32_t count){
+    uint64_t hv = 0;
+    for(uint32_t i = 0;i < count;i++){
+        hv ^= hashAttributeAndResidence(attribs + i);
+        hv = ROT_BYTES(hv, 7);
+    }
+    return hv;
+}
 
 #endif
 /**
@@ -157,17 +148,17 @@ InOutAttributeInfo getAttributes    (ShaderSources sources);
 extern "C" void PrepareFrameGlobals();
 extern "C" DescribedBuffer* UpdateVulkanRenderbatch();
 extern "C" void PushUsedBuffer(void* nativeBuffer);
-struct VertexBufferLayout{
+typedef struct VertexBufferLayout{
     uint64_t arrayStride;
     WGPUVertexStepMode stepMode;
     size_t attributeCount;
     WGPUVertexAttribute* attributes; //NOT owned, points into data owned by VertexBufferLayoutSet::attributePool with an offset
-};
+}VertexBufferLayout;
 
 typedef struct VertexBufferLayoutSet{
     uint32_t number_of_buffers;
-    std::vector<VertexBufferLayout> layouts;    
-    std::vector<WGPUVertexAttribute> attributePool;
+    VertexBufferLayout* layouts;    
+    WGPUVertexAttribute* attributePool;
 }VertexBufferLayoutSet;
 
 static inline PixelFormat fromWGPUPixelFormat(WGPUTextureFormat format) {
@@ -235,54 +226,17 @@ static inline uint64_t hash_bytes(const void* bytes, size_t count){
         return xsstate.x64;
     }
 }
-namespace std{
-    template<>
-    struct hash<VertexBufferLayoutSet>{
-        size_t operator()(const VertexBufferLayoutSet& set)const noexcept{
-            xorshiftstate xsstate{uint64_t(0x1919846573) * uint64_t(set.number_of_buffers << 14)};
-            for(uint32_t i = 0;i < set.number_of_buffers;i++){
-                for(uint32_t j = 0;j < set.layouts[i].attributeCount;j++){
-                    xsstate.update(set.layouts[i].attributes[j].offset, set.layouts[i].attributes[j].shaderLocation);
-                }
-            }
-            return xsstate.x64;
-        }
-    };
-}
-struct attributeVectorCompare{
-    inline bool operator()(const std::vector<AttributeAndResidence>& a, const std::vector<AttributeAndResidence>& b)const noexcept{
-        #ifndef NDEBUG
-        int prevloc = -1;
 
-        for(size_t i = 0;i < a.size();i++){
-            assert((int)a[i].attr.shaderLocation > prevloc && "std::vector<AttributeAndResidence> not sorted");
-            prevloc = a[i].attr.shaderLocation;
+static inline size_t hashVertexBufferLayoutSet(const VertexBufferLayoutSet* set){
+    xorshiftstate xsstate{uint64_t(0x1919846573) * uint64_t(set->number_of_buffers << 14)};
+    for(uint32_t i = 0;i < set->number_of_buffers;i++){
+        for(uint32_t j = 0;j < set->layouts[i].attributeCount;j++){
+            xsstate.update(set->layouts[i].attributes[j].offset, set->layouts[i].attributes[j].shaderLocation);
         }
-        prevloc = -1;
-        for(size_t i = 0;i < b.size();i++){
-            assert((int)b[i].attr.shaderLocation > prevloc && "std::vector<AttributeAndResidence> not sorted");
-            prevloc = b[i].attr.shaderLocation;
-        }
-        #endif
-        if(a.size() != b.size()){
-            return false;
-        }
-        for(size_t i = 0;i < a.size();i++){
-            if(
-                   a[i].bufferSlot != b[i].bufferSlot 
-                || a[i].enabled != b[i].enabled
-                || a[i].stepMode != b[i].stepMode 
-                || a[i].attr.format != b[i].attr.format 
-                || a[i].attr.offset != b[i].attr.offset 
-                || a[i].attr.shaderLocation != b[i].attr.shaderLocation
-            ){
-                return false;
-            }
-
-        }
-        return true;
     }
-};
+    return xsstate.x64;
+}
+
 struct vblayoutVectorCompare{
     inline bool operator()(const VertexBufferLayoutSet& a, const VertexBufferLayoutSet& b)const noexcept{
         
@@ -302,10 +256,6 @@ struct vblayoutVectorCompare{
 };
 
 
-typedef struct VertexStateToPipelineMap{
-    std::unordered_map<VertexBufferLayoutSet, RenderPipelineQuartet, std::hash<VertexBufferLayoutSet>, vblayoutVectorCompare> pipelines;
-}VertexStateToPipelineMap;
-
 struct ColorAttachmentState{
     PixelFormat attachmentFormats[MAX_COLOR_ATTACHMENTS];
     uint32_t colorAttachmentCount;
@@ -321,56 +271,349 @@ struct ColorAttachmentState{
         return false;
     }
 };
-
 typedef struct ModifiablePipelineState{
     AttributeAndResidence* vertexAttributes;
     uint32_t vertexAttributeCount;
     PrimitiveType primitiveType;
     RenderSettings settings;
     ColorAttachmentState colorAttachmentState;
-    bool operator==(const ModifiablePipelineState& mfps)const noexcept{
-        return attributeVectorCompare{}(vertexAttributes, mfps.vertexAttributes)
-        && primitiveType == mfps.primitiveType &&
-           settings == mfps.settings && colorAttachmentState == mfps.colorAttachmentState;
-        return false;
-    }
 }ModifiablePipelineState;
 
-static inline bool ModifiablePipelineState_eq(const ModifiablePipelineState* msp1, const ModifiablePipelineState* msp2){
-    return true;
-}
-
-//typedef struct PipelineState{
-//    ModifiablePipelineState modifiablePart;
-//}PipelineState;
-
-namespace std{
-    template<> struct hash<ModifiablePipelineState>{
-        size_t operator()(const ModifiablePipelineState& mfps)const noexcept{
-            size_t ret = hash<vector<AttributeAndResidence>>{}(mfps.vertexAttributes) ^ hash_bytes(&mfps.settings, sizeof(RenderSettings)) ^ ROT_BYTES(mfps.primitiveType, 17);
-            for(uint32_t i = 0;i < mfps.colorAttachmentState.colorAttachmentCount;i++){
-                ret = ROT_BYTES(mfps.primitiveType, 3) ^ size_t(mfps.colorAttachmentState.attachmentFormats[i]);
-            }
-            return ret;
-        }
+static ModifiablePipelineState ModifiablePipelineState_copy(const ModifiablePipelineState mpst_){
+    const ModifiablePipelineState* mpst = &mpst_;
+    ModifiablePipelineState ret = {
+        .vertexAttributes = (AttributeAndResidence*)RL_CALLOC(mpst->vertexAttributeCount, sizeof(AttributeAndResidence)),
+        .vertexAttributeCount = mpst->vertexAttributeCount,
+        .primitiveType = mpst->primitiveType,
+        .settings = mpst->settings,
+        .colorAttachmentState = mpst->colorAttachmentState
     };
+    memcpy(ret.vertexAttributes, mpst->vertexAttributes, mpst->vertexAttributeCount * sizeof(AttributeAndResidence));
+    return ret;
 }
-extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout);
-typedef struct HighLevelPipelineCache{
-    std::unordered_map<ModifiablePipelineState, WGPURenderPipeline> cacheMap; 
-    WGPURenderPipeline getOrCreate(const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout){
-        auto it = cacheMap.find(mst);
-        if(it != cacheMap.end()){
-            return it->second;
-        }
-        else{
-            //TRACELOG(LOG_WARNING, "Cache NOT hit: %f", mst.settings.lineWidth);
-            WGPURenderPipeline toEmplace = createSingleRenderPipe(mst, shaderModule, bglayout, pllayout);
-            cacheMap.emplace(mst, toEmplace);
-            return toEmplace;
+static void ModifiablePipelineState_free(ModifiablePipelineState mpst){
+    free(mpst.vertexAttributes);
+}
+static WGPURenderPipeline RenderPipelineCopy(const WGPURenderPipeline rpl){
+    wgpuRenderPipelineAddRef(rpl);
+    return rpl;
+}
+static void RenderPipeline_free(WGPURenderPipeline mpst){
+    wgpuRenderPipelineRelease(mpst);
+}
+
+static inline bool vertexArCompare(const AttributeAndResidence* a, uint32_t aCount, const AttributeAndResidence* b, uint32_t bCount){
+    
+    #ifndef NDEBUG
+    int prevloc = -1;
+    for(size_t i = 0;i < aCount;i++){
+        assert((int)a[i].attr.shaderLocation > prevloc && "AttributeAndResidence* not sorted");
+        prevloc = a[i].attr.shaderLocation;
+    }
+    prevloc = -1;
+    for(size_t i = 0;i < bCount;i++){
+        assert((int)b[i].attr.shaderLocation > prevloc && "AttributeAndResidence* not sorted");
+        prevloc = b[i].attr.shaderLocation;
+    }
+    #endif
+    if(aCount != bCount)return false;
+
+    for(size_t i = 0;i < aCount;i++){
+        if(
+               a[i].bufferSlot != b[i].bufferSlot 
+            || a[i].enabled != b[i].enabled
+            || a[i].stepMode != b[i].stepMode 
+            || a[i].attr.format != b[i].attr.format 
+            || a[i].attr.offset != b[i].attr.offset 
+            || a[i].attr.shaderLocation != b[i].attr.shaderLocation
+        ){
+            return false;
         }
     }
-}HighLevelPipelineCache;
+    return true;
+}
+static inline bool ModifiablePipelineState_eq(const ModifiablePipelineState msp1_, const ModifiablePipelineState msp2_){
+    const ModifiablePipelineState* msp1 = &msp1_;
+    const ModifiablePipelineState* msp2 = &msp2_;
+    return vertexArCompare(msp1->vertexAttributes, msp1->vertexAttributeCount, msp2->vertexAttributes, msp2->vertexAttributeCount)
+    && msp1->primitiveType        == msp2->primitiveType
+    && msp1->settings             == msp2->settings
+    && msp1->colorAttachmentState == msp2->colorAttachmentState;
+}
+
+static inline size_t hashModifiablePipelineState(ModifiablePipelineState mfps_){
+    ModifiablePipelineState* mfps = &mfps_;
+    size_t ret = hashVectorOfAttributeAndResidence(mfps->vertexAttributes, mfps->vertexAttributeCount) ^ hash_bytes(&mfps->settings, sizeof(RenderSettings)) ^ ROT_BYTES(mfps->primitiveType, 17);
+    for(uint32_t i = 0;i < mfps->colorAttachmentState.colorAttachmentCount;i++){
+        ret = ROT_BYTES(mfps->primitiveType, 3) ^ size_t(mfps->colorAttachmentState.attachmentFormats[i]);
+    }
+    return ret;
+}
+
+
+#ifndef PHM_INLINE_CAPACITY
+#define PHM_INLINE_CAPACITY 3
+#endif
+
+#ifndef PHM_INITIAL_HEAP_CAPACITY
+#define PHM_INITIAL_HEAP_CAPACITY 8
+#endif
+
+#ifndef PHM_LOAD_FACTOR_NUM
+#define PHM_LOAD_FACTOR_NUM 3
+#endif
+
+#ifndef PHM_LOAD_FACTOR_DEN
+#define PHM_LOAD_FACTOR_DEN 4
+#endif
+
+#ifndef PHM_HASH_MULTIPLIER
+#define PHM_HASH_MULTIPLIER 0x9E3779B97F4A7C15ULL
+#endif
+#ifndef PHM_EMPTY_SLOT_KEY
+#define PHM_EMPTY_SLOT_KEY NULL
+#endif
+#ifndef PHM_DELETED_SLOT_KEY
+#define PHM_DELETED_SLOT_KEY ((void*)0xFFFFFFFFFFFFFFFF)
+#endif
+
+#define RG_DEFINE_GENERIC_HASH_MAP(SCOPE, Name, KeyType, ValueType, KeyHashFunc, KeyCmpFunc, KeyEmptyVal, KeyCopyFunc, ValueCopyFunc, KeyDeleteFunc, ValueDeleteFunc) \
+    typedef struct Name##_kv_pair {                                                                                              \
+        KeyType key;                                                                                                             \
+        ValueType value;                                                                                                         \
+    } Name##_kv_pair;                                                                                                            \
+    typedef struct Name {                                                                                                        \
+        uint64_t current_size;                                                                                                   \
+        uint64_t current_capacity;                                                                                               \
+        KeyType empty_key_sentinel;                                                                                              \
+        Name##_kv_pair *table;                                                                                                   \
+    } Name;                                                                                                                      \
+    static inline uint64_t Name##_hash_key_internal(KeyType key) { return KeyHashFunc(key); }                                    \
+    static inline uint64_t Name##_round_up_to_power_of_2(uint64_t v) {                                                           \
+        if (v == 0)                                                                                                              \
+            return 0;                                                                                                            \
+        v--;                                                                                                                     \
+        v |= v >> 1;                                                                                                             \
+        v |= v >> 2;                                                                                                             \
+        v |= v >> 4;                                                                                                             \
+        v |= v >> 8;                                                                                                             \
+        v |= v >> 16;                                                                                                            \
+        v |= v >> 32;                                                                                                            \
+        v++;                                                                                                                     \
+        return v;                                                                                                                \
+    }                                                                                                                            \
+    static void Name##_insert_entry(                                                                                             \
+        Name##_kv_pair *table, uint64_t capacity, KeyType key, ValueType value, KeyType empty_key_val_param) {                   \
+        assert(!KeyCmpFunc(key, empty_key_val_param) && capacity > 0 && (capacity & (capacity - 1)) == 0);                       \
+        uint64_t cap_mask = capacity - 1;                                                                                        \
+        uint64_t index = Name##_hash_key_internal(key) & cap_mask;                                                               \
+        while (!KeyCmpFunc(table[index].key, empty_key_val_param)) {                                                             \
+            index = (index + 1) & cap_mask;                                                                                      \
+        }                                                                                                                        \
+        table[index].key = key;                                                                                                  \
+        table[index].value = value;                                                                                              \
+    }                                                                                                                            \
+    static Name##_kv_pair *Name##_find_slot(Name *map, KeyType key) {                                                            \
+        assert(map->table != NULL && map->current_capacity > 0);                                                                 \
+        uint64_t cap_mask = map->current_capacity - 1;                                                                           \
+        uint64_t index = Name##_hash_key_internal(key) & cap_mask;                                                               \
+        while (!KeyCmpFunc(map->table[index].key, map->empty_key_sentinel) && !KeyCmpFunc(map->table[index].key, key)) {         \
+            index = (index + 1) & cap_mask;                                                                                      \
+        }                                                                                                                        \
+        return &map->table[index];                                                                                               \
+    }                                                                                                                            \
+    static void Name##_grow(Name *map);                                                                                          \
+    SCOPE void Name##_init(Name *map) {                                                                                          \
+        map->current_size = 0;                                                                                                   \
+        map->current_capacity = 0;                                                                                               \
+        map->empty_key_sentinel = (KeyEmptyVal);                                                                                 \
+        map->table = NULL;                                                                                                       \
+    }                                                                                                                            \
+    static void Name##_grow(Name *map) {                                                                                         \
+        uint64_t old_capacity = map->current_capacity;                                                                           \
+        Name##_kv_pair *old_table = map->table;                                                                                  \
+        uint64_t new_capacity;                                                                                                   \
+        if (old_capacity == 0) {                                                                                                 \
+            new_capacity = (PHM_INITIAL_HEAP_CAPACITY > 0) ? PHM_INITIAL_HEAP_CAPACITY : 8;                                      \
+        } else {                                                                                                                 \
+            if (old_capacity >= (UINT64_MAX / 2))                                                                                \
+                new_capacity = UINT64_MAX;                                                                                       \
+            else                                                                                                                 \
+                new_capacity = old_capacity * 2;                                                                                 \
+        }                                                                                                                        \
+        new_capacity = Name##_round_up_to_power_of_2(new_capacity);                                                              \
+        if (new_capacity == 0 && old_capacity == 0 && ((PHM_INITIAL_HEAP_CAPACITY > 0) ? PHM_INITIAL_HEAP_CAPACITY : 8) > 0) {   \
+            new_capacity = (UINT64_C(1) << 63);                                                                                  \
+        }                                                                                                                        \
+        if (new_capacity == 0 || (new_capacity <= old_capacity && old_capacity > 0)) {                                           \
+            return;                                                                                                              \
+        }                                                                                                                        \
+        Name##_kv_pair *new_table = (Name##_kv_pair *)malloc(new_capacity * sizeof(Name##_kv_pair));                             \
+        if (!new_table)                                                                                                          \
+            return;                                                                                                              \
+        for (uint64_t i = 0; i < new_capacity; ++i) {                                                                            \
+            new_table[i].key = map->empty_key_sentinel;                                                                          \
+        }                                                                                                                        \
+        if (old_table && map->current_size > 0) {                                                                                \
+            uint64_t rehashed_count = 0;                                                                                         \
+            for (uint64_t i = 0; i < old_capacity; ++i) {                                                                        \
+                if (!KeyCmpFunc(old_table[i].key, map->empty_key_sentinel)) {                                                    \
+                    Name##_insert_entry(new_table, new_capacity, old_table[i].key, old_table[i].value, map->empty_key_sentinel); \
+                    rehashed_count++;                                                                                            \
+                    if (rehashed_count == map->current_size)                                                                     \
+                        break;                                                                                                   \
+                }                                                                                                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+        if (old_table)                                                                                                           \
+            free(old_table);                                                                                                     \
+        map->table = new_table;                                                                                                  \
+        map->current_capacity = new_capacity;                                                                                    \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE int Name##_put(Name *map, KeyType key, ValueType value) {                                                              \
+        assert(!KeyCmpFunc(key, map->empty_key_sentinel));                                                                       \
+        if (map->current_capacity == 0 ||                                                                                        \
+            (map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM) {                      \
+            uint64_t old_cap = map->current_capacity;                                                                            \
+            Name##_grow(map);                                                                                                    \
+            if (map->current_capacity == old_cap && old_cap > 0) {                                                               \
+                if ((map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM)                \
+                    return 0;                                                                                                    \
+            } else if (map->current_capacity == 0)                                                                               \
+                return 0;                                                                                                        \
+            else if ((map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM)               \
+                return 0;                                                                                                        \
+        }                                                                                                                        \
+        assert(map->current_capacity > 0 && map->table != NULL);                                                                 \
+        Name##_kv_pair *slot = Name##_find_slot(map, key);                                                                       \
+        if (KeyCmpFunc(slot->key, map->empty_key_sentinel)) {                                                                    \
+            slot->key = KeyCopyFunc(key);                                                                                        \
+            slot->value = ValueCopyFunc(value);                                                                                  \
+            map->current_size++;                                                                                                 \
+            return 1;                                                                                                            \
+        } else {                                                                                                                 \
+            assert(KeyCmpFunc(slot->key, key));                                                                                  \
+            ValueDeleteFunc(slot->value);                                                                                        \
+            slot->value = ValueCopyFunc(value);                                                                                  \
+            return 0;                                                                                                            \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE ValueType *Name##_get(Name *map, KeyType key) {                                                                        \
+        assert(!KeyCmpFunc(key, map->empty_key_sentinel));                                                                       \
+        if (map->current_capacity == 0 || map->table == NULL)                                                                    \
+            return NULL;                                                                                                         \
+        Name##_kv_pair *slot = Name##_find_slot(map, key);                                                                       \
+        return (KeyCmpFunc(slot->key, key)) ? &slot->value : NULL;                                                               \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE int Name##_erase(Name* map, KeyType key) {                                                                             \
+        assert(!KeyCmpFunc(key, map->empty_key_sentinel));                                                                       \
+        if (map->current_capacity == 0 || map->table == NULL)                                                                    \
+            return 0;                                                                                                            \
+        Name##_kv_pair* slot = Name##_find_slot(map, key);                                                                        \
+        if (KeyCmpFunc(slot->key, key)) {                                                                                        \
+            KeyDeleteFunc(slot->key);                                                                                            \
+            ValueDeleteFunc(slot->value);                                                                                        \
+            slot->key = map->empty_key_sentinel;                                                                                 \
+            map->current_size--;                                                                                                 \
+            return 1;                                                                                                            \
+        }                                                                                                                        \
+        return 0;                                                                                                                \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_for_each(Name *map, void (*callback)(KeyType key, ValueType * value, void *user_data), void *user_data) {  \
+        if (map->current_capacity > 0 && map->table != NULL && map->current_size > 0) {                                          \
+            uint64_t count = 0;                                                                                                  \
+            for (uint64_t i = 0; i < map->current_capacity; ++i) {                                                               \
+                if (!KeyCmpFunc(map->table[i].key, map->empty_key_sentinel)) {                                                   \
+                    callback(map->table[i].key, &map->table[i].value, user_data);                                                \
+                    if (++count == map->current_size)                                                                            \
+                        break;                                                                                                   \
+                }                                                                                                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_free(Name *map) {                                                                                          \
+        if (map->table != NULL) {                                                                                                \
+            for (uint64_t i = 0; i < map->current_capacity; ++i) {                                                               \
+                if (!KeyCmpFunc(map->table[i].key, map->empty_key_sentinel)) {                                                   \
+                    KeyDeleteFunc(map->table[i].key);                                                                            \
+                    ValueDeleteFunc(map->table[i].value);                                                                        \
+                }                                                                                                                \
+            }                                                                                                                    \
+            free(map->table);                                                                                                    \
+        }                                                                                                                        \
+        Name##_init(map);                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_move(Name *dest, Name *source) {                                                                           \
+        if (dest == source)                                                                                                      \
+            return;                                                                                                              \
+        if (dest->table != NULL)                                                                                                 \
+            Name##_free(dest);                                                                                                   \
+        *dest = *source;                                                                                                         \
+        Name##_init(source);                                                                                                     \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_clear(Name *map) {                                                                                         \
+        if (map->table != NULL && map->current_capacity > 0) {                                                                   \
+            for (uint64_t i = 0; i < map->current_capacity; ++i) {                                                               \
+                if (!KeyCmpFunc(map->table[i].key, map->empty_key_sentinel)) {                                                   \
+                    KeyDeleteFunc(map->table[i].key);                                                                            \
+                    ValueDeleteFunc(map->table[i].value);                                                                        \
+                    map->table[i].key = map->empty_key_sentinel;                                                                 \
+                }                                                                                                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+        map->current_size = 0;                                                                                                   \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_copy(Name *dest, const Name *source) {                                                                     \
+        if (dest == source)                                                                                                      \
+            return;                                                                                                              \
+        if (dest->table != NULL)                                                                                                 \
+            Name##_free(dest);                                                                                                   \
+        Name##_init(dest);                                                                                                       \
+        if (source->table != NULL && source->current_capacity > 0) {                                                             \
+            dest->table = (Name##_kv_pair *)malloc(source->current_capacity * sizeof(Name##_kv_pair));                           \
+            if (!dest->table) {                                                                                                  \
+                Name##_init(dest);                                                                                               \
+                return;                                                                                                          \
+            }                                                                                                                    \
+            dest->current_capacity = source->current_capacity;                                                                   \
+            dest->empty_key_sentinel = source->empty_key_sentinel;                                                               \
+            for (uint64_t i = 0; i < source->current_capacity; ++i) {                                                            \
+                if (!KeyCmpFunc(source->table[i].key, source->empty_key_sentinel)) {                                             \
+                    dest->table[i].key = KeyCopyFunc(source->table[i].key);                                                      \
+                    dest->table[i].value = ValueCopyFunc(source->table[i].value);                                                \
+                } else {                                                                                                         \
+                    dest->table[i].key = source->empty_key_sentinel;                                                             \
+                }                                                                                                                \
+            }                                                                                                                    \
+            dest->current_size = source->current_size;                                                                           \
+        }                                                                                                                        \
+    }
+
+RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState,
+    ModifiablePipelineState_eq, ModifiablePipelineState{0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
+
+
+extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout);
+
+static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap, const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout){
+    WGPURenderPipeline* pl = PipelineHashMap_get(cacheMap, mst);
+    if(pl){
+        return *pl;
+    }
+    else{
+        WGPURenderPipeline toEmplace = createSingleRenderPipe(mst, shaderModule, bglayout, pllayout);
+        PipelineHashMap_put(cacheMap, mst, toEmplace);
+        return toEmplace;
+    }
+}
 
 typedef struct DescribedPipeline{
     WGPURenderPipeline activePipeline;
@@ -382,8 +625,7 @@ typedef struct DescribedPipeline{
     DescribedPipelineLayout layout;
     DescribedBindGroupLayout bglayout;
 
-    HighLevelPipelineCache pipelineCache;
-    
+    PipelineHashMap pipelineCache;
 }DescribedPipeline;
 
 /**
@@ -391,48 +633,78 @@ typedef struct DescribedPipeline{
  * 
  * @return VertexBufferLayoutSet 
  */
-inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, uint32_t number_of_buffers){
-    std::vector<std::vector<WGPUVertexAttribute>> buffer_to_attributes(number_of_buffers);
-    
-    std::vector<WGPUVertexAttribute> attributePool(number_of_attribs);
-    std::vector<VertexBufferLayout> vbLayouts(number_of_buffers);
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 
-    std::vector<uint32_t> strides  (number_of_buffers, 0);
-    std::vector<WGPUVertexStepMode> stepmodes(number_of_buffers, WGPUVertexStepMode_Undefined);
-    std::vector<uint32_t> attrIndex(number_of_buffers, 0);
+inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
+    VertexBufferLayoutSet result;
+    result.number_of_buffers = number_of_buffers;
+    result.layouts = NULL;
+    result.attributePool = NULL;
 
-    for(size_t i = 0;i < number_of_attribs;i++){
-        buffer_to_attributes[attributes[i].bufferSlot].push_back(attributes[i].attr);
-        strides[attributes[i].bufferSlot] += attributeSize(attributes[i].attr.format);
-        if(stepmodes[attributes[i].bufferSlot] != WGPUVertexStepMode_Undefined && stepmodes[attributes[i].bufferSlot] != attributes[i].stepMode){
-            TRACELOG(LOG_ERROR, "Conflicting stepmodes");
+    if (number_of_buffers > 0) {
+        result.layouts = (VertexBufferLayout*)RL_CALLOC(number_of_buffers, sizeof(VertexBufferLayout));
+    }
+    if (number_of_attribs > 0) {
+        result.attributePool = (WGPUVertexAttribute*)RL_CALLOC(number_of_attribs, sizeof(WGPUVertexAttribute));
+    }
+
+    if ((number_of_buffers > 0 && result.layouts == NULL) || (number_of_attribs > 0 && result.attributePool == NULL)) {
+        free(result.layouts);
+        free(result.attributePool);
+        result.number_of_buffers = 0;
+        result.layouts = NULL;
+        result.attributePool = NULL;
+        return result;
+    }
+
+    uint32_t* attribute_counts = (uint32_t*)RL_CALLOC(number_of_buffers, sizeof(uint32_t));
+    if (number_of_buffers > 0 && attribute_counts == NULL) {
+        free(result.layouts);
+        free(result.attributePool);
+        result.number_of_buffers = 0;
+        result.layouts = NULL;
+        result.attributePool = NULL;
+        return result;
+    }
+
+    for (uint32_t i = 0; i < number_of_attribs; ++i) {
+        if (attributes[i].bufferSlot < number_of_buffers) {
+            attribute_counts[attributes[i].bufferSlot]++;
         }
-        stepmodes[attributes[i].bufferSlot] = attributes[i].stepMode;
-    }
-    uint32_t poolOffset = 0;
-    
-    std::vector<uint32_t> attributeOffsets(number_of_buffers, 0);
-
-    for(size_t i = 0;i < number_of_buffers;i++){
-        attributeOffsets[i] = poolOffset;
-        if(buffer_to_attributes[i].size())
-            std::memcpy(attributePool.data() + poolOffset, buffer_to_attributes[i].data(), buffer_to_attributes[i].size() * sizeof(WGPUVertexAttribute));
-        poolOffset += buffer_to_attributes[i].size();
     }
 
-    for(size_t i = 0;i < number_of_buffers;i++){
-        vbLayouts[i].attributes = attributePool.data() + attributeOffsets[i];
-        vbLayouts[i].attributeCount = buffer_to_attributes[i].size();
-        vbLayouts[i].arrayStride = strides[i];
-        vbLayouts[i].stepMode = stepmodes[i];
+    WGPUVertexAttribute* current_pool_pointer = result.attributePool;
+    for (uint32_t i = 0; i < number_of_buffers; ++i) {
+        result.layouts[i].attributeCount = attribute_counts[i];
+        result.layouts[i].attributes = current_pool_pointer;
+        result.layouts[i].stepMode = WGPUVertexStepMode_Undefined;
+        current_pool_pointer += attribute_counts[i];
     }
-    // return value
-    VertexBufferLayoutSet ret{
-        .number_of_buffers = number_of_buffers,
-        .layouts = std::move(vbLayouts),
-        .attributePool = std::move(attributePool)
-    };
-    return ret;
+
+    memset(attribute_counts, 0, number_of_buffers * sizeof(uint32_t));
+
+    for (uint32_t i = 0; i < number_of_attribs; ++i) {
+        uint32_t slot = attributes[i].bufferSlot;
+        if (slot < number_of_buffers) {
+            VertexBufferLayout* layout = &result.layouts[slot];
+            
+            uint32_t index_in_buffer = attribute_counts[slot];
+            layout->attributes[index_in_buffer] = attributes[i].attr;
+            attribute_counts[slot]++;
+
+            layout->arrayStride += attributeSize(attributes[i].attr.format);
+
+            if (layout->stepMode != WGPUVertexStepMode_Undefined && layout->stepMode != attributes[i].stepMode) {
+            }
+            layout->stepMode = attributes[i].stepMode;
+        }
+    }
+
+    free(attribute_counts);
+
+    return result;
 }
 extern "C" const char* copyString(const char* str);
 //static inline void UnloadBufferLayoutSet(VertexBufferLayoutSet set){
@@ -489,183 +761,209 @@ inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndRes
     const uint32_t number_of_buffers = maxslot + 1;
     return getBufferLayoutRepresentation(attributes, number_of_attribs, number_of_buffers);
 }
+typedef struct BufferEntry{
+    DescribedBuffer* buffer;
+    WGPUVertexStepMode stepMode;
+} BufferEntry;
+
 typedef struct VertexArray{
-    std::vector<AttributeAndResidence> attributes;
-    std::vector<std::pair<DescribedBuffer*, WGPUVertexStepMode>> buffers;
-    void add(DescribedBuffer* buffer, uint32_t shaderLocation, 
-                              WGPUVertexFormat fmt, uint32_t offset, 
-                              WGPUVertexStepMode stepmode) {
-        // Search for existing attribute by shaderLocation
-        auto it = std::find_if(attributes.begin(), attributes.end(),
-                               [shaderLocation](const AttributeAndResidence& ar) {
-                                   return ar.attr.shaderLocation == shaderLocation;
-                               });
+    AttributeAndResidence* attributes;
+    size_t attributes_count;
+    size_t attributes_capacity;
 
-        if (it != attributes.end()) {
-            // Attribute exists, update it
-            size_t existingBufferSlot = it->bufferSlot;
-            auto& existingBufferPair = buffers[existingBufferSlot];
+    BufferEntry* buffers;
+    size_t buffers_count;
+    size_t buffers_capacity;
+} VertexArray;
 
-            // Check if the buffer is the same
-            if (existingBufferPair.first->buffer != buffer->buffer) {
-                // Attempting to update to a new buffer
-                // Check if the new buffer is already in buffers
-                auto bufferIt = std::find_if(buffers.begin(), buffers.end(),
-                                            [buffer, stepmode](const std::pair<DescribedBuffer*, WGPUVertexStepMode>& b) {
-                                                return b.first->buffer == buffer->buffer && b.second == stepmode;
-                                            });
-
-                if (bufferIt != buffers.end()) {
-                    // Reuse existing buffer slot
-                    it->bufferSlot = std::distance(buffers.begin(), bufferIt);
-                } else {
-                    uint32_t pufferIndex = bufferIt - buffers.begin();
-                    auto attribIt = std::find_if(attributes.begin(), attributes.end(), [&](const AttributeAndResidence& attr){
-                        return attr.bufferSlot == it->bufferSlot && attr.attr.shaderLocation != it->attr.shaderLocation;
-                    });
-                    //This buffer slot is unused otherwise, so reuse
-                    if(attribIt == attributes.end()){
-                        buffers[it->bufferSlot] = {buffer, stepmode};
-                    }
-                    // Add new buffer
-                    else{
-                        it->bufferSlot = buffers.size();
-                        buffers.emplace_back(buffer, stepmode);
-                    }
-                }
-            }
-
-            // Update the rest of the attribute properties
-            it->stepMode = stepmode;
-            it->attr.format = (fmt);
-            it->attr.offset = offset;
-            it->enabled = true;
-
-            TRACELOG(LOG_DEBUG, "Attribute at shader location %u updated.", shaderLocation);
-        } else {
-            // Attribute does not exist, add as new
-            AttributeAndResidence insert{};
-            insert.enabled = true;
-            bool bufferFound = false;
-
-            for (size_t i = 0; i < buffers.size(); ++i) {
-                auto& existingBufferPair = buffers[i];
-                if (existingBufferPair.first->buffer == buffer->buffer) {
-                    if (existingBufferPair.second == stepmode) {
-                        // Reuse existing buffer slot
-                        insert.bufferSlot = i;
-                        bufferFound = true;
-                        break;
-                    } else {
-                        TRACELOG(LOG_FATAL, "Mixed step modes for the same buffer are not implemented");
-                        // Handle mixed step modes as per your application's requirements
-                        // For now, we'll exit to indicate the limitation
-                        exit(EXIT_FAILURE);
-                    }
-                }
-            }
-
-            if (!bufferFound) {
-                // Add new buffer
-                insert.bufferSlot = buffers.size();
-                buffers.emplace_back(buffer, stepmode);
-            }
-
-            // Set the attribute properties
-            insert.stepMode = stepmode;
-            insert.attr.format = (fmt);
-            insert.attr.offset = offset;
-            insert.attr.shaderLocation = shaderLocation;
-            attributes.emplace_back(insert);
-
-            TRACELOG(LOG_DEBUG,  "New attribute added at shader location %u", shaderLocation);
-        }
-        std::sort(attributes.begin(), attributes.end(), [](const AttributeAndResidence& a, const AttributeAndResidence& b){
-            return a.attr.shaderLocation < b.attr.shaderLocation;
-        });
+static void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+    if (newSize == 0) {
+        RL_FREE(pointer);
+        return NULL;
     }
-    void add_old(DescribedBuffer* buffer, uint32_t shaderLocation, WGPUVertexFormat fmt, uint32_t offset, WGPUVertexStepMode stepmode){
-        AttributeAndResidence insert{};
-        for(size_t i = 0;i < buffers.size();i++){
-            auto& _buffer = buffers[i];
-            if(_buffer.first->buffer == buffer->buffer){
-                if(_buffer.second == stepmode){
-                    insert.bufferSlot = i;
-                    insert.stepMode = stepmode;
-                    insert.attr.format = fmt;
-                    insert.attr.offset = offset;
-                    insert.attr.shaderLocation = shaderLocation;
-                    attributes.push_back(insert);
-                    return;
+    void* result = RL_REALLOC(pointer, newSize);
+    if (result == NULL) {
+        TRACELOG(LOG_FATAL, "realloc: Out of Memory!");
+    }
+    return result;
+}
+
+static void VertexArray_Init(VertexArray* vao) {
+    vao->attributes = NULL;
+    vao->attributes_count = 0;
+    vao->attributes_capacity = 0;
+    vao->buffers = NULL;
+    vao->buffers_count = 0;
+    vao->buffers_capacity = 0;
+}
+
+static void VertexArray_Destroy(VertexArray* vao) {
+    free(vao->attributes);
+    free(vao->buffers);
+    VertexArray_Init(vao); // Reset to a clean state
+}
+
+static int compareAttributes(const void* a, const void* b) {
+    const AttributeAndResidence* attrA = (const AttributeAndResidence*)a;
+    const AttributeAndResidence* attrB = (const AttributeAndResidence*)b;
+    if (attrA->attr.shaderLocation < attrB->attr.shaderLocation) return -1;
+    if (attrA->attr.shaderLocation > attrB->attr.shaderLocation) return 1;
+    return 0;
+}
+
+static void VertexArray_add(VertexArray* vao, DescribedBuffer* buffer, uint32_t shaderLocation,
+                            WGPUVertexFormat fmt, uint32_t offset, WGPUVertexStepMode stepmode) {
+    // Search for existing attribute by shaderLocation
+    AttributeAndResidence* it = NULL;
+    for (size_t i = 0; i < vao->attributes_count; ++i) {
+        if (vao->attributes[i].attr.shaderLocation == shaderLocation) {
+            it = &vao->attributes[i];
+            break;
+        }
+    }
+
+    if (it != NULL) {
+        // Attribute exists, update it
+        size_t existingBufferSlot = it->bufferSlot;
+        BufferEntry* existingBufferPair = &vao->buffers[existingBufferSlot];
+
+        // Check if the buffer is the same
+        if (existingBufferPair->buffer->buffer != buffer->buffer) {
+            // Attempting to update to a new buffer
+            // Check if the new buffer is already in buffers
+            int bufferIt_idx = -1;
+            for (size_t i = 0; i < vao->buffers_count; ++i) {
+                if (vao->buffers[i].buffer->buffer == buffer->buffer && vao->buffers[i].stepMode == stepmode) {
+                    bufferIt_idx = i;
+                    break;
                 }
-                else{
-                    std::cerr << "Mixed stepmodes not implemented yet\n";
-                    exit(1);
+            }
+
+            if (bufferIt_idx != -1) {
+                // Reuse existing buffer slot
+                it->bufferSlot = bufferIt_idx;
+            } else {
+                // Check if the old buffer slot is now unused by other attributes
+                bool is_slot_used_by_others = false;
+                for(size_t i = 0; i < vao->attributes_count; ++i) {
+                    if (vao->attributes[i].bufferSlot == it->bufferSlot && vao->attributes[i].attr.shaderLocation != it->attr.shaderLocation) {
+                        is_slot_used_by_others = true;
+                        break;
+                    }
+                }
+                
+                // This buffer slot is unused otherwise, so reuse
+                if (!is_slot_used_by_others) {
+                    vao->buffers[it->bufferSlot].buffer = buffer;
+                    vao->buffers[it->bufferSlot].stepMode = stepmode;
+                } else {
+                    // Add new buffer
+                    it->bufferSlot = vao->buffers_count;
+                    if (vao->buffers_count >= vao->buffers_capacity) {
+                        size_t old_capacity = vao->buffers_capacity;
+                        vao->buffers_capacity = old_capacity < 8 ? 8 : old_capacity * 2;
+                        vao->buffers = (BufferEntry*)reallocate(vao->buffers, old_capacity * sizeof(BufferEntry), vao->buffers_capacity * sizeof(BufferEntry));
+                    }
+                    vao->buffers[vao->buffers_count].buffer = buffer;
+                    vao->buffers[vao->buffers_count].stepMode = stepmode;
+                    vao->buffers_count++;
                 }
             }
         }
-        insert.bufferSlot = buffers.size();
-        buffers.push_back({buffer, stepmode});
+
+        // Update the rest of the attribute properties
+        it->stepMode = stepmode;
+        it->attr.format = fmt;
+        it->attr.offset = offset;
+        it->enabled = true;
+
+        TRACELOG(LOG_DEBUG, "Attribute at shader location %u updated.", shaderLocation);
+    } else {
+        // Attribute does not exist, add as new
+        AttributeAndResidence insert = {0};
+        insert.enabled = true;
+        bool bufferFound = false;
+
+        for (size_t i = 0; i < vao->buffers_count; ++i) {
+            if (vao->buffers[i].buffer->buffer == buffer->buffer) {
+                if (vao->buffers[i].stepMode == stepmode) {
+                    // Reuse existing buffer slot
+                    insert.bufferSlot = i;
+                    bufferFound = true;
+                    break;
+                } else {
+                    TRACELOG(LOG_FATAL, "Mixed step modes for the same buffer are not implemented");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
+
+        if (!bufferFound) {
+            // Add new buffer
+            insert.bufferSlot = vao->buffers_count;
+            if (vao->buffers_count >= vao->buffers_capacity) {
+                size_t old_capacity = vao->buffers_capacity;
+                vao->buffers_capacity = old_capacity < 8 ? 8 : old_capacity * 2;
+                vao->buffers = (BufferEntry*)reallocate(vao->buffers, old_capacity * sizeof(BufferEntry), vao->buffers_capacity * sizeof(BufferEntry));
+            }
+            vao->buffers[vao->buffers_count].buffer = buffer;
+            vao->buffers[vao->buffers_count].stepMode = stepmode;
+            vao->buffers_count++;
+        }
+
+        // Set the attribute properties
         insert.stepMode = stepmode;
-        insert.attr.format = (fmt);
+        insert.attr.format = fmt;
         insert.attr.offset = offset;
         insert.attr.shaderLocation = shaderLocation;
-        attributes.push_back(insert);
-        std::sort(attributes.begin(), attributes.end(), [](const AttributeAndResidence& a, const AttributeAndResidence& b){
-            return a.attr.shaderLocation < b.attr.shaderLocation;
-        });
+
+        // Add the new attribute to the dynamic array
+        if (vao->attributes_count >= vao->attributes_capacity) {
+            size_t old_capacity = vao->attributes_capacity;
+            vao->attributes_capacity = old_capacity < 8 ? 8 : old_capacity * 2;
+            vao->attributes = (AttributeAndResidence*)reallocate(vao->attributes, old_capacity * sizeof(AttributeAndResidence), vao->attributes_capacity * sizeof(AttributeAndResidence));
+        }
+        vao->attributes[vao->attributes_count] = insert;
+        vao->attributes_count++;
+
+
+        TRACELOG(LOG_DEBUG,  "New attribute added at shader location %u", shaderLocation);
     }
 
-    /**
-     * Enables an attribute based on shaderLocation.
-     *
-     * @param shaderLocation The shader location identifier to enable.
-     * @return true if the attribute was found and enabled, false otherwise.
-     */
-    bool enableAttribute(uint32_t shaderLocation) {
-        auto it = std::find_if(attributes.begin(), attributes.end(),
-                               [shaderLocation](const AttributeAndResidence& ar) {
-                                   return ar.attr.shaderLocation == shaderLocation;
-                               });
+    // Sort attributes based on shaderLocation
+    qsort(vao->attributes, vao->attributes_count, sizeof(AttributeAndResidence), compareAttributes);
+}
 
-        if (it != attributes.end()) {
-            if (!it->enabled) {
-                it->enabled = true;
+
+static bool VertexArray_enableAttribute(VertexArray* vao, uint32_t shaderLocation) {
+    for (size_t i = 0; i < vao->attributes_count; ++i) {
+        if (vao->attributes[i].attr.shaderLocation == shaderLocation) {
+            if (!vao->attributes[i].enabled) {
+                vao->attributes[i].enabled = true;
             }
             return true;
         }
-
-        TRACELOG(LOG_WARNING, "Attribute with shader location %u not found.", shaderLocation);
-        return false;
     }
 
-    /**
-     * Disables an attribute based on shaderLocation.
-     *
-     * @param shaderLocation The shader location identifier to disable.
-     * @return true if the attribute was found and disabled, false otherwise.
-     */
-    bool disableAttribute(uint32_t shaderLocation) {
-        auto it = std::find_if(attributes.begin(), attributes.end(),
-                               [shaderLocation](const AttributeAndResidence& ar) {
-                                   return ar.attr.shaderLocation == shaderLocation;
-                               });
+    TRACELOG(LOG_WARNING, "Attribute with shader location %u not found.", shaderLocation);
+    return false;
+}
 
-        if (it != attributes.end()) {
-            if (it->enabled) {
-                it->enabled = false;
+static bool VertexArray_disableAttribute(VertexArray* vao, uint32_t shaderLocation) {
+    for (size_t i = 0; i < vao->attributes_count; ++i) {
+        if (vao->attributes[i].attr.shaderLocation == shaderLocation) {
+            if (vao->attributes[i].enabled) {
+                vao->attributes[i].enabled = false;
                 TRACELOG(LOG_DEBUG, "Attribute at shader location %u disabled.", shaderLocation);
             } else {
                 TRACELOG(LOG_DEBUG, "Attribute at shader location %u is already disabled", shaderLocation);
             }
             return true;
         }
-        TRACELOG(LOG_WARNING, "Attribute at shader location %u does not exist", shaderLocation);
-        return false;
     }
-    
-}VertexArray;
-
+    TRACELOG(LOG_WARNING, "Attribute at shader location %u does not exist", shaderLocation);
+    return false;
+}
 
 typedef struct StringToUniformMap{
     std::unordered_map<std::string, ResourceTypeDescriptor> uniforms;
@@ -682,7 +980,7 @@ typedef struct StringToUniformMap{
         return uniforms.find(v)->second;
     }
     uint32_t GetLocation(const char* v)const noexcept{
-        auto it = uniforms.find(v);
+        auto it = uniforms.find(std::string(v));
         if(it == uniforms.end())
             return LOCATION_NOT_FOUND;
         return it->second.location;
@@ -712,56 +1010,44 @@ typedef struct StringToAttributeMap{
 }StringToAttributeMap;
 
 
-namespace std{
-    template<>
-    struct hash<VertexArray>{
-        inline size_t operator()(const VertexArray& va)const noexcept{
-            size_t hashValue = 0;
-
-            // Hash the attributes
-            for (const auto& attrRes : va.attributes) {
-                // Hash bufferSlot
-                size_t bufferSlotHash = std::hash<size_t>()(attrRes.bufferSlot);
-                hashValue ^= bufferSlotHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-
-                // Hash stepMode
-                size_t stepModeHash = std::hash<int>()(static_cast<int>(attrRes.stepMode));
-                hashValue ^= stepModeHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-
-                // Hash shaderLocation
-                size_t shaderLocationHash = std::hash<uint32_t>()(attrRes.attr.shaderLocation);
-                hashValue ^= shaderLocationHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-
-                // Hash format
-                size_t formatHash = std::hash<int>()(static_cast<int>(attrRes.attr.format));
-                hashValue ^= formatHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-
-                // Hash offset
-                size_t offsetHash = std::hash<uint32_t>()(attrRes.attr.offset);
-                hashValue ^= offsetHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-
-                // Hash enabled flag
-                size_t enabledHash = std::hash<bool>()(attrRes.enabled);
-                hashValue ^= enabledHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-            }
-
-            // Hash the buffers (excluding DescribedBuffer* pointers)
-            for (const auto& bufferPair : va.buffers) {
-                // Only hash the WGPUVertexStepMode, not the buffer pointer
-                size_t stepModeHash = std::hash<uint64_t>()(static_cast<uint64_t>(bufferPair.second));
-                hashValue ^= stepModeHash;
-                hashValue = ROT_BYTES(hashValue, 5);
-            }
-
-            return hashValue;
-        }
-    };
+static size_t hashVertexArray(const VertexArray va){
+    size_t hashValue = 0;
+    // Hash the attributes
+    for (size_t i = 0;i < va.attributes_count;i++) {
+        AttributeAndResidence* attrRes = &va.attributes[i];
+        // Hash bufferSlot
+        size_t bufferSlotHash = std::hash<size_t>()(attrRes->bufferSlot);
+        hashValue ^= bufferSlotHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+        // Hash stepMode
+        size_t stepModeHash = std::hash<int>()(static_cast<int>(attrRes->stepMode));
+        hashValue ^= stepModeHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+        // Hash shaderLocation
+        size_t shaderLocationHash = std::hash<uint32_t>()(attrRes->attr.shaderLocation);
+        hashValue ^= shaderLocationHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+        // Hash format
+        size_t formatHash = std::hash<int>()(static_cast<int>(attrRes->attr.format));
+        hashValue ^= formatHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+        // Hash offset
+        size_t offsetHash = std::hash<uint32_t>()(attrRes->attr.offset);
+        hashValue ^= offsetHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+        // Hash enabled flag
+        size_t enabledHash = std::hash<bool>()(attrRes->enabled);
+        hashValue ^= enabledHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+    }
+    // Hash the buffers (excluding DescribedBuffer* pointers)
+    for (size_t i = 0;i < va.buffers_count;i++) {
+        // Only hash the WGPUVertexStepMode, not the buffer pointer
+        size_t stepModeHash = std::hash<uint64_t>()(static_cast<uint64_t>(va.buffers[i].stepMode));
+        hashValue ^= stepModeHash;
+        hashValue = ROT_BYTES(hashValue, 5);
+    }
+    return hashValue;
 }
 
 

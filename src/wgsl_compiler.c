@@ -49,9 +49,9 @@ int main(int argc, char** argv){
             .length = size
         }
     };
-    tc_SpirvBlob spirv = wgslToSpirv(&source);
-    char* outname = replace_extension(filename);
-    FILE* outputfile = fopen(outname, "w");
-    fwrite((char*)spirv.code, 1, spirv.codeSize, outputfile);
-    fclose(outputfile);
+    //tc_SpirvBlob spirv = wgslToSpirv(&source);
+    //char* outname = replace_extension(filename);
+    //FILE* outputfile = fopen(outname, "w");
+    //fwrite((char*)spirv.code, 1, spirv.codeSize, outputfile);
+    //fclose(outputfile);
 }

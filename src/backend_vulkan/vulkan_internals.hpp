@@ -502,31 +502,4 @@ extern "C" void UpdateBindGroupEntry(DescribedBindGroup* bg, size_t index, WGPUB
 extern "C" void GetNewTexture(FullSurface *fsurface);
 extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t height);
 
-
-
-static inline void SetBindgroupSampler_Vk(DescribedBindGroup* bg, uint32_t index, DescribedSampler smp){
-    WGPUBindGroupEntry entry{};
-    entry.binding = index;
-    entry.sampler = smp.sampler;
-    
-    UpdateBindGroupEntry(bg, index, entry);
-}
-static inline void SetBindgroupTexture_Vk(DescribedBindGroup* bg, uint32_t index, Texture tex){
-    WGPUBindGroupEntry entry{};
-    entry.binding = index;
-    entry.textureView = (WGPUTextureView)tex.view;
-    
-    UpdateBindGroupEntry(bg, index, entry);
-}
-static inline void BindVertexArray_Vk(WGPURenderPassEncoder rpenc, VertexArray* vao){
-    for(uint32_t i = 0;i < vao->buffers.size();i++){
-        wgpuRenderPassEncoderSetVertexBuffer(rpenc, i, (WGPUBuffer)vao->buffers[i].first->buffer, 0, WGPU_WHOLE_SIZE);
-    }
-}
-
-
-
-
-
-
 #endif

@@ -22,10 +22,12 @@
  * SOFTWARE.
  */
 
+#include "macros_and_constants.h"
+#include "pipeline.h"
+#include <c_fs_utils.h>
+#include <cstddef>
 #include <raygpu.h>
-
 #include <cassert>
-#include <filesystem>
 #include <vector>
 #include <cstdlib>
 #include <chrono>
@@ -37,8 +39,6 @@
 #include <unordered_map>
 #include <deque>
 #include <map>
-#include <optional>
-//#include <webgpu/webgpu_cpp.h>
 
 #include <external/stb_image_write.h>
 #include <external/stb_image.h>
@@ -54,10 +54,9 @@ extern "C" void ToggleFullscreenImpl(cwoid);
 //#include <enum_translation.h>
 
 renderstate g_renderstate{};
-constexpr uint32_t swap_uint32(uint32_t val){
-    val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF ); 
-    return (val << 16) | (val >> 16);
-}
+
+#define swap_uint32(val) (((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) << 16) | ((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) >> 16))
+
 ShaderSourceType detectShaderLanguage(const void* data, size_t sizeInBytes){
     if(data == 0 || sizeInBytes == 0){
         return sourceTypeUnknown;
@@ -69,22 +68,23 @@ ShaderSourceType detectShaderLanguage(const void* data, size_t sizeInBytes){
             return sourceTypeSPIRV;
         }
     }
-    std::string_view source(reinterpret_cast<const char*>(data), sizeInBytes);
-    if(source.find("@location") != std::string::npos || source.find("@binding") != std::string::npos){
+    char* c_str = (char*)(data);
+    if(strstr(c_str, "@location") || strstr(c_str, "@location")){
         return sourceTypeWGSL;
     }
-    else if(source.find("#version") != std::string::npos){
+    
+    else if(strstr(c_str, "#version")){
         return sourceTypeGLSL;
     }
+
     else{
         return sourceTypeUnknown;
     }
 }
 
 void detectShaderLanguage(ShaderSources* sourcesPointer){
-    ShaderSources& sources = *sourcesPointer;
     for(uint32_t i = 0;i < sourcesPointer->sourceCount;i++){
-        ShaderSourceType srctype = (sources.sources[i].data == nullptr) ? sourceTypeUnknown : detectShaderLanguage(sources.sources[i].data, sources.sources[i].sizeInBytes);
+        ShaderSourceType srctype = (sourcesPointer->sources[i].data == nullptr) ? sourceTypeUnknown : detectShaderLanguage(sourcesPointer->sources[i].data, sourcesPointer->sources[i].sizeInBytes);
         if(srctype != sourceTypeUnknown){
             sourcesPointer->language = srctype;
             return;
@@ -109,7 +109,7 @@ void startRecording(GIFRecordState* grst, uint64_t delayInCentiseconds){
         grst->numberOfFrames = 0;
     }
     msf_gif_bgra_flag = true;
-    grst->msf_state = MsfGifState{};
+    grst->msf_state = CLITERAL(MsfGifState){0};
     grst->delayInCentiseconds = delayInCentiseconds;
     msf_gif_begin(&grst->msf_state, GetScreenWidth(), GetScreenHeight());
     grst->recording = true;
@@ -226,7 +226,7 @@ void rlTexCoord2f(float u, float v){
 
 void rlVertex2f(float x, float y){
     *(vboptr++) = CLITERAL(vertex){{x, y, 0}, nextuv, nextnormal, nextcol};
-    if(UNLIKELY(vboptr - vboptr_base >= RENDERBATCH_SIZE)){
+    if(UNLIKELY(vboptr - vboptr_base >= (ptrdiff_t)RENDERBATCH_SIZE)){
         drawCurrentBatch();
     }
 }
@@ -237,7 +237,7 @@ void rlNormal3f(float x, float y, float z){
 }
 void rlVertex3f(float x, float y, float z){
     *(vboptr++) = CLITERAL(vertex){{x, y, z}, nextuv, nextnormal, nextcol};
-    if(UNLIKELY(vboptr - vboptr_base >= RENDERBATCH_SIZE)){
+    if(UNLIKELY(vboptr - vboptr_base >= (ptrdiff_t)RENDERBATCH_SIZE)){
         drawCurrentBatch();
     }
 }
@@ -248,7 +248,7 @@ RGAPI VertexArray* LoadVertexArray(){
     return ret;
 }
 RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, WGPUVertexFormat format, uint32_t offset, WGPUVertexStepMode stepmode){
-    array->add(buffer, attribLocation, format, offset, stepmode);
+    VertexArray_add(array, buffer, attribLocation, format, offset, stepmode);
 }
 RGAPI void BindVertexArray(VertexArray* va){
     BindPipelineVertexArray(GetActivePipeline(), va);
@@ -256,14 +256,14 @@ RGAPI void BindVertexArray(VertexArray* va){
 
 RGAPI void BindPipelineVertexArray(DescribedPipeline* pipeline, VertexArray* va){
     PreparePipeline(pipeline, va);
-    // Iterate over each buffer
-    for(unsigned i = 0; i < va->buffers.size(); i++){
+    for(unsigned i = 0; i < va->buffers_count; i++){
         bool shouldBind = false;
 
         // Check if any enabled attribute uses this buffer
-        for(const auto& attr : va->attributes){
-            if(attr.bufferSlot == i){
-                if(attr.enabled){
+        for(size_t j = 0; j < va->attributes_count;j++){
+            const AttributeAndResidence* attr = va->attributes + j; 
+            if(attr->bufferSlot == i){
+                if(attr->enabled){
                     shouldBind = true;
                     break;
                 }
@@ -273,12 +273,8 @@ RGAPI void BindPipelineVertexArray(DescribedPipeline* pipeline, VertexArray* va)
         }
 
         if(shouldBind){
-            auto& bufferPair = va->buffers[i];
-            // Bind the buffer
-            RenderPassSetVertexBuffer(GetActiveRenderPass(), 
-                                                i, 
-                                                bufferPair.first, 
-                                                0);
+            const BufferEntry* bufferPair = va->buffers + i;
+            RenderPassSetVertexBuffer(GetActiveRenderPass(), i, bufferPair->buffer, 0);
         } else {
             TRACELOG(LOG_DEBUG, "Buffer slot %u not bound (no enabled attributes use it).", i);
         }
@@ -286,12 +282,10 @@ RGAPI void BindPipelineVertexArray(DescribedPipeline* pipeline, VertexArray* va)
     
 }
 RGAPI void EnableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
-    array->enableAttribute(attribLocation);
-    return;
+    VertexArray_enableAttribute(array, attribLocation);
 }
 RGAPI void DisableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
-    array->disableAttribute(attribLocation);
-    return;
+    VertexArray_disableAttribute(array, attribLocation);
 }
 RGAPI void DrawArrays(PrimitiveType drawMode, uint32_t vertexCount){
     BindPipeline(GetActivePipeline(), drawMode);
@@ -321,15 +315,11 @@ RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer in
     RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
     RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
 }
+
 RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount){
     BindPipeline(GetActivePipeline(), drawMode);
-    //if(GetActivePipeline()->bindGroup.needsUpdate){
-    //    UpdateBindGroup(&GetActivePipeline()->bindGroup);
-    //}
-    //RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
     RenderPassDraw(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0);
 }
-
 
 RGAPI Texture GetDepthTexture(){
     return g_renderstate.renderTargetStack.peek().depth;
@@ -360,8 +350,7 @@ RGAPI void drawCurrentBatch(){
     }
     #endif
 
-    //BufferData(vbo, vboptr_base, vertexCount * sizeof(vertex));
-    renderBatchVAO->buffers.front().first = vbo;
+    renderBatchVAO->buffers[0].buffer = vbo;
     SetStorageBuffer(3, g_renderstate.identityMatrix);
     UpdateBindGroup(&GetActivePipeline()->bindGroup);
     switch(current_drawmode){
@@ -496,11 +485,14 @@ DescribedShaderModule LoadShaderModule(ShaderSources sources){
         #if SUPPORT_GLSL_PARSER == 1
         return LoadShaderModuleGLSL(sources);
         #else
-        return ret;
+        TRACELOG(LOG_FATAL, "Library was built without GLSL support, recompile with SUPPORT_GLSL_PARSER=1");
         #endif
+        return ret;
         case sourceTypeWGSL:
         #if SUPPORT_WGSL_PARSER == 1
         return LoadShaderModuleWGSL(sources);
+        #else
+        TRACELOG(LOG_FATAL, "Library was built without WGSL support, recompile with SUPPORT_WGSL_PARSER=1");
         #endif
         return ret;
         case sourceTypeSPIRV:
@@ -973,12 +965,15 @@ void StartGIFRecording(){
 void EndGIFRecording(){
     #ifndef __EMSCRIPTEN__
     if(!g_renderstate.grst->recording)return;
-    char buf[128] = {0};
+    char buf[32] = {0};
     for(int i = 1;i < 1000;i++){
-        sprintf(buf, "recording%03d.gif", i);
-        std::filesystem::path p(buf);
-        if(!std::filesystem::exists(p))
+        snprintf(buf, sizeof(buf), "recording%03d.gif", i);
+        cfs_path path;
+        cfs_path_init(&path);
+        cfs_path_set(&path, buf);
+        if(!cfs_path_exists(&path)){
             break;
+        }
     }
     #else
     constexpr char buf[] = "gifexport.gif";
@@ -1320,11 +1315,11 @@ extern "C" const char* copyString(const char* str){
 }
 
 extern "C" void PreparePipeline(DescribedPipeline* pipeline, VertexArray* va){
-    //auto plquart = GetPipelinesForLayout(pipeline, va->attributes);
     pipeline->state.vertexAttributes = va->attributes;
-    pipeline->activePipeline = pipeline->pipelineCache.getOrCreate(pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
-    //pipeline->quartet = plquart;
+    pipeline->state.vertexAttributeCount = va->attributes_count;
+    pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
 }
+
 constexpr char mipmapComputerSource[] = R"(
 @group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
 @group(0) @binding(1) var nextMipLevel: texture_storage_2d<rgba8unorm, write>;
@@ -1746,7 +1741,7 @@ void SaveImage(Image _img, const char* filepath){
             TRACELOG(LOG_WARNING, "Grayscale can only export to png");
         }
     }
-    Image img = ImageFromImage(_img, Rectangle{0,0,(float)_img.width, (float)_img.height});
+    Image img = ImageFromImage(_img, CLITERAL(Rectangle){0,0,(float)_img.width, (float)_img.height});
     ImageFormat(&img, PixelFormat::RGBA8);
     //size_t stride = std::ceil(img.rowStrideInBytes);
     //if(stride == 0){
@@ -1779,63 +1774,6 @@ void UseTexture(Texture tex){
     SetTexture(texture0loc, tex);
     
 }
-/*DescribedPipeline* ClonePipeline(const DescribedPipeline* _pipeline){
-    DescribedPipeline* pipeline = callocnew(DescribedPipeline);
-    pipeline->createdPipelines = callocnew(VertexStateToPipelineMap);
-    new (pipeline->createdPipelines) VertexStateToPipelineMap;
-    
-    pipeline->settings = _pipeline->settings;
-    //TODO: this incurs an erroneous shallow copy of a DescribedBindGroupLayout
-    pipeline->layout = _pipeline->layout;
-    pipeline->bglayout = LoadBindGroupLayout(_pipeline->bglayout.entries, _pipeline->bglayout.entryCount, false);
-
-    pipeline->bindGroup = LoadBindGroup(&_pipeline->bglayout, _pipeline->bindGroup.entries, _pipeline->bindGroup.entryCount);
-    for(uint32_t i = 0;i < _pipeline->bindGroup.entryCount;i++){
-        //if(_pipeline->bindGroup.releaseOnClear & (1ull << i)){
-        //    if(_pipeline->bindGroup.entries[i].buffer){
-        //        if(_pipeline->bglayout.entries[i].type == uniform_buffer){
-        //            pipeline->bindGroup.entries[i].buffer = cloneBuffer((WGPUBuffer)pipeline->bindGroup.entries[i].buffer, WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc | WGPUBufferUsage_Uniform);
-        //        }
-        //        else if(_pipeline->bglayout.entries[i].type == storage_buffer){
-        //            pipeline->bindGroup.entries[i].buffer = cloneBuffer((WGPUBuffer)pipeline->bindGroup.entries[i].buffer, WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc | WGPUBufferUsage_Storage);
-        //        }
-        //    }
-        //}
-    }
-    pipeline->vertexLayout = new VertexBufferLayoutSet(*_pipeline->vertexLayout);
-    
-    auto& pvl = *pipeline->vertexLayout;
-    const auto& _pvl = *_pipeline->vertexLayout;
-    
-    pvl.layouts = (VertexBufferLayout*)std::calloc(_pvl.number_of_buffers, sizeof(VertexBufferLayout));
-    pvl.number_of_buffers = _pvl.number_of_buffers;
-    uint32_t attributeCount = 0;
-    for(size_t i = 0;i < pvl.number_of_buffers;i++){
-        attributeCount += _pvl.layouts[i].attributeCount;
-    }
-    pvl.attributePool = std::vector<VertexAttribute>(attributeCount);
-    
-    for(size_t i = 0;i < _pvl.number_of_buffers;i++){
-        pvl.layouts[i].attributes = pvl.attributePool.data() + (_pvl.layouts[i].attributes - _pvl.attributePool.data());
-        pvl.layouts[i].attributeCount = _pvl.layouts[i].attributeCount;
-    }
-    std::memcpy(pvl.attributePool.data(), _pvl.attributePool.data(), attributeCount * sizeof(VertexAttribute));
-    //TODO: this incurs lifetime problem, so do other things in this
-    //TODO: Probably CloneShaderModule
-    
-    pipeline->shaderModule = _pipeline->shaderModule;
-    UpdatePipeline(pipeline);
-    
-
-    pipeline->shaderModule.reflectionInfo.uniforms = callocnew(StringToUniformMap);
-    pipeline->shaderModule.reflectionInfo.uniforms->uniforms = _pipeline->shaderModule.reflectionInfo.uniforms->uniforms;
-    pipeline->shaderModule.reflectionInfo.attributes = callocnew(StringToAttributeMap);
-    pipeline->shaderModule.reflectionInfo.attributes->attributes = _pipeline->shaderModule.reflectionInfo.attributes->attributes;
-
-    //new(pipeline->sh.uniformLocations) StringToUniformMap(*_pipeline->sh.uniformLocations);
-    return pipeline;
-}*/
-
 
 void UseNoTexture(){
     uint32_t textureLocation = GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);
@@ -1861,12 +1799,9 @@ void UniformAccessor::operator=(DescribedBuffer* buf){
     SetBindgroupStorageBuffer(bindgroup, index, buf);
 }
 
-//TODO: this function should clone the pipeline, but it doesn't right now
 DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
     pl->state.vertexAttributes = vao->attributes;
-    pl->activePipeline = pl->pipelineCache.getOrCreate(pl->state, pl->shaderModule, pl->bglayout, pl->layout);
-    //DescribedPipeline* klon = ClonePipeline(pl);
-    //PreparePipeline(klon, vao);
+    pl->activePipeline = PipelineHashMap_getOrCreate(&pl->pipelineCache, pl->state, pl->shaderModule, pl->bglayout, pl->layout);
     return pl;
 }
 
@@ -2218,66 +2153,261 @@ static const char *strprbrk(const char *s, const char *charset)
 
     return latestMatch;
 }
-template<typename callable>
-    requires(std::is_invocable_r_v<bool, callable, const std::filesystem::path&>)
-std::optional<std::filesystem::path> breadthFirstSearch(const std::filesystem::path& paf, int depth, callable lambda){
-    namespace fs = std::filesystem;
-    std::deque<std::pair<fs::path, int>> deq;
-    deq.emplace_back(paf, 0);
-    while(!deq.empty()){
-        auto [elem, d] = deq.front();
-        deq.pop_front();
-        if(lambda(elem)){
-            return elem;
+typedef bool (*cfs_search_predicate)(const cfs_path* path, void* user_data);
+
+// Internal struct for the BFS queue, pairing a path with its search depth.
+typedef struct cfs_search_item_t {
+    cfs_path path;
+    int depth;
+} cfs_search_item;
+
+// A simple queue for the search items, required for BFS.
+typedef struct cfs_search_queue_t {
+    cfs_search_item* items;
+    int capacity;
+    int count;
+    int head;
+} cfs_search_queue;
+
+
+/**
+ * @brief Initializes a search queue. Returns false on memory allocation failure.
+ */
+static inline bool cfs_int_queue_init(cfs_search_queue* q) {
+    q->capacity = 16; // Start with a slightly larger capacity
+    q->count = 0;
+    q->head = 0;
+    q->items = (cfs_search_item*)malloc(q->capacity * sizeof(cfs_search_item));
+    return q->items != NULL;
+}
+
+/**
+ * @brief Frees all memory used by the queue, including the paths within it.
+ */
+static inline void cfs_int_queue_destroy(cfs_search_queue* q) {
+    if (!q || !q->items) return;
+    // Free any remaining paths in the queue
+    for (int i = 0; i < q->count; ++i) {
+        int index = (q->head + i) % q->capacity;
+        cfs_path_free_storage(&q->items[index].path);
+    }
+    free(q->items);
+    q->items = NULL;
+    q->capacity = 0;
+    q->count = 0;
+    q->head = 0;
+}
+
+/**
+ * @brief Adds an item to the back of the queue, resizing if necessary.
+ * @note This function takes ownership of the path data in 'item'.
+ */
+static inline bool cfs_int_queue_push(cfs_search_queue* q, cfs_search_item item) {
+    if (q->count == q->capacity) {
+        int new_capacity = q->capacity * 2;
+        // The queue needs to be re-ordered to be contiguous before realloc.
+        cfs_search_item* new_items = (cfs_search_item*)malloc(new_capacity * sizeof(cfs_search_item));
+        if (!new_items) return false;
+
+        for (int i = 0; i < q->count; ++i) {
+            new_items[i] = q->items[(q->head + i) % q->capacity];
         }
-        if(fs::is_directory(elem) && d < depth){
-            fs::directory_iterator dirit(elem);
-            for(auto& paf : dirit){
-                deq.emplace_back(paf, d + 1);
+        
+        free(q->items);
+        q->items = new_items;
+        q->capacity = new_capacity;
+        q->head = 0;
+    }
+
+    // Add the new item to the logical end of the queue.
+    int tail_index = (q->head + q->count) % q->capacity;
+    q->items[tail_index] = item;
+    q->count++;
+    return true;
+}
+
+/**
+ * @brief Removes and returns the item from the front of the queue.
+ */
+static inline cfs_search_item cfs_int_queue_pop(cfs_search_queue* q) {
+    cfs_search_item item = q->items[q->head];
+    q->head = (q->head + 1) % q->capacity;
+    q->count--;
+    return item;
+}
+
+/**
+ * @brief Gets the filename component of a path.
+ * @example cfs_path_get_filename("C:/folder/file.txt") -> "file.txt"
+ * @return A pointer into the original string, not a new allocation.
+ */
+static inline const char* cfs_path_get_filename(const cfs_path* p) {
+    if (!p || p->len == 0) return "";
+    
+    const char* c_str = cfs_path_c_str(p);
+    // Find the last path separator
+    for (size_t i = p->len - 1; i > 0; --i) {
+        if (c_str[i] == CFS_PATH_SEPARATOR) {
+            return &c_str[i + 1];
+        }
+    }
+    // If no separator is found, the whole string is the filename
+    return c_str;
+}
+
+
+// -----------------------------------------------------------------------------
+// ---[ Core Search Function Implementations ]----------------------------------
+// -----------------------------------------------------------------------------
+
+/**
+ * @brief C99 implementation of the breadth-first search logic.
+ * @param result_path Output parameter; if a path is found, it's copied here. Must be initialized.
+ * @param start_path The directory where the search begins.
+ * @param max_depth How many levels of subdirectories to search. 0=only check items in start_path.
+ * @param predicate The function to call for each file/directory found.
+ * @param user_data Context data to be passed to the predicate function.
+ * @return Returns true if the predicate found a match, false otherwise.
+ */
+static inline bool breadthFirstSearch_c(
+    cfs_path* result_path,
+    const cfs_path* start_path,
+    int max_depth,
+    cfs_search_predicate predicate,
+    void* user_data)
+{
+    cfs_search_queue queue;
+    if (!cfs_int_queue_init(&queue)) {
+        return false;
+    }
+
+    // Push the starting item onto the queue
+    cfs_search_item start_item;
+    start_item.depth = 0;
+    cfs_path_init(&start_item.path);
+    if (cfs_path_set(&start_item.path, cfs_path_c_str(start_path))) {
+        cfs_int_queue_push(&queue, start_item);
+    } else {
+        cfs_path_free_storage(&start_item.path);
+        cfs_int_queue_destroy(&queue);
+        return false; // Could not set initial path
+    }
+
+    bool found = false;
+    while (queue.count > 0) {
+        cfs_search_item current = cfs_int_queue_pop(&queue);
+
+        // 1. Test the current path against the predicate
+        if (predicate(&current.path, user_data)) {
+            cfs_path_set(result_path, cfs_path_c_str(&current.path));
+            found = true;
+            cfs_path_free_storage(&current.path); // Free the popped item
+            goto cleanup; // Exit search, we found it
+        }
+
+        // 2. If it's a directory and we can go deeper, add its children
+        if (current.depth < max_depth && cfs_is_directory(cfs_path_c_str(&current.path))) {
+            cfs_path_list children;
+            if (cfs_list_directory(cfs_path_c_str(&current.path), &children)) {
+                for (uint32_t i = 0; i < children.pathCount; ++i) {
+                    cfs_search_item child_item;
+                    child_item.depth = current.depth + 1;
+                    cfs_path_init(&child_item.path);
+                    // Move path from list to the search item
+                    if (cfs_path_set(&child_item.path, cfs_path_c_str(&children.paths[i]))) {
+                       if (!cfs_int_queue_push(&queue, child_item)) {
+                           // Push failed, free the path we just created
+                           cfs_path_free_storage(&child_item.path);
+                       }
+                    }
+                }
+                cfs_free_path_list(&children);
             }
         }
+        
+        // 3. Free the path from the item we popped and processed
+        cfs_path_free_storage(&current.path);
     }
-    return std::nullopt;
-}
-const char* FindDirectory(const char* directoryName, int maxOutwardSearch){
-    static char dirPaff[2048] = {0};
-    namespace fs = std::filesystem;
 
-    fs::path searchPath(".");
-    std::optional<fs::path> path = std::nullopt;
-    for(int i = 0;i < maxOutwardSearch;i++){
-        auto pathopt = breadthFirstSearch(searchPath, 2, [directoryName](const fs::path& p){
-            //TRACELOG(LOG_WARNING, "%s", p.string().c_str());
-            return p.filename().string() == directoryName;
-        });
-        if(pathopt){
-            path = std::move(pathopt);
+cleanup:
+    cfs_int_queue_destroy(&queue); // This frees any paths remaining in the queue
+    return found;
+}
+
+/**
+ * @brief Predicate function used by FindDirectory to match a directory name.
+ */
+static inline bool find_directory_predicate(const cfs_path* path, void* user_data) {
+    const char* directory_name_to_find = (const char*)user_data;
+    if (cfs_is_directory(cfs_path_c_str(path))) {
+        const char* filename = cfs_path_get_filename(path);
+        if (strcmp(filename, directory_name_to_find) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * @brief Searches for a directory by name, starting from the current directory
+ *        and searching outwards into parent directories. This is a direct C99
+ *        port of the provided C++ function.
+ *
+ * @param directoryName The name of the directory to find (e.g., "data").
+ * @param maxOutwardSearch The number of parent directories to search upwards. (0 = current dir only).
+ * @return A const char* to the full path if found, otherwise NULL.
+ * @warning The returned pointer is to a static internal buffer and is NOT
+ *          thread-safe. Its content becomes invalid on the next call to this function.
+ */
+const char* FindDirectory(const char* directoryName, int maxOutwardSearch) {
+    static char dirPaff[2048] = {0};
+
+    cfs_path search_dir;
+    cfs_path_init(&search_dir);
+    if (!cfs_get_working_directory(&search_dir)) {
+        return NULL; // Cannot even start if we don't know where we are.
+    }
+    
+    cfs_path found_path;
+    cfs_path_init(&found_path);
+
+    bool is_found = false;
+    for (int i = 0; i <= maxOutwardSearch; ++i) {
+        // Use BFS with a fixed depth of 2, as in the original C++ code.
+        if (breadthFirstSearch_c(&found_path, &search_dir, 2, find_directory_predicate, (void*)directoryName)) {
+            is_found = true;
             break;
         }
-        searchPath /= fs::path("..");
+
+        // If not found, prepare to search in the parent directory for the next loop iteration.
+        // We do this by appending "/.." and letting cfs_get_absolute_path resolve it.
+        char parent_path_str[CFS_MAX_PATH];
+        snprintf(parent_path_str, CFS_MAX_PATH, "%s%c..", cfs_path_c_str(&search_dir), CFS_PATH_SEPARATOR);
+        
+        cfs_path absolute_parent_path;
+        cfs_path_init(&absolute_parent_path);
+        if (cfs_get_absolute_path(&absolute_parent_path, parent_path_str)) {
+            // Update search_dir for the next loop.
+            cfs_path_set(&search_dir, cfs_path_c_str(&absolute_parent_path));
+        }
+        cfs_path_free_storage(&absolute_parent_path);
     }
-    //for(int i = 0;i < maxOutwardSearch;i++, searchPath /= ".."){
-    //    fs::recursive_directory_iterator iter(searchPath);
-    //    for(auto& entry : iter){
-    //        if(entry.path().filename().string() == directoryName){
-    //            if(entry.is_directory()){
-    //                strcpy(dirPaff, entry.path().string().c_str());
-    //                goto end;
-    //            }else{
-    //                TRACELOG(LOG_WARNING, "Found file %s, but it's not a directory", entry.path().c_str());
-    //            }
-    //        }
-    //    }
-    //}
-    //abort();
-    if(!path.has_value()){
-        TRACELOG(LOG_WARNING, "Directory %s not found", directoryName);
-        return nullptr;
+
+    const char* return_val = NULL;
+    if (is_found) {
+        // Copy result into the static buffer. Use strncpy for safety.
+        strncpy(dirPaff, cfs_path_c_str(&found_path), 2047);
+        dirPaff[2047] = '\0'; // Ensure null termination
+        return_val = dirPaff;
     }
-    std::string val = path.value().string();
-    *std::copy(val.begin(), val.end(), dirPaff) = '\0';
-    return dirPaff;
+
+    // Clean up all heap-allocated path objects.
+    cfs_path_free_storage(&search_dir);
+    cfs_path_free_storage(&found_path);
+
+    return return_val;
 }
+
 const char *GetDirectoryPath(const char *filePath)
 {
     /*
@@ -2326,7 +2456,7 @@ const char *GetDirectoryPath(const char *filePath)
 }
 char *EncodeDataBase64(const unsigned char *data, int dataSize, int *outputSize)
 {
-    static const unsigned char base64encodeTable[] = {
+    static const char base64encodeTable[] = {
         'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
         'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
         'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
@@ -2371,7 +2501,7 @@ unsigned char *DecodeDataBase64(const unsigned char *data, int *outputSize)
 
     // Get output size of Base64 input data
     int outSize = 0;
-    for (int i = 0; data[4*i] != 0; i++)
+    for (int i = 0; data[4*(size_t)i] != 0; i++)
     {
         if (data[4*i + 3] == '=')
         {
@@ -2386,29 +2516,29 @@ unsigned char *DecodeDataBase64(const unsigned char *data, int *outputSize)
 
     for (int i = 0; i < outSize/3; i++)
     {
-        unsigned char a = base64decodeTable[(int)data[4*i]];
-        unsigned char b = base64decodeTable[(int)data[4*i + 1]];
-        unsigned char c = base64decodeTable[(int)data[4*i + 2]];
-        unsigned char d = base64decodeTable[(int)data[4*i + 3]];
+        unsigned char a = base64decodeTable[(int)data[4*(size_t)i]];
+        unsigned char b = base64decodeTable[(int)data[4*(size_t)i + 1]];
+        unsigned char c = base64decodeTable[(int)data[4*(size_t)i + 2]];
+        unsigned char d = base64decodeTable[(int)data[4*(size_t)i + 3]];
 
-        decodedData[3*i] = (a << 2) | (b >> 4);
-        decodedData[3*i + 1] = (b << 4) | (c >> 2);
-        decodedData[3*i + 2] = (c << 6) | d;
+        decodedData[3*(size_t)i] = (a << 2) | (b >> 4);
+        decodedData[3*(size_t)i + 1] = (b << 4) | (c >> 2);
+        decodedData[3*(size_t)i + 2] = (c << 6) | d;
     }
 
     if (outSize%3 == 1)
     {
         int n = outSize/3;
-        unsigned char a = base64decodeTable[(int)data[4*n]];
-        unsigned char b = base64decodeTable[(int)data[4*n + 1]];
+        unsigned char a = base64decodeTable[(int)data[4*(size_t)n]];
+        unsigned char b = base64decodeTable[(int)data[4*(size_t)n + 1]];
         decodedData[outSize - 1] = (a << 2) | (b >> 4);
     }
     else if (outSize%3 == 2)
     {
         int n = outSize/3;
-        unsigned char a = base64decodeTable[(int)data[4*n]];
-        unsigned char b = base64decodeTable[(int)data[4*n + 1]];
-        unsigned char c = base64decodeTable[(int)data[4*n + 2]];
+        unsigned char a = base64decodeTable[(int)data[4*(size_t)n]];
+        unsigned char b = base64decodeTable[(int)data[4*(size_t)n + 1]];
+        unsigned char c = base64decodeTable[(int)data[4*(size_t)n + 2]];
         decodedData[outSize - 2] = (a << 2) | (b >> 4);
         decodedData[outSize - 1] = (b << 4) | (c >> 2);
     }

@@ -1,5 +1,5 @@
-#ifndef CFS_H
-#define CFS_H
+#ifndef C_FS_UTILS_H
+#define C_FS_UTILS_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -9,11 +9,23 @@
 
 #if defined(_WIN32)
     #define CFS_PLATFORM_WINDOWS 1
+    #define Rectangle w__Rectangle
+    #define LoadImage w__LoadImage
+    #define DrawText w__DrawText
+    #define DrawTextEx w__DrawTextEx
+    #define ShowCursor w__ShowCursor
+    #define AdapterType w__AdapterType
     #include <windows.h>
+    #undef AdapterType
+    #undef ShowCursor
+    #undef LoadImage
+    #undef DrawTextEx
+    #undef DrawText
+    #undef Rectangle
     #include <io.h>
     #define CFS_PATH_SEPARATOR '\\'
     #define CFS_MAX_PATH MAX_PATH
-#elif defined(__linux__) || defined(__APPLE__) || defined(__ANDROID__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__ANDROID__) || defined(__EMSCRIPTEN__)
     #define CFS_PLATFORM_POSIX 1
     #include <unistd.h>
     #include <sys/stat.h>
@@ -22,7 +34,7 @@
     #define CFS_PATH_SEPARATOR '/'
     #define CFS_MAX_PATH PATH_MAX
 #else
-    #error "cfs: Unsupported platform"
+    #error "c_fs_utils: Unsupported platform"
 #endif
 
 // The size of the inline buffer for cfs_path.
@@ -165,6 +177,10 @@ static inline bool cfs_exists(const char* path) {
     return access(path, F_OK) == 0;
 #endif
 }
+static inline bool cfs_path_exists(const cfs_path* p) {
+    if (!p) return false;
+    return cfs_exists(cfs_path_c_str(p));
+}
 
 static inline bool cfs_is_directory(const char* path) {
 #if CFS_PLATFORM_WINDOWS
@@ -179,7 +195,7 @@ static inline bool cfs_is_directory(const char* path) {
 #endif
 }
 
-static inline bool cfs_get_absolute_path(const char* path, cfs_path* absolute_path) {
+static inline bool cfs_get_absolute_path(cfs_path* absolute_path, const char* path) {
     if (!path || !absolute_path) return false;
     cfs_path_init(absolute_path);
     char buffer[CFS_MAX_PATH];

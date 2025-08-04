@@ -1,3 +1,5 @@
+#include "config.h"
+#include "wgvk.h"
 #include <external/volk.h>
 #define Font rlFont
 #include <raygpu.h>
@@ -82,246 +84,100 @@ static inline VkPrimitiveTopology toVulkanPrimitive(PrimitiveType type){
 }
 extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout){
     TRACELOG(LOG_INFO, "Generating new single pipeline");
-    WGPURenderPipeline ret = callocnewpp(WGPURenderPipelineImpl);
-    ret->refCount = 1;
-    ret->device = bglayout.layout->device;
-    auto& settings = mst;
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_VERTEX_BIT,
-        .pName = shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name,
-    };
-    if(shaderModule.stages[WGPUShaderStageEnum_Vertex].module->vulkanModuleMultiEP)
-        vertShaderStageInfo.module = shaderModule.stages[WGPUShaderStageEnum_Vertex].module->vulkanModuleMultiEP;
-    else
-        vertShaderStageInfo.module = shaderModule.stages[WGPUShaderStageEnum_Vertex].module->modules[WGPUShaderStageEnum_Vertex].module;
+    WGPURenderPipelineDescriptor pipelineDesc zeroinit;
+    const RenderSettings* settings = &mst.settings; 
+    pipelineDesc.multisample.count = settings->sampleCount ? settings->sampleCount : 1;
+    pipelineDesc.multisample.mask = 0xFFFFFFFF;
+    pipelineDesc.multisample.alphaToCoverageEnabled = false;
+    pipelineDesc.layout = (WGPUPipelineLayout)pllayout.layout;
 
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .pName = shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name,
-    };
-    if(shaderModule.stages[WGPUShaderStageEnum_Fragment].module->vulkanModuleMultiEP)
-        fragShaderStageInfo.module = shaderModule.stages[WGPUShaderStageEnum_Fragment].module->vulkanModuleMultiEP;
-    else
-        fragShaderStageInfo.module = shaderModule.stages[WGPUShaderStageEnum_Fragment].module->modules[WGPUShaderStageEnum_Fragment].module;
+    WGPUVertexState   vertexState   zeroinit;
+    WGPUFragmentState fragmentState zeroinit;
+    WGPUBlendState    blendState    zeroinit;
 
-    VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+    vertexState.module = (WGPUShaderModule)shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
 
-    // Vertex Input Setup
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes, mst.vertexAttributeCount);
+    vertexState.bufferCount = vlayout_complete.number_of_buffers;
+
+    std::vector<WGPUVertexBufferLayout> layouts_converted;
+    for(uint32_t i = 0;i < vlayout_complete.number_of_buffers;i++){
+        layouts_converted.push_back(WGPUVertexBufferLayout{
+            .nextInChain    = nullptr,
+            .stepMode       = (WGPUVertexStepMode)vlayout_complete.layouts[i].stepMode,
+            .arrayStride    = vlayout_complete.layouts[i].arrayStride,
+            .attributeCount = vlayout_complete.layouts[i].attributeCount,
+            //TODO: this relies on the fact that VertexAttribute and WGPUVertexAttribute are exactly compatible
+            .attributes     = (WGPUVertexAttribute*)vlayout_complete.layouts[i].attributes,
+        });
+    }
+    vertexState.buffers = layouts_converted.data();
+    vertexState.constantCount = 0;
+    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    pipelineDesc.vertex = vertexState;
+
+
     
-    auto vls = getBufferLayoutRepresentation(mst.vertexAttributes.data(), mst.vertexAttributes.size());
-    auto [vad, vbd] = genericVertexLayoutSetToVulkan(vls);
+    fragmentState.module = shaderModule.stages[WGPUShaderStageEnum_Fragment].module;
+    fragmentState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    fragmentState.constantCount = 0;
+    fragmentState.constants = nullptr;
 
-    vertexInputInfo.vertexBindingDescriptionCount = vbd.size();
-    vertexInputInfo.vertexAttributeDescriptionCount = vad.size();
-    vertexInputInfo.pVertexAttributeDescriptions = vad.data();
-    vertexInputInfo.pVertexBindingDescriptions = vbd.data();
+    blendState.color.srcFactor = (WGPUBlendFactor   )settings->blendState.color.srcFactor;
+    blendState.color.dstFactor = (WGPUBlendFactor   )settings->blendState.color.dstFactor;
+    blendState.color.operation = (WGPUBlendOperation)settings->blendState.color.operation;
+    blendState.alpha.srcFactor = (WGPUBlendFactor   )settings->blendState.alpha.srcFactor;
+    blendState.alpha.dstFactor = (WGPUBlendFactor   )settings->blendState.alpha.dstFactor;
+    blendState.alpha.operation = (WGPUBlendOperation)settings->blendState.alpha.operation;
+    WGPUColorTargetState colorTargets[MAX_COLOR_ATTACHMENTS];
 
-    // Input Assembly Setup
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = toVulkanPrimitive(mst.primitiveType);
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
-
-    // Viewport and Scissor Setup
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-    VkRect2D scissor{0, 0, g_vulkanstate.surface.surfaceConfig.width, g_vulkanstate.surface.surfaceConfig.height};
-    VkViewport fullView{
-        0.0f, 
-        (float)g_vulkanstate. surface.surfaceConfig.height, 
-        (float)g_vulkanstate. surface.surfaceConfig.width, 
-        -((float)g_vulkanstate.surface.surfaceConfig.height), 
-        0.0f, 
-        1.0f
-    };
-    viewportState.pScissors = &scissor;
-    viewportState.pViewports = &fullView;
-
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = (float)mst.settings.lineWidth;
-
-    // Incorporate face culling from RenderSettings
-    // TODO: Cull modes
-    rasterizer.cullMode = VK_CULL_MODE_NONE; 
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-    rasterizer.depthBiasEnable = VK_FALSE;
-
-    // Depth Stencil State Setup
-    VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = settings.settings.depthTest ? VK_TRUE : VK_FALSE;
-    depthStencil.depthWriteEnable = settings.settings.depthTest ? VK_TRUE : VK_FALSE;
-    depthStencil.depthCompareOp = toVulkanCompareFunction(settings.settings.depthCompare);
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.minDepthBounds = 0.0f; // Optional
-    depthStencil.maxDepthBounds = 1.0f; // Optional
-    depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = {}; // Optional
-    depthStencil.back = {}; // Optional
-
-    // Multisampling State Setup
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    
-    // Map sampleCount from RenderSettings to VkSampleCountFlagBits
-    switch (settings.settings.sampleCount) {
-        case 1: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; break;
-        case 2: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_2_BIT; break;
-        case 4: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_4_BIT; break;
-        case 8: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_8_BIT; break;
-        case 16: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_16_BIT; break;
-        case 32: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_32_BIT; break;
-        case 64: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_64_BIT; break;
-        default: multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; break;
+    for(uint32_t i = 0;i < mst.colorAttachmentState.colorAttachmentCount;i++){
+        WGPUColorTargetState insert = {
+            .format = toWGPUPixelFormat(mst.colorAttachmentState.attachmentFormats[i]),
+            .blend = &blendState,
+            .writeMask = WGPUColorWriteMask_All,
+        };
+        colorTargets[i] = insert;
+    }
+    fragmentState.targetCount = mst.colorAttachmentState.colorAttachmentCount;
+    fragmentState.targets = colorTargets;
+    pipelineDesc.fragment = &fragmentState;
+    // We setup a depth buffer state for the render pipeline
+    WGPUDepthStencilState depthStencilState;
+    if(settings->depthTest){
+        // Keep a fragment only if its depth is lower than the previously blended one
+        // Each time a fragment is blended into the target, we update the value of the Z-buffer
+        // Store the format in a variable as later parts of the code depend on it
+        // Deactivate the stencil alltogether
+        WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
+        depthStencilState = (WGPUDepthStencilState){
+            .format = depthTextureFormat,
+            .depthWriteEnabled = WGPUOptionalBool_True,
+            .depthCompare = (WGPUCompareFunction)settings->depthCompare,
+            .stencilFront = {.compare = WGPUCompareFunction_Always},
+            .stencilBack = {.compare = WGPUCompareFunction_Always},
+            .stencilReadMask = 0,
+            .stencilWriteMask = 0,
+        };
     }
 
-    // Color Blend Attachment Setup
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachments[max_color_attachments];
-    for(uint32_t i = 0;i < mst.colorAttachmentState.colorAttachmentCount;i++){
-        VkPipelineColorBlendAttachmentState& colorBlendAttachment = colorBlendAttachments[i];
-        colorBlendAttachment.colorWriteMask = 
-            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | 
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        
-        // Enable blending based on whether blend operations are set
-        bool blendingEnabled = 
-            settings.settings.blendState.alpha.operation != WGPUBlendOperation_Add || 
-            settings.settings.blendState.alpha.srcFactor != WGPUBlendFactor_One ||
-            settings.settings.blendState.alpha.dstFactor != WGPUBlendFactor_Zero ||
-            settings.settings.blendState.alpha.operation != WGPUBlendOperation_Add ||
-            settings.settings.blendState.alpha.srcFactor != WGPUBlendFactor_One ||
-            settings.settings.blendState.alpha.dstFactor != WGPUBlendFactor_Zero;
-
-        colorBlendAttachment.blendEnable = blendingEnabled ? VK_TRUE : VK_FALSE;
-
-        if (blendingEnabled) {
-            // Configure blending for color
-            colorBlendAttachment.srcColorBlendFactor = toVulkanBlendFactor   (settings.settings.blendState.color.srcFactor);
-            colorBlendAttachment.dstColorBlendFactor = toVulkanBlendFactor   (settings.settings.blendState.color.dstFactor);
-            colorBlendAttachment.colorBlendOp =        toVulkanBlendOperation(settings.settings.blendState.color.operation);
-
-            // Configure blending for alpha
-            colorBlendAttachment.srcAlphaBlendFactor = toVulkanBlendFactor   (settings.settings.blendState.alpha.srcFactor);
-            colorBlendAttachment.dstAlphaBlendFactor = toVulkanBlendFactor   (settings.settings.blendState.alpha.dstFactor);
-            colorBlendAttachment.alphaBlendOp =        toVulkanBlendOperation(settings.settings.blendState.alpha.operation);
+    pipelineDesc.depthStencil = settings->depthTest ? &depthStencilState : nullptr;
+    pipelineDesc.primitive.frontFace = (WGPUFrontFace)settings->frontFace;
+    pipelineDesc.primitive.cullMode = settings->faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
+    pipelineDesc.primitive.cullMode = WGPUCullMode_None;
+    auto toWebGPUPrimitive = [](PrimitiveType pt){
+        switch(pt){
+            case RL_LINES: return WGPUPrimitiveTopology_LineList;
+            case RL_TRIANGLES: return WGPUPrimitiveTopology_TriangleList;
+            case RL_TRIANGLE_STRIP: return WGPUPrimitiveTopology_TriangleStrip;
+            case RL_POINTS: return WGPUPrimitiveTopology_PointList;
+            case RL_QUADS:
+            default:
+            rg_unreachable();
         }
-    }
-
-    // Color Blending State Setup
-    VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = mst.colorAttachmentState.colorAttachmentCount;
-    colorBlending.pAttachments = colorBlendAttachments;
-    colorBlending.blendConstants[0] = 1.0f;
-    colorBlending.blendConstants[1] = 1.0f;
-    colorBlending.blendConstants[2] = 1.0f;
-    colorBlending.blendConstants[3] = 1.0f;
-    // Dynamic State Setup (optional based on RenderSettings)
-    VkDynamicStateVector dynamicStates;
-    VkDynamicStateVector_init(&dynamicStates);
-    VkDynamicStateVector_reserve(&dynamicStates, 4);
-    
-    VkDynamicStateVector_push_back(&dynamicStates, VK_DYNAMIC_STATE_VIEWPORT); 
-    VkDynamicStateVector_push_back(&dynamicStates, VK_DYNAMIC_STATE_SCISSOR);
-    //VkDynamicStateVector_push_back(&dynamicStates, VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY); 
-    //VkDynamicStateVector_push_back(&dynamicStates, VK_DYNAMIC_STATE_VERTEX_INPUT_EXT);,
-        
-    VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    
-    // You can make dynamic states configurable via RenderSettings if needed
-    dynamicState.dynamicStateCount = dynamicStates.size;
-    dynamicState.pDynamicStates = dynamicStates.data;
-    
-    // Pipeline Layout Setup
-    
-    
-    // Graphics Pipeline Creation
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = settings.settings.depthTest ? &depthStencil : nullptr; // Enable depth stencil if needed
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = pllayout.layout->layout;
-
-    RenderPassLayout rpLayout zeroinit;
-    rpLayout.colorAttachmentCount = mst.colorAttachmentState.colorAttachmentCount;
-    rpLayout.depthAttachmentPresent = settings.settings.depthTest;
-    
-    for(uint32_t i = 0;i < rpLayout.colorAttachmentCount;i++){
-        rpLayout.colorAttachments[i].format = toVulkanPixelFormat(toWGPUPixelFormat(mst.colorAttachmentState.attachmentFormats[i]));
-        rpLayout.colorAttachments[i].loadop  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        rpLayout.colorAttachments[i].storeop = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        rpLayout.colorAttachments[i].sampleCount = settings.settings.sampleCount;
-    }
-    
-    if(rpLayout.colorAttachments[0].sampleCount > 1){
-        rpLayout.colorResolveAttachments[0].format = toVulkanPixelFormat(toWGPUPixelFormat(mst.colorAttachmentState.attachmentFormats[0]));
-        rpLayout.colorResolveAttachments[0].loadop  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        rpLayout.colorResolveAttachments[0].storeop = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        rpLayout.colorResolveAttachments[0].sampleCount = 1;
-    }
-    else{
-        //rpLayout.colorResolveIndex = VK_ATTACHMENT_UNUSED;
-    }
-
-    if(settings.settings.depthTest){
-        rpLayout.depthAttachment.format = toVulkanPixelFormat(WGPUTextureFormat_Depth32Float);
-        rpLayout.depthAttachment.loadop  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        rpLayout.depthAttachment.storeop = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        rpLayout.depthAttachment.sampleCount = settings.settings.sampleCount;
-    }
-    
-    
-    #if VULKAN_USE_DYNAMIC_RENDERING == 1
-    VkPipelineRenderingCreateInfo rci zeroinit;
-    rci.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    rci.colorAttachmentCount = mst.colorAttachmentState.colorAttachmentCount;
-    VkFormat colorAttachmentFormat[max_color_attachments];
-    for(uint32_t i = 0;i < mst.colorAttachmentState.colorAttachmentCount;i++){
-        colorAttachmentFormat[i] = toVulkanPixelFormat(toWGPUPixelFormat(mst.colorAttachmentState.attachmentFormats[i]));
-    }
-
-    rci.pColorAttachmentFormats = colorAttachmentFormat;
-    rci.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
-    pipelineInfo.pNext = &rci;
-    #else
-    LayoutedRenderPass rp = LoadRenderPassFromLayout(g_vulkanstate.device, rpLayout);
-    pipelineInfo.renderPass = rp.renderPass;
-    pipelineInfo.subpass = 0;
-    #endif
-    
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-    VkDynamicStateVector_move(&ret->dynamicStates, &dynamicStates);
-    ret->layout = pllayout.layout;
-    wgpuPipelineLayoutAddRef(pllayout.layout);
-    if (vkCreateGraphicsPipelines(g_vulkanstate.device->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, (VkPipeline*)&ret->renderPipeline) != VK_SUCCESS) {
-        TRACELOG(LOG_FATAL, "Trianglelist pipiline creation failed");
-    }
-    return ret;
+    };
+    pipelineDesc.primitive.topology = toWebGPUPrimitive(mst.primitiveType);
+    return wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
 }
 
 /*
@@ -634,29 +490,16 @@ extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
     return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
 }
 
-extern "C" void UpdatePipelineWithNewLayout(DescribedPipeline* ret, const std::vector<AttributeAndResidence>& attributes){
-    // Shader Stage Setup
-    ret->state.vertexAttributes = attributes;
-    ret->activePipeline = ret->pipelineCache.getOrCreate(ret->state, ret->shaderModule, ret->bglayout, ret->layout);
-    //VertexBufferLayoutSet layoutset = getBufferLayoutRepresentation(attributes.data(), attributes.size());
-    //auto it = ret->createdPipelines->pipelines.find(layoutset);
-    //if(it != ret->createdPipelines->pipelines.end()){
-    //    UnloadBufferLayoutSet(layoutset);
-    //    ret->quartet = it->second;
-    //    return;
-    //}
-
-    //RenderPipelineQuartet quartet = GetPipelinesForLayout(ret, attributes);
-
-    //ret->quartet = quartet;
-    //ret->createdPipelines->pipelines[layoutset] = ret->quartet;
-    //UnloadBufferLayoutSet(layoutset);
-}
+//extern "C" void UpdatePipelineWithNewLayout(DescribedPipeline* ret, const std::vector<AttributeAndResidence>& attributes){
+//    ret->state.vertexAttributes = attributes;
+//    ret->activePipeline = ret->pipelineCache.getOrCreate(ret->state, ret->shaderModule, ret->bglayout, ret->layout);
+//}
 
 extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
     DescribedPipeline* ret = callocnewpp(DescribedPipeline);
     ret->state.settings = settings;
-    ret->state.vertexAttributes = std::vector<AttributeAndResidence>(attribs, attribs + attribCount); 
+    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
+    ret->state.vertexAttributeCount = attribCount; 
     ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
     ret->shaderModule = mod;
     ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
@@ -678,33 +521,7 @@ extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const A
         bge[i].binding = uniforms[i].location;
     }
     ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
-    
-    //ret->vertexLayout = getBufferLayoutRepresentation(attribs, attribCount);
-    
-    //UpdatePipeline(ret);//, std::vector<AttributeAndResidence>{attribs, attribs + attribCount});    
-    
     return ret;
-
-}
-
-
-
-
-DescribedPipeline* LoadPipelineForVAO_Vk(const char* vsSource, const char* fsSource, const VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    
-    ShaderSources sources zeroinit;
-    sources.sourceCount = 2;
-    sources.sources[0].data = vsSource;
-    sources.sources[0].sizeInBytes = std::strlen(vsSource);
-    sources.sources[0].stageMask = WGPUShaderStage_Vertex;
-    
-    sources.sources[1].data = fsSource;
-    sources.sources[1].sizeInBytes = std::strlen(fsSource);
-    sources.sources[1].stageMask = WGPUShaderStage_Fragment;
-
-    DescribedShaderModule sh = LoadShaderModule(sources);
-    return LoadPipelineMod(sh, vao->attributes.data(), vao->attributes.size(), uniforms, uniformCount, settings);
-    
 }
 
 extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
@@ -712,7 +529,7 @@ extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, Vertex
     
     DescribedShaderModule module = LoadShaderModule(sources);
     
-    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes.data(), vao->attributes.size(), uniforms, uniformCount, settings);
+    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
     //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
     PreparePipeline(pl, vao);
     return pl;
