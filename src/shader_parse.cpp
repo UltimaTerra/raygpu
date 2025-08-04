@@ -26,7 +26,6 @@
 //#include <ctre.hpp>
 
 
-#include "src/tint/utils/result.h"
 #include <raygpu.h>
 #include <internals.hpp>
 #include <vector>
@@ -35,6 +34,7 @@
 #include <string_view>
 
 #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1
+#include "src/tint/utils/result.h"
 #include "src/tint/lang/spirv/writer/helpers/generate_bindings.h"
 #include "src/tint/lang/spirv/writer/raise/raise.h"
 #include <tint/tint.h>

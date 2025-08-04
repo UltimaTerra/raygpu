@@ -355,9 +355,8 @@ void ToggleFullscreen_GLFW(){
         //We need to enter fullscreen
         int xpos = 0, ypos = 0;
         int xs, ys;
-        #ifndef DAWN_USE_WAYLAND
-        glfwGetWindowPos(g_renderstate.window, &xpos, &ypos);
-        #endif
+        if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+            glfwGetWindowPos(g_renderstate.window, &xpos, &ypos);
         glfwGetWindowSize(g_renderstate.window, &xs, &ys);
         g_renderstate.input_map[g_renderstate.window].windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         int monitorCount = 0;
@@ -425,55 +424,14 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
         }
     #endif
     
-    #ifndef __EMSCRIPTEN__
-        window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
+    window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
+    if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
         glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
-    //#endif
-
-    //#ifndef __EMSCRIPTEN__
-    //    window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
-    //    //glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
-    //    if (!window) {
-    //        abort();
-    //    }
-    //    
-//
-    //    // Create the surface.
-    //    #if SUPPORT_WGPU_BACKEND == 1
-    //    wgpu::Surface rs = wgpu::glfw::CreateSurfaceForWindow((WGPUInstance)GetInstance(), (GLFWwindow*)window);
-    //    WGPUSurface wsurfaceHandle = rs.MoveToCHandle();
-    //    //ret.surface = CreateSurface(wsurfaceHandle, width, height);
-    //    #elif SUPPORT_VULKAN_BACKEND == 1
-    //    WGPUSurfaceConfiguration config{};
-    //    config.format = WGPUTextureFormat_BGRA8Unorm;
-    //    config.presentMode = WGPUPresentMode_Fifo;
-    //    config.width = width;
-    //    config.height = height;
-    //    //ret.surface = LoadSurface((GLFWwindow*)window, config);
-    //    #endif
-    //    //negotiateSurfaceFormatAndPresentMode(wsurfaceHandle);
-    #else
-        // Create the surface.
-        
-        //wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector;
-        //fromCanvasHTMLSelector.sType = wgpu::SType::EmscriptenSurfaceSourceCanvasHTMLSelector;
-        //fromCanvasHTMLSelector.selector = (WGPUStringView){ "canvas", WGPU_STRLEN };
-        //wgpu::SurfaceDescriptor surfaceDesc = {};
-        //surfaceDesc.nextInChain = &fromCanvasHTMLSelector;
-        //g_renderstate.surface = g_wgpustate.instance.CreateSurface(&surfaceDesc);
-        //negotiateSurfaceFormatAndPresentMode(g_wgpustate.surface);
-        //ret.surface.surface = g_wgpustate.surface.Get();
-        //window = glfwCreateWindow(width, height, title, mon, nullptr);
-        //g_renderstate.window = (GLFWwindow*)window;
-    #endif
-    
-
     
     int wposx = 0, wposy = 0;
-    #ifndef DAWN_USE_WAYLAND
-    glfwGetWindowPos((GLFWwindow*)window, &wposx, &wposy);
-    #endif
-    g_renderstate.input_map[window].windowPosition = Rectangle{
+    if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+        glfwGetWindowPos((GLFWwindow*)window, &wposx, &wposy);
+    g_renderstate.input_map[window].windowPosition = CLITERAL(Rectangle){
         (float)wposx,
         (float)wposy,
         (float)GetScreenWidth(),
@@ -492,33 +450,8 @@ extern "C" SubWindow OpenSubWindow_GLFW(uint32_t width, uint32_t height, const c
     #ifndef __EMSCRIPTEN__
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    //glfwWindowHint(GLFW_RESIZABLE, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE ) ? GLFW_TRUE : GLFW_FALSE);
     glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
     ret.handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
-    
-    //WGPUInstance inst = (WGPUInstance)GetInstance();
-    //wgpu::Surface secondSurface = wgpu::glfw::CreateSurfaceForWindow(inst, (GLFWwindow*)ret.handle);
-    //wgpu::SurfaceCapabilities capabilities;
-    //secondSurface.GetCapabilities(GetCXXAdapter(), &capabilities);
-    //wgpu::SurfaceConfiguration config = {};
-    //config.device = GetCXXDevice();
-    //config.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc;
-    //config.format = (wgpu::TextureFormat)g_renderstate.frameBufferFormat;
-    //config.presentMode = (wgpu::PresentMode)g_renderstate.unthrottled_PresentMode;
-    //config.width = width;
-    //config.height = height;
-    //secondSurface.Configure(&config);
-    //SurfaceConfiguration cf;
-//
-    //ret.surface.surfaceConfig = SurfaceConfiguration{
-    //    static_cast<void*>(config.device.Get()),
-    //    config.width,
-    //    config.height,
-    //    (PixelFormat)config.format,
-    //    (PresentMode)config.presentMode
-    //};
-    //ret.surface.surface = secondSurface.MoveToCHandle();
-    //ret.surface.renderTarget = LoadRenderTexture(config.width, config.height);
     g_renderstate.createdSubwindows[ret.handle] = ret;
     g_renderstate.input_map[(GLFWwindow*)ret.handle] = window_input_state{};
     setupGLFWCallbacks((GLFWwindow*)ret.handle);
