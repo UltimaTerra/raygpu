@@ -1,4 +1,5 @@
-// Copyright (C) 2020 The Khronos Group Inc.
+//
+// Copyright (C) 2016 Google, Inc.
 //
 // All rights reserved.
 //
@@ -14,7 +15,7 @@
 //    disclaimer in the documentation and/or other materials provided
 //    with the distribution.
 //
-//    Neither the name of The Khronos Group Inc. nor the names of its
+//    Neither the name of Google Inc. nor the names of its
 //    contributors may be used to endorse or promote products derived
 //    from this software without specific prior written permission.
 //
@@ -31,32 +32,20 @@
 // ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef GLSLANG_BUILD_INFO
-#define GLSLANG_BUILD_INFO
+#include "Settings.h"
 
-#define GLSLANG_VERSION_MAJOR 15
-#define GLSLANG_VERSION_MINOR 1
-#define GLSLANG_VERSION_PATCH 0
-#define GLSLANG_VERSION_FLAVOR ""
+namespace glslangtest {
 
-#define GLSLANG_VERSION_GREATER_THAN(major, minor, patch) \
-    ((GLSLANG_VERSION_MAJOR) > (major) || ((major) == GLSLANG_VERSION_MAJOR && \
-    ((GLSLANG_VERSION_MINOR) > (minor) || ((minor) == GLSLANG_VERSION_MINOR && \
-     (GLSLANG_VERSION_PATCH) > (patch)))))
+// We need CMake to provide us the absolute path to the directory containing
+// test files, so we are certain to find those files no matter where the test
+// harness binary is generated. This provides out-of-source build capability.
+// This will be used as the default test root, but can be overridden with
+// the --test-root argument.
+#ifndef GLSLANG_TEST_DIRECTORY
+#error \
+    "GLSLANG_TEST_DIRECTORY needs to be defined for gtest to locate test files."
+#endif
 
-#define GLSLANG_VERSION_GREATER_OR_EQUAL_TO(major, minor, patch) \
-    ((GLSLANG_VERSION_MAJOR) > (major) || ((major) == GLSLANG_VERSION_MAJOR && \
-    ((GLSLANG_VERSION_MINOR) > (minor) || ((minor) == GLSLANG_VERSION_MINOR && \
-     (GLSLANG_VERSION_PATCH >= (patch))))))
+GTestSettings GlobalTestSettings = {nullptr, false, GLSLANG_TEST_DIRECTORY};
 
-#define GLSLANG_VERSION_LESS_THAN(major, minor, patch) \
-    ((GLSLANG_VERSION_MAJOR) < (major) || ((major) == GLSLANG_VERSION_MAJOR && \
-    ((GLSLANG_VERSION_MINOR) < (minor) || ((minor) == GLSLANG_VERSION_MINOR && \
-     (GLSLANG_VERSION_PATCH) < (patch)))))
-
-#define GLSLANG_VERSION_LESS_OR_EQUAL_TO(major, minor, patch) \
-    ((GLSLANG_VERSION_MAJOR) < (major) || ((major) == GLSLANG_VERSION_MAJOR && \
-    ((GLSLANG_VERSION_MINOR) < (minor) || ((minor) == GLSLANG_VERSION_MINOR && \
-     (GLSLANG_VERSION_PATCH <= (patch))))))
-
-#endif // GLSLANG_BUILD_INFO
+}  // namespace glslangtest

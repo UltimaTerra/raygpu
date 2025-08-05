@@ -636,7 +636,7 @@ void RecreateStagingBuffer(StagingBuffer* buffer){
     gpudesc.usage = buffer->gpuUsable.usage;
     buffer->gpuUsable.buffer = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &gpudesc);
 }
-
+static void emptyfunction_123(WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2){}
 void UpdateStagingBuffer(StagingBuffer* buffer){
     wgpuBufferUnmap((WGPUBuffer)buffer->mappable.buffer);
     WGPUCommandEncoderDescriptor arg{};
@@ -647,13 +647,18 @@ void UpdateStagingBuffer(StagingBuffer* buffer){
     WGPUCommandBuffer buf = wgpuCommandEncoderFinish(enc, &arg2);
     wgpuQueueSubmit(GetQueue(), 1, &buf);
     
-    wgpu::Buffer b((WGPUBuffer)buffer->mappable.buffer);
-    WGPUFuture f = b.MapAsync(wgpu::MapMode::Write, 0, b.GetSize(), wgpu::CallbackMode::WaitAnyOnly, [](wgpu::MapAsyncStatus status, wgpu::StringView message){});
+    WGPUBufferMapCallbackInfo callbackInfo = {
+        .mode = WGPUCallbackMode_WaitAnyOnly,
+        .callback = emptyfunction_123,
+        .userdata1 = NULL,
+        .userdata2 = NULL,
+    };
+    WGPUFuture future = wgpuBufferMapAsync(buffer->mappable.buffer, WGPUMapMode_Write, 0, wgpuBufferGetSize(buffer->mappable.buffer), callbackInfo);
+
     wgpuCommandEncoderRelease(enc);
     wgpuCommandBufferRelease(buf);
-    WGPUFutureWaitInfo winfo{f, 0};
+    WGPUFutureWaitInfo winfo{future, 0};
     wgpuInstanceWaitAny((WGPUInstance)GetInstance(), 1, &winfo, UINT64_MAX);
-    buffer->mappable.buffer = b.MoveToCHandle();
     buffer->map = (vertex*)wgpuBufferGetMappedRange((WGPUBuffer)buffer->mappable.buffer, 0, buffer->mappable.size);
 }
 void UnloadStagingBuffer(StagingBuffer* buf){

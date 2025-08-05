@@ -204,27 +204,37 @@ static inline WGPUTextureFormat toWGPUPixelFormat(PixelFormat format) {
     return WGPUTextureFormat_Undefined;
 }
 
+typedef struct {
+    uint64_t x64;
+} xorshiftstate_c99;
 
+static inline void init_xorshiftstate(xorshiftstate_c99* state, uint64_t seed) {
+    state->x64 = seed;
+}
+static inline void update_xorshiftstate(xorshiftstate_c99* state, uint64_t value) {
+    state->x64 ^= (state->x64 << 13);
+    state->x64 ^= (state->x64 >> 7);
+    state->x64 ^= (state->x64 << 17);
+    state->x64 ^= value;
+}
 
-static inline uint64_t hash_bytes(const void* bytes, size_t count){
-    if(count < 32){
-        uint64_t data[32 / sizeof(uint64_t)] zeroinit;
-        std::memcpy(data, bytes, count);
-        xorshiftstate xsstate{0x324234fff1f1};
-        for(uint32_t i = 0;i < 4;i++){
-            xsstate.update(data[i]);
-        }
-        return xsstate.x64;
+static inline uint64_t hash_bytes(const void* bytes, size_t count) {
+    xorshiftstate_c99 xsstate;
+    init_xorshiftstate(&xsstate, 0x324234fff1f1);
+
+    size_t i = 0;
+    for (i = 0; i + sizeof(uint64_t) <= count; i += sizeof(uint64_t)) {
+        uint64_t chunk;
+        memcpy(&chunk, (const char*)bytes + i, sizeof(uint64_t));
+        update_xorshiftstate(&xsstate, chunk);
     }
-    else{
-        std::vector<uint64_t> vec(((count + sizeof(uint64_t) - 1) / sizeof(uint64_t)) * 8, 0);
-        std::memcpy(vec.data(), bytes, count);
-        xorshiftstate xsstate{0x324234fff1f1};
-        for(uint32_t i = 0;i < vec.size();i++){
-            xsstate.update(vec[i]);
-        }
-        return xsstate.x64;
+
+    if (count % sizeof(uint64_t) != 0) {
+        uint64_t remaining_chunk = 0;
+        memcpy(&remaining_chunk, (const char*)bytes + i, count % sizeof(uint64_t));
+        update_xorshiftstate(&xsstate, remaining_chunk);
     }
+    return xsstate.x64;
 }
 
 static inline size_t hashVertexBufferLayoutSet(const VertexBufferLayoutSet* set){

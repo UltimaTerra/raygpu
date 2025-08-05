@@ -677,7 +677,7 @@ RGAPI void EndMode3D(){
 }
 
 RGAPI void rlSetLineWidth(float lineWidth){
-    g_renderstate.currentSettings.lineWidth = lineWidth;
+    g_renderstate.currentSettings.lineWidth = (uint32_t)(lineWidth <= 0.0f ? 0.0f : lineWidth);
 }
 
 RGAPI int GetScreenWidth (cwoid){

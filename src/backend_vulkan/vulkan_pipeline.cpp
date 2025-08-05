@@ -165,6 +165,14 @@ extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineSta
     pipelineDesc.primitive.frontFace = (WGPUFrontFace)settings->frontFace;
     pipelineDesc.primitive.cullMode = settings->faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
+    WGPUPrimitiveLineWidthInfo lwinfo = {
+        .chain = {
+            .sType = WGPUSType_PrimitiveLineWidthInfo,
+        },
+        .lineWidth = mst.settings.lineWidth,
+    };
+
+    pipelineDesc.primitive.nextInChain = &lwinfo.chain;
     auto toWebGPUPrimitive = [](PrimitiveType pt){
         switch(pt){
             case RL_LINES: return WGPUPrimitiveTopology_LineList;

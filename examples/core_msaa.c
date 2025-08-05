@@ -7,8 +7,8 @@ int textWidth;
 Texture tex;
 void mainloop(void){
 
-    rlSetLineWidth(GetMouseX() / 100);
     BeginDrawing();
+    rlSetLineWidth(GetMouseX() / 100);
     
     ClearBackground((Color){130, 130, 130, 255});
     //UseNoTexture();
