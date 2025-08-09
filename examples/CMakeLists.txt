@@ -102,5 +102,5 @@ if(SUPPORT_VULKAN_BACKEND)
 
     add_executable(surface_wgvk "surface_wgvk.c")
     target_link_libraries  (surface_wgvk PUBLIC wgvk glfw)
-    target_compile_features(surface_wgvk PUBLIC c_std_23)
+    #target_compile_features(surface_wgvk PUBLIC c_std_23)
 endif()
