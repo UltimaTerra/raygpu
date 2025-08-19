@@ -191,8 +191,8 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         VkSubmitInfo submitInfo zeroinit;
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &g_vulkanstate.queue->syncState[cacheIndex].acquireImageSemaphore;
-        g_vulkanstate.queue->syncState[cacheIndex].acquireImageSemaphoreSignalled = true;
+        submitInfo.pSignalSemaphores = &g_vulkanstate.device->fifCache.frameCaches[cacheIndex].syncState.acquireImageSemaphore;
+        g_vulkanstate.device->fifCache.frameCaches[cacheIndex].syncState.acquireImageSemaphoreSignalled = true;
         vkQueueSubmit(g_vulkanstate.queue->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     }
     else{
@@ -204,11 +204,11 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
             g_vulkanstate.device->device,
             wgpusurf->swapchain,
             UINT64_MAX,
-            g_vulkanstate.queue->syncState[cacheIndex].acquireImageSemaphore,
+            g_vulkanstate.device->fifCache.frameCaches[cacheIndex].syncState.acquireImageSemaphore,
             VK_NULL_HANDLE,
             &imageIndex
         );
-        g_vulkanstate.queue->syncState[cacheIndex].acquireImageSemaphoreSignalled = true;
+        g_vulkanstate.device->fifCache.frameCaches[cacheIndex].syncState.acquireImageSemaphoreSignalled = true;
         if(acquireResult != VK_SUCCESS){
             TRACELOG(LOG_WARNING, "vkAcquireNextImageKHR returned %s", vkErrorString(acquireResult));
         }
@@ -947,7 +947,7 @@ extern "C" void RenderPassDrawIndexed (DescribedRenderpass* drp, uint32_t indexC
 }
 extern "C" void PrepareFrameGlobals(){
     uint32_t cacheIndex = g_vulkanstate.device->submittedFrames % framesInFlight;
-    auto& cache = g_vulkanstate.device->frameCaches[cacheIndex];
+    auto& cache = g_vulkanstate.device->fifCache.frameCaches[cacheIndex];
     if(vbo_buf != 0){
         wgpuBufferUnmap(vbo_buf);
     }
@@ -977,7 +977,7 @@ extern "C" void PrepareFrameGlobals(){
 }
 extern "C" DescribedBuffer* UpdateVulkanRenderbatch(){
     uint32_t cacheIndex = g_vulkanstate.device->submittedFrames % framesInFlight;
-    auto& cache = g_vulkanstate.device->frameCaches[cacheIndex];
+    auto& cache = g_vulkanstate.device->fifCache.frameCaches[cacheIndex];
     DescribedBuffer* db = callocnewpp(DescribedBuffer); 
     db->usage = vbo_buf->usage;
     db->size = wgpuBufferGetSize(vbo_buf);
@@ -1013,7 +1013,7 @@ extern "C" DescribedBuffer* UpdateVulkanRenderbatch(){
 void PushUsedBuffer(void* nativeBuffer){
     return;
     uint32_t cacheIndex = g_vulkanstate.device->submittedFrames % framesInFlight;
-    auto& cache = g_vulkanstate.device->frameCaches[cacheIndex];
+    auto& cache = g_vulkanstate.device->fifCache.frameCaches[cacheIndex];
     WGPUBuffer buffer = (WGPUBuffer)nativeBuffer;
     
 }
