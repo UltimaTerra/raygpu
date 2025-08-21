@@ -112,6 +112,7 @@ if(SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER)
     set(DAWN_ENABLE_D3D11 OFF CACHE BOOL "" FORCE)
     set(DAWN_USE_WINDOWS_UI OFF CACHE BOOL "" FORCE)
     set(TINT_BUILD_GLSL_VALIDATOR OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_IR_BINARY OFF CACHE BOOL "" FORCE)
     set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "" FORCE)
     set(TINT_BUILD_MSL_WRITER OFF CACHE BOOL "" FORCE)
     if(SUPPORT_GLSL_PARSER)
@@ -175,7 +176,7 @@ if(SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER)
         set(FETCHCONTENT_QUIET FALSE)
         FetchContent_Declare(
             dawn
-            URL https://github.com/manuel5975p/dawn_monorepo/archive/refs/tags/v7281.tar.gz
+            URL https://github.com/manuel5975p/dawn_monorepo/archive/refs/tags/chromium/7369.tar.gz
 
         )
         FetchContent_MakeAvailable(dawn)

@@ -969,8 +969,12 @@ void InitBackend(){
     instanceDescriptor.nextInChain = togglesChain;
 
     const wgpu::InstanceFeatureName timedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
-    instanceDescriptor.requiredFeatures = &timedWaitAny;
-    instanceDescriptor.requiredFeatureCount = 1;
+    wgpu::InstanceFeatureName requiredInstanceFeatues[2] = {
+        wgpu::InstanceFeatureName::TimedWaitAny,
+        wgpu::InstanceFeatureName::ShaderSourceSPIRV
+    };
+    instanceDescriptor.requiredFeatures = requiredInstanceFeatues;
+    instanceDescriptor.requiredFeatureCount = 2;
 
     sample->instance = wgpu::CreateInstance(&instanceDescriptor);
     #else
@@ -1296,7 +1300,7 @@ extern "C" Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat f
     tDesc.size = {width, height, 1u};
     tDesc.mipLevelCount = mipmaps;
     tDesc.sampleCount = sampleCount;
-    tDesc.format = (WGPUTextureFormat)format;
+    tDesc.format = toWGPUPixelFormat(format);
     tDesc.usage  = usage;
     tDesc.viewFormatCount = 1;
     tDesc.viewFormats = &tDesc.format;
@@ -1420,10 +1424,10 @@ Texture LoadTextureFromImage(Image img){
         WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
         WGPUTextureDimension_2D,
         WGPUExtent3D{img.width, img.height, 1},
-        img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : (WGPUTextureFormat)img.format,
+        img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUTextureFormat(img.format),
         1,1,1,nullptr
     };
-    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : (WGPUTextureFormat)img.format;
+    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUTextureFormat(img.format);
     desc.viewFormats = (WGPUTextureFormat*)&resulting_tf;
     ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &desc);
     WGPUTextureViewDescriptor vdesc{};
