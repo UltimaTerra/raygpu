@@ -888,8 +888,8 @@ RGAPI void EndDrawing(){
     if(g_renderstate.grst->recording){
         uint64_t stmp = NanoTime();
         if(stmp - g_renderstate.grst->lastFrameTimestamp > g_renderstate.grst->delayInCentiseconds * 10000000ull){
-            g_renderstate.renderTargetStack.peek().texture.format = (PixelFormat)g_renderstate.frameBufferFormat;
-            Texture fbCopy = LoadTextureEx(g_renderstate.renderTargetStack.peek().texture.width, g_renderstate.renderTargetStack.peek().texture.height, (PixelFormat)g_renderstate.frameBufferFormat, false);
+            g_renderstate.renderTargetStack.peek().texture.format = g_renderstate.frameBufferFormat;
+            Texture fbCopy = LoadTextureEx(g_renderstate.renderTargetStack.peek().texture.width, g_renderstate.renderTargetStack.peek().texture.height, g_renderstate.frameBufferFormat, false);
             BeginComputepass();
             ComputepassEndOnlyComputing();
             CopyTextureToTexture(g_renderstate.renderTargetStack.peek().texture, fbCopy);

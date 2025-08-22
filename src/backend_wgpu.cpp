@@ -160,7 +160,7 @@ extern "C" Texture3D LoadTexture3DPro(uint32_t width, uint32_t height, uint32_t 
     tDesc.size = {width, height, depth};
     tDesc.mipLevelCount = 1;
     tDesc.sampleCount = sampleCount;
-    tDesc.format = (WGPUTextureFormat)format;
+    tDesc.format = toWGPUPixelFormat(format);
     tDesc.usage  = usage;
     tDesc.viewFormatCount = 1;
     tDesc.viewFormats = &tDesc.format;
@@ -280,7 +280,7 @@ extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, co
     blendState.alpha.operation = (WGPUBlendOperation)settings.blendOperationAlpha;
     WGPUColorTargetState colorTarget{};
 
-    colorTarget.format = (WGPUTextureFormat)g_renderstate.frameBufferFormat;
+    colorTarget.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
     colorTarget.blend = &blendState;
     colorTarget.writeMask = WGPUColorWriteMask_All;
     fragmentState.targetCount = 1;
@@ -580,7 +580,7 @@ extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t 
     }
     TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(config.presentMode).c_str());
     config.alphaMode = WGPUCompositeAlphaMode_Opaque;
-    config.format = (WGPUTextureFormat)g_renderstate.frameBufferFormat;
+    config.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
     config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
     config.width = width;
     config.height = height;
@@ -1203,7 +1203,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     {
         std::string formatsString;
         for(uint32_t i = 0;i < capabilities.formatCount;i++){
-            formatsString += textureFormatSpellingTable.at((WGPUTextureFormat)capabilities.formats[i]).c_str();
+            formatsString += textureFormatSpellingTable.at(capabilities.formats[i]).c_str();
             if(i < capabilities.formatCount - 1){
                 formatsString += ", ";
             }
@@ -1224,13 +1224,13 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
             break;
         }
     }
-    g_renderstate.frameBufferFormat = (PixelFormat)selectedFormat;
+    g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if(format_index == capabilities.formatCount){
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off"); 
-        g_renderstate.frameBufferFormat = (PixelFormat)selectedFormat;
+        g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     }
     
-    TRACELOG(LOG_INFO, "Selected surface format %s", textureFormatSpellingTable.at((WGPUTextureFormat)g_renderstate.frameBufferFormat).c_str());
+    TRACELOG(LOG_INFO, "Selected surface format %s", textureFormatSpellingTable.at(toWGPUPixelFormat(g_renderstate.frameBufferFormat)).c_str());
     
     //TRACELOG(LOG_INFO, "Selected present mode %s", presentModeSpellingTable.at((WGPUPresentMode)g_wgpustate.presentMode).c_str());
 }
@@ -1467,7 +1467,7 @@ extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t newWidth, uint32_t
     fsurface->renderTarget.texture.height = newHeight;
     fsurface->renderTarget.depth.width = newWidth;
     fsurface->renderTarget.depth.height = newHeight;
-    WGPUTextureFormat format = (WGPUTextureFormat)fsurface->surfaceConfig.format;
+    WGPUTextureFormat format = fsurface->surfaceConfig.format;
     WGPUSurfaceConfiguration wsconfig{};
     wsconfig.device = (WGPUDevice)fsurface->surfaceConfig.device;
     wsconfig.width = newWidth;
@@ -1596,7 +1596,7 @@ wgpu::Buffer readtex zeroinit;
 volatile bool waitflag = false;
 Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     
-    size_t formatSize = GetPixelSizeInBytes((PixelFormat)wgpuTextureGetFormat(tex));
+    size_t formatSize = GetPixelSizeInBytes(fromWGPUPixelFormat(wgpuTextureGetFormat(tex)));
     uint32_t width = wgpuTextureGetWidth(tex);
     uint32_t height = wgpuTextureGetHeight(tex);
     Image ret {
@@ -1604,7 +1604,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
         wgpuTextureGetWidth(tex), 
         wgpuTextureGetHeight(tex), 
         1,
-        (PixelFormat)wgpuTextureGetFormat(tex), 
+        fromWGPUPixelFormat(wgpuTextureGetFormat(tex)), 
         RoundUpToNextMultipleOf256(formatSize * width), 
     };
     WGPUBufferDescriptor b{};
@@ -1642,7 +1642,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     //wgpuDeviceTick((WGPUDevice)GetDevice());
     //#else
     //#endif
-    ret.format = (PixelFormat)ret.format;
+    ret.format = ret.format;
     waitflag = true;
     auto onBuffer2Mapped = [&ret](wgpu::MapAsyncStatus status, const char* userdata){
         //std::cout << "Backcalled: " << (int)status << std::endl;
@@ -1759,12 +1759,12 @@ extern "C" void EndRenderpassPro(DescribedRenderpass* rp, bool renderTexture){
 
 RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
     RenderTexture ret{
-        .texture = LoadTextureEx(width, height, (PixelFormat)g_renderstate.frameBufferFormat, true),
+        .texture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true),
         .colorMultisample = Texture{}, 
         .depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
     };
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT){
-        ret.colorMultisample = LoadTexturePro(width, height, (PixelFormat)g_renderstate.frameBufferFormat,WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
+        ret.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat,WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
     }
     ret.colorAttachmentCount = 1;
     return ret;
@@ -2014,7 +2014,7 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     blendState.alpha.operation = (WGPUBlendOperation)settings.blendState.alpha.operation;
     WGPUColorTargetState colorTarget{};
 
-    colorTarget.format = (WGPUTextureFormat)g_renderstate.frameBufferFormat;
+    colorTarget.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
     colorTarget.blend = &blendState;
     colorTarget.writeMask = WGPUColorWriteMask_All;
     fragmentState.targetCount = 1;

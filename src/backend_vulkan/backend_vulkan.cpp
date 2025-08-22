@@ -1189,12 +1189,12 @@ extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t 
 
 RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
     RenderTexture ret{
-        .texture = LoadTextureEx(width, height, (PixelFormat)g_renderstate.frameBufferFormat, true),
+        .texture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true),
         .colorMultisample = Texture{}, 
         .depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
     };
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT){
-        ret.colorMultisample = LoadTexturePro(width, height, (PixelFormat)g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
+        ret.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
     }
     WGPUTextureView colorTargetView = (WGPUTextureView)ret.texture.view;
     //wgpuQueueTransitionLayout(g_vulkanstate.queue, colorTargetView->texture, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
