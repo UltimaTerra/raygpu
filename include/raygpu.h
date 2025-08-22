@@ -48,36 +48,38 @@ static inline uint64_t ROT_BYTES(uint64_t V, uint8_t C) {
 }
 
 typedef enum PixelFormat {
-    RGBA8      = 0x12, //WGPUTextureFormat_RGBA8Unorm,
-    RGBA8_Srgb = 0x13, //WGPUTextureFormat_RGBA8UnormSrgb,
-    BGRA8      = 0x17, //WGPUTextureFormat_BGRA8Unorm,
-    BGRA8_Srgb = 0x18, //WGPUTextureFormat_BGRA8UnormSrgb,
-    RGBA16F    = 0x22, //WGPUTextureFormat_RGBA16Float,
-    RGBA32F    = 0x23, //WGPUTextureFormat_RGBA32Float,
-    Depth24    = 0x28, //WGPUTextureFormat_Depth24Plus,
-    Depth32    = 0x2A, //WGPUTextureFormat_Depth32Float,
+    PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+    PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB,
+    PIXELFORMAT_UNCOMPRESSED_B8G8R8A8,
+    PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB,
+    PIXELFORMAT_UNCOMPRESSED_R16G16B16A16,
+    PIXELFORMAT_UNCOMPRESSED_R32G32B32A32,
+
+    PIXELFORMAT_DEPTH_24_PLUS    = 0x28, //WGPUTextureFormat_Depth24Plus,
+    PIXELFORMAT_DEPTH_32_FLOAT    = 0x2A, //WGPUTextureFormat_Depth32Float,
 
     GRAYSCALE = 0x100000, // No WGPU_ equivalent
     RGB8 = 0x100001,      // No WGPU_ equivalent
     PixelFormat_Force32 = 0x7FFFFFFF
 } PixelFormat;
 
-typedef enum TFilterMode { TFilterMode_Undefined = 0x00000000, TFilterMode_Nearest = 0x00000001, TFilterMode_Linear = 0x00000002, TFilterMode_Force32 = 0x7FFFFFFF } TFilterMode;
+typedef enum TextureFilter {
+    TEXTURE_FILTER_POINT = 0x00000000,
+    TEXTURE_FILTER_BILINEAR = 0x00000001,
+    TFilterMode_Force32 = 0x7FFFFFFF
+} TextureFilter;
 
 typedef enum FrontFace { FrontFace_Undefined = 0x00000000, FrontFace_CCW = 0x00000001, FrontFace_CW = 0x00000002, FrontFace_Force32 = 0x7FFFFFFF } FrontFace;
 
 typedef enum IndexFormat { IndexFormat_Undefined = 0x00000000, IndexFormat_Uint16 = 0x00000001, IndexFormat_Uint32 = 0x00000002, IndexFormat_Force32 = 0x7FFFFFFF } IndexFormat;
 
-typedef enum filterMode {
-    filter_nearest = 0x1,
-    filter_linear = 0x2,
-} filterMode;
 
-typedef enum addressMode {
-    clampToEdge = 0x1,
-    repeat = 0x2,
-    mirrorRepeat = 0x3,
-} addressMode;
+typedef enum TextureWrap {
+    TEXTURE_WRAP_CLAMP = 0x1,
+    TEXTURE_WRAP_REPEAT = 0x2,
+    TEXTURE_WRAP_MIRROR_REPEAT = 0x3,
+    TEXTURE_WRAP_MIRROR_CLAMP = 0x4,
+} TextureWrap;
 
 typedef enum PrimitiveType{
     RL_TRIANGLES, RL_TRIANGLE_STRIP, RL_QUADS, RL_LINES, RL_POINTS
@@ -222,12 +224,12 @@ typedef struct DescribedBuffer{
 
 typedef struct DescribedSampler{
     WGPUSampler sampler;
-    addressMode addressModeU;
-    addressMode addressModeV;
-    addressMode addressModeW;
-    filterMode magFilter;
-    filterMode minFilter;
-    filterMode mipmapFilter;
+    TextureWrap addressModeU;
+    TextureWrap addressModeV;
+    TextureWrap addressModeW;
+    TextureFilter magFilter;
+    TextureFilter minFilter;
+    TextureFilter mipmapFilter;
     
     float lodMinClamp;
     float lodMaxClamp;
@@ -1000,8 +1002,8 @@ EXTERN_C_BEGIN
     RGAPI const char* FindDirectory(const char* directoryName, int maxOutwardSearch);
     RGAPI bool IsFileExtension(const char *fileName, const char *ext);
     
-    RGAPI DescribedSampler LoadSampler(addressMode amode, filterMode fmode);
-    RGAPI DescribedSampler LoadSamplerEx(addressMode amode, filterMode fmode, filterMode mipmapFilter, float maxAnisotropy);
+    RGAPI DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode);
+    RGAPI DescribedSampler LoadSamplerEx(TextureWrap amode, TextureFilter fmode, TextureFilter mipmapFilter, float maxAnisotropy);
     RGAPI void UnloadSampler(DescribedSampler sampler);
 
     RGAPI WGPUTexture GetActiveColorTarget(cwoid);

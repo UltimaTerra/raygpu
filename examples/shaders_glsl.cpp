@@ -29,7 +29,7 @@ void main() {
 )";
 int main(){
     InitWindow(800, 800, "Shaders example");
-    RenderTexture multi = LoadRenderTextureEx(800, 800, BGRA8, 1, 2);
+    RenderTexture multi = LoadRenderTextureEx(800, 800, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8, 1, 2);
     Shader colorInverter = LoadShaderFromMemory(vertexSourceGLSL, fragmentSourceGLSL);
 
     Matrix matrix = ScreenMatrix(GetScreenWidth(), GetScreenHeight());
@@ -38,7 +38,7 @@ int main(){
     DescribedBuffer* matrixbuffers = GenStorageBuffer(&identity, sizeof(Matrix));
     
     Texture tex = LoadTexture(TextFormat("%s/tileset.png", FindDirectory("resources", 3)));
-    DescribedSampler sampler = LoadSampler(repeat, filter_linear);
+    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
 
     float vertices[6] = {0,-0.5,-0.5,0.5,0.5,0.5};
     DescribedBuffer* buffer = GenVertexBuffer(vertices, sizeof(vertices));

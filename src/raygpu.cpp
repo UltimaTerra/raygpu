@@ -858,14 +858,14 @@ RGAPI void EndDrawing(){
     }
     if(g_renderstate.windowFlags & FLAG_STDOUT_TO_FFMPEG){
         Image img = LoadImageFromTextureEx((WGPUTexture)GetActiveColorTarget(), 0);
-        if (img.format != BGRA8 && img.format != RGBA8) {
+        if (img.format != PIXELFORMAT_UNCOMPRESSED_B8G8R8A8 && img.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
             // Handle unsupported formats or convert as necessary
             fprintf(stderr, "Unsupported pixel format for FFmpeg export.\n");
             // You might want to convert the image to a supported format here
             // For simplicity, we'll skip exporting in this case
             return;
         }
-        ImageFormat(&img, RGBA8);
+        ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
 
         // Calculate the total size of the image data to write
         size_t totalSize = img.rowStrideInBytes * img.height;
@@ -1052,11 +1052,11 @@ RGAPI void ImageFormat(Image* img, PixelFormat newFormat){
     newimg.rowStrideInBytes = newimg.width * psize;
     newimg.data = calloc(img->width * img->height, psize);
     switch(img->format){
-        case PixelFormat::BGRA8:{
-            if(newFormat == RGBA8){
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:{
+            if(newFormat == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8){
                 FormatImage_Impl<BGRA8Color, RGBA8Color>(*img, newimg);
             }
-            if(newFormat == RGBA32F){
+            if(newFormat == PIXELFORMAT_UNCOMPRESSED_R32G32B32A32){
                 FormatImage_Impl<BGRA8Color, RGBA32FColor>(*img, newimg);
             }
         }break;
@@ -1071,7 +1071,7 @@ RGAPI void ImageFormat(Image* img, PixelFormat newFormat){
 }
 RGAPI Color* LoadImageColors(Image img){
     Image copy = ImageFromImage(img, Rectangle{0,0,(float)img.width, (float)img.height});
-    ImageFormat(&copy, RGBA8);
+    ImageFormat(&copy, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     return (RGBA8Color*)copy.data;
 }
 RGAPI void UnloadImageColors(Color* cols){
@@ -1367,17 +1367,17 @@ Texture LoadTexture(const char* filename){
     return tex;
 }
 Texture LoadBlankTexture(uint32_t width, uint32_t height){
-    return LoadTextureEx(width, height, RGBA8, true);
+    return LoadTextureEx(width, height, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, true);
 }
 
 Texture LoadDepthTexture(uint32_t width, uint32_t height){
-    return LoadTextureEx(width, height, Depth32, true);
+    return LoadTextureEx(width, height, PIXELFORMAT_DEPTH_32_FLOAT, true);
 }
 RenderTexture LoadRenderTextureEx(uint32_t width, uint32_t height, PixelFormat colorFormat, uint32_t sampleCount, uint32_t attachmentCount){
     RenderTexture ret{
         .texture = LoadTextureEx(width, height, colorFormat, true),
         .colorMultisample = Texture{}, 
-        .depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1)
+        .depth = LoadTexturePro(width, height, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1)
     };
     if(sampleCount > 1){
         ret.colorMultisample = LoadTexturePro(width, height, colorFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1);
@@ -1567,7 +1567,7 @@ void UnloadRenderpass(DescribedRenderpass rp){
 }
 
 
-DescribedSampler LoadSampler(addressMode amode, filterMode fmode){
+DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode){
     return LoadSamplerEx(amode, fmode, fmode, 1.0f);
 }
 
@@ -1690,7 +1690,7 @@ extern "C" Image LoadImageFromMemory(const char* extension, const void* data, si
     image.data = stbi_load_from_memory((stbi_uc*)data, static_cast<int>(dataSize), (int*)&image.width, (int*)&image.height, (int*)&comp, 0);
     image.rowStrideInBytes = comp * image.width;
     if(comp == 4){
-        image.format = RGBA8;
+        image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     }else if(comp == 3){
         image.format = RGB8;
     }
@@ -1702,7 +1702,7 @@ extern "C" Image GenImageColor(Color a, uint32_t width, uint32_t height){
         .width = width, 
         .height = height,
         .mipmaps = 1,
-        .format = RGBA8, 
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 
         .rowStrideInBytes = width * 4,
     };
     for(uint32_t i = 0;i < height;i++){
@@ -1719,7 +1719,7 @@ extern "C" Image GenImageChecker(Color a, Color b, uint32_t width, uint32_t heig
         .width = width, 
         .height = height, 
         .mipmaps = 1,
-        .format = RGBA8, 
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 
         .rowStrideInBytes = width * 4, 
     };
     for(uint32_t i = 0;i < height;i++){
@@ -1745,7 +1745,7 @@ void SaveImage(Image _img, const char* filepath){
         }
     }
     Image img = ImageFromImage(_img, CLITERAL(Rectangle){0,0,(float)_img.width, (float)_img.height});
-    ImageFormat(&img, PixelFormat::RGBA8);
+    ImageFormat(&img, PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     //size_t stride = std::ceil(img.rowStrideInBytes);
     //if(stride == 0){
     //    stride = img.width * sizeof(Color);

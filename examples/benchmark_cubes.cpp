@@ -78,7 +78,7 @@ int main(){
         .fovy = 60.0f
     };
     pl = LoadPipeline(shaderSource);
-    auto smp = LoadSampler(repeat, filter_nearest);
+    auto smp = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     SetPipelineSampler(pl, 2, smp);
     for(int i = -0;i < 2000;i++){
         for(int j = 0;j < 2000;j++){

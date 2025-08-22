@@ -192,7 +192,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     g_renderstate.windowFlags |= FLAG_HEADLESS;
     #endif
     //TODO: fix this, preferrably set correct format in InitWindow_SDL or GLFW
-    g_renderstate.frameBufferFormat = BGRA8;
+    g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
     if(g_renderstate.windowFlags & FLAG_STDOUT_TO_FFMPEG){
         if(IsATerminal(stdout)){
             TRACELOG(LOG_ERROR, "Refusing to pipe video output to terminal");
@@ -264,7 +264,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         
         //std::cout << "Supported Framebuffer Format: 0x" << std::hex << (WGPUTextureFormat)config.format << std::dec << "\n";        
     }else{
-        g_renderstate.frameBufferFormat = BGRA8;
+        g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
         g_renderstate.createdSubwindows[nullptr].surface = CreateHeadlessSurface(width, height, g_renderstate.frameBufferFormat);
     }
     
@@ -293,7 +293,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         g_renderstate.mainWindowRenderTarget.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 4, 1);
     auto depthTexture = LoadTexturePro(width,
                                   height, 
-                                  Depth32, 
+                                  PIXELFORMAT_DEPTH_32_FLOAT, 
                                   WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 
                                   (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
                                   1
@@ -381,7 +381,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     Matrix iden = MatrixIdentity();
     SetStorageBufferData(3, &iden, 64);
     
-    DescribedSampler sampler = LoadSampler(repeat, filter_linear);
+    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     g_renderstate.defaultSampler = sampler;
     SetSampler(2, sampler);
     g_renderstate.init_timestamp = NanoTime();
@@ -474,7 +474,7 @@ extern "C" SubWindow OpenSubWindow(uint32_t width, uint32_t height, const char* 
         fsurface.renderTarget.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 4, 1);
     fsurface.renderTarget.depth = LoadTexturePro(width,
                                   height, 
-                                  Depth32, 
+                                  PIXELFORMAT_DEPTH_32_FLOAT, 
                                   WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 
                                   (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
                                   1
@@ -542,22 +542,22 @@ void SetWindowShouldClose(){
 
 extern "C" size_t GetPixelSizeInBytes(PixelFormat format) {
     switch(format){
-        case PixelFormat::BGRA8:
-        case PixelFormat::BGRA8_Srgb:
-        case PixelFormat::RGBA8:
-        case PixelFormat::RGBA8_Srgb:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB:
         return 4;
-        case PixelFormat::RGBA16F:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
         return 8;
-        case PixelFormat::RGBA32F:
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
         return 16;
 
         case PixelFormat::GRAYSCALE:
         return 2;
         case PixelFormat::RGB8:
         return 3;
-        case PixelFormat::Depth24:
-        case PixelFormat::Depth32:
+        case PixelFormat::PIXELFORMAT_DEPTH_24_PLUS:
+        case PixelFormat::PIXELFORMAT_DEPTH_32_FLOAT:
         return 4;
         default: 
         rg_unreachable();

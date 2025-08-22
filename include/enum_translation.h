@@ -948,45 +948,30 @@ static inline WGPUBufferUsage toWebGPUBufferUsage(WGPUBufferUsage busg) {
     return usage;
 }
 
-
-// Translation function for filterMode to WGPUFilterMode
-static inline WGPUFilterMode toWebGPUFilterMode(filterMode fm) {
-    switch (fm) {
-    case filter_nearest:
+// Translation function for TextureFilter to WGPUFilterMode
+static inline WGPUFilterMode toWebGPUFilterMode(TextureFilter filter) {
+    switch (filter) {
+    case TEXTURE_FILTER_POINT:
         return WGPUFilterMode_Nearest;
-    case filter_linear:
+    case TEXTURE_FILTER_BILINEAR:
         return WGPUFilterMode_Linear;
     default:
         return WGPUFilterMode_Nearest; // Default fallback
     }
 }
 
-// Translation function for addressMode to WGPUAddressMode
-static inline WGPUAddressMode toWebGPUAddressMode(addressMode am) {
-    switch (am) {
-    case clampToEdge:
+// Translation function for TextureWrap to WGPUAddressMode
+static inline WGPUAddressMode toWebGPUAddressMode(TextureWrap wrapMode) {
+    switch (wrapMode) {
+    case TEXTURE_WRAP_CLAMP:
         return WGPUAddressMode_ClampToEdge;
-    case repeat:
+    case TEXTURE_WRAP_REPEAT:
         return WGPUAddressMode_Repeat;
-    case mirrorRepeat:
+    case TEXTURE_WRAP_MIRROR_REPEAT:
         return WGPUAddressMode_MirrorRepeat;
+    // Note: TEXTURE_WRAP_MIRROR_CLAMP may map to WGPUAddressMode_MirrorClampToEdge depending on your wgpu.h version
     default:
         return WGPUAddressMode_ClampToEdge; // Default fallback
-    }
-}
-
-
-
-
-// Translation function for TFilterMode to WGPUFilterMode
-static inline WGPUFilterMode toWebGPUTFilterMode(TFilterMode tfm) {
-    switch (tfm) {
-    case TFilterMode_Nearest:
-        return WGPUFilterMode_Nearest;
-    case TFilterMode_Linear:
-        return WGPUFilterMode_Linear;
-    default:
-        return WGPUFilterMode_Nearest; // Default fallback
     }
 }
 
@@ -997,6 +982,7 @@ static inline WGPUFrontFace toWebGPUFrontFace(FrontFace ff) {
         return WGPUFrontFace_CCW;
     case FrontFace_CW:
         return WGPUFrontFace_CW;
+    case FrontFace_Undefined:
     default:
         return WGPUFrontFace_CCW; // Default fallback
     }
@@ -1009,22 +995,35 @@ static inline WGPUIndexFormat toWebGPUIndexFormat(IndexFormat ifmt) {
         return WGPUIndexFormat_Uint16;
     case IndexFormat_Uint32:
         return WGPUIndexFormat_Uint32;
+    case IndexFormat_Undefined:
     default:
-        return WGPUIndexFormat_Uint16; // Default fallback
-    }
-}
-static inline WGPUTextureFormat toWGPUTextureFormat(PixelFormat format){
-    switch(format){
-        case RGBA8:return WGPUTextureFormat_RGBA8Unorm;
-        case BGRA8:return WGPUTextureFormat_BGRA8Unorm;
-        case RGBA16F: return WGPUTextureFormat_RGBA16Float;
-        case RGBA32F: return WGPUTextureFormat_RGBA32Float;
-        case Depth24: return WGPUTextureFormat_Depth24Plus;
-        case Depth32: return WGPUTextureFormat_Depth32Float;
-        default: return WGPUTextureFormat_Undefined;
+        return WGPUIndexFormat_Undefined;
     }
 }
 
+// Translation function for PixelFormat to WGPUTextureFormat
+static inline WGPUTextureFormat toWGPUTextureFormat(PixelFormat format) {
+    switch (format) {
+    case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+        return WGPUTextureFormat_RGBA8Unorm;
+    case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB:
+        return WGPUTextureFormat_RGBA8UnormSrgb;
+    case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+        return WGPUTextureFormat_BGRA8Unorm;
+    case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB:
+        return WGPUTextureFormat_BGRA8UnormSrgb;
+    case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+        return WGPUTextureFormat_RGBA16Float;
+    case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+        return WGPUTextureFormat_RGBA32Float;
+    case PIXELFORMAT_DEPTH_24_PLUS:
+        return WGPUTextureFormat_Depth24Plus;
+    case PIXELFORMAT_DEPTH_32_FLOAT:
+        return WGPUTextureFormat_Depth32Float;
+    default:
+        return WGPUTextureFormat_Undefined;
+    }
+}
 #endif // SUPPORT_WGPU_BACKEND
 
 #endif // ENUM_HEADER_H

@@ -33,8 +33,8 @@ void mainloop(){
 int main(cwoid){
     InitWindow(1000, 1000, "Textures");
     GuiSetStyle(DEFAULT, TEXT_SIZE, 30);
-    tex = LoadTextureEx(10, 10, RGBA8, false);
-    texSrgb = LoadTextureEx(10, 10, RGBA8_Srgb, false);
+    tex = LoadTextureEx(10, 10, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, false);
+    texSrgb = LoadTextureEx(10, 10, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB, false);
     
     #ifndef __EMSCRIPTEN__
     while(!WindowShouldClose()){

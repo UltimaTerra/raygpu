@@ -131,7 +131,7 @@ void CopyBufferToImage(WGPUDevice device, VkCommandPool commandPool, VkQueue que
 }
 
 inline bool is__depth(PixelFormat fmt){
-    return fmt ==  Depth24 || fmt == Depth32;
+    return fmt ==  PIXELFORMAT_DEPTH_24_PLUS || fmt == PIXELFORMAT_DEPTH_32_FLOAT;
 }
 inline bool is__depth(VkFormat fmt){
     return fmt ==  VK_FORMAT_D32_SFLOAT || fmt == VK_FORMAT_D32_SFLOAT_S8_UINT || fmt == VK_FORMAT_D24_UNORM_S8_UINT;
@@ -186,7 +186,7 @@ extern "C" Texture LoadTexturePro_Data(uint32_t width, uint32_t height, PixelFor
     ret.format = format_;
     
     VkImageAspectFlags aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-    if (format_ == Depth24 || format_ == Depth32) {
+    if (format_ == PIXELFORMAT_DEPTH_24_PLUS || format_ == PIXELFORMAT_DEPTH_32_FLOAT) {
         aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
     }
     WGPUTextureViewDescriptor descriptor zeroinit;
@@ -195,7 +195,7 @@ extern "C" Texture LoadTexturePro_Data(uint32_t width, uint32_t height, PixelFor
     descriptor.baseArrayLayer = 0;
     descriptor.mipLevelCount = mipmaps;
     descriptor.baseMipLevel = 0;
-    descriptor.aspect = (format_ == Depth24 || format_ == Depth32) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All;
+    descriptor.aspect = (format_ == PIXELFORMAT_DEPTH_24_PLUS || format_ == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All;
     descriptor.dimension = WGPUTextureViewDimension_2D;
     descriptor.usage = usage;
     WGPUTextureView view = wgpuTextureCreateView(image, &descriptor);
@@ -215,7 +215,7 @@ extern "C" Texture LoadTexturePro_Data(uint32_t width, uint32_t height, PixelFor
             singleMipDescriptor.baseArrayLayer = 0;
             singleMipDescriptor.mipLevelCount = 1;
             singleMipDescriptor.baseMipLevel = i;
-            singleMipDescriptor.aspect = (format_ == Depth24 || format_ == Depth32) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All;
+            singleMipDescriptor.aspect = (format_ == PIXELFORMAT_DEPTH_24_PLUS || format_ == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All;
             singleMipDescriptor.dimension = WGPUTextureViewDimension_2D;
             singleMipDescriptor.usage = usage;
             ret.mipViews[i] = wgpuTextureCreateView(image, &singleMipDescriptor);
@@ -391,14 +391,14 @@ Texture LoadTextureFromImage(Image img) {
             ((Color*)altdata)[i].a = gscv >> 8;
         }
     }
-    else if (img.format != RGBA8 && img.format != BGRA8 && img.format != RGBA16F && img.format != RGBA32F && img.format != Depth24) {
+    else if (img.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && img.format != PIXELFORMAT_UNCOMPRESSED_B8G8R8A8 && img.format != PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 && img.format != PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 && img.format != PIXELFORMAT_DEPTH_24_PLUS) {
         TRACELOG(LOG_FATAL, "Unsupported image format.");
     }
     rassert(img.mipmaps < MAX_MIP_LEVELS, "Too many mip levels");
     auto ret = LoadTexturePro_Data(
         img.width,
         img.height,
-        img.format == GRAYSCALE ? RGBA8 : img.format,
+        img.format == GRAYSCALE ? PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 : img.format,
         WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding, // Assuming TextureUsage enum exists and has a Sampled option
         1, // sampleCount
         img.mipmaps > 0 ? img.mipmaps : 1, 

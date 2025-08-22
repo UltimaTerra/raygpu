@@ -163,14 +163,14 @@ typedef struct VertexBufferLayoutSet{
 
 static inline PixelFormat fromWGPUPixelFormat(WGPUTextureFormat format) {
     switch (format) {
-        case WGPUTextureFormat_RGBA8Unorm:      return RGBA8;
-        case WGPUTextureFormat_RGBA8UnormSrgb:  return RGBA8_Srgb;
-        case WGPUTextureFormat_BGRA8Unorm:      return BGRA8;
-        case WGPUTextureFormat_BGRA8UnormSrgb:  return BGRA8_Srgb;
-        case WGPUTextureFormat_RGBA16Float:     return RGBA16F;
-        case WGPUTextureFormat_RGBA32Float:     return RGBA32F;
-        case WGPUTextureFormat_Depth24Plus:     return Depth24;
-        case WGPUTextureFormat_Depth32Float:    return Depth32;
+        case WGPUTextureFormat_RGBA8Unorm:      return PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+        case WGPUTextureFormat_RGBA8UnormSrgb:  return PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB;
+        case WGPUTextureFormat_BGRA8Unorm:      return PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
+        case WGPUTextureFormat_BGRA8UnormSrgb:  return PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB;
+        case WGPUTextureFormat_RGBA16Float:     return PIXELFORMAT_UNCOMPRESSED_R16G16B16A16;
+        case WGPUTextureFormat_RGBA32Float:     return PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;
+        case WGPUTextureFormat_Depth24Plus:     return PIXELFORMAT_DEPTH_24_PLUS;
+        case WGPUTextureFormat_Depth32Float:    return PIXELFORMAT_DEPTH_32_FLOAT;
         default:
             rg_unreachable();
     }
@@ -178,21 +178,21 @@ static inline PixelFormat fromWGPUPixelFormat(WGPUTextureFormat format) {
 }
 static inline WGPUTextureFormat toWGPUPixelFormat(PixelFormat format) {
     switch (format) {
-        case RGBA8:
+        case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
             return WGPUTextureFormat_RGBA8Unorm;
-        case RGBA8_Srgb:
+        case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB:
             return WGPUTextureFormat_RGBA8UnormSrgb;
-        case BGRA8:
+        case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
             return WGPUTextureFormat_BGRA8Unorm;
-        case BGRA8_Srgb:
+        case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB:
             return WGPUTextureFormat_BGRA8UnormSrgb;
-        case RGBA16F:
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
             return WGPUTextureFormat_RGBA16Float;
-        case RGBA32F:
+        case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
             return WGPUTextureFormat_RGBA32Float;
-        case Depth24:
+        case PIXELFORMAT_DEPTH_24_PLUS:
             return WGPUTextureFormat_Depth24Plus;
-        case Depth32:
+        case PIXELFORMAT_DEPTH_32_FLOAT:
             return WGPUTextureFormat_Depth32Float;
         case GRAYSCALE:
             assert(0 && "GRAYSCALE format not supported in Vulkan.");
@@ -1091,23 +1091,25 @@ extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle);
 extern "C" void* CreateSurfaceForWindow_RGFW(void* windowHandle);
 
 
-static inline WGPUFilterMode toWGPUFilterMode(filterMode fm){
+static inline WGPUFilterMode toWGPUFilterMode(TextureFilter fm){
     switch(fm){
-        case filter_linear:return WGPUFilterMode_Linear;
-        case filter_nearest: return WGPUFilterMode_Nearest;
+        case TEXTURE_FILTER_BILINEAR:return WGPUFilterMode_Linear;
+        default: return WGPUFilterMode_Nearest;
     }
 }
-static inline WGPUMipmapFilterMode toWGPUMipmapFilterMode(filterMode fm){
+static inline WGPUMipmapFilterMode toWGPUMipmapFilterMode(TextureFilter fm){
     switch(fm){
-        case filter_linear:return WGPUMipmapFilterMode_Linear;
-        case filter_nearest: return WGPUMipmapFilterMode_Nearest;
+        case TEXTURE_FILTER_BILINEAR:return WGPUMipmapFilterMode_Linear;
+        default: return WGPUMipmapFilterMode_Nearest;
     }
 }
-static inline WGPUAddressMode toWGPUAddressMode(addressMode am){
+static inline WGPUAddressMode toWGPUAddressMode(TextureWrap am){
     switch(am){
-        case clampToEdge: return WGPUAddressMode_ClampToEdge;
-        case repeat: return WGPUAddressMode_Repeat;
-        case mirrorRepeat: return WGPUAddressMode_MirrorRepeat;
+        case TEXTURE_WRAP_CLAMP: return WGPUAddressMode_ClampToEdge;
+        case TEXTURE_WRAP_REPEAT: return WGPUAddressMode_Repeat;
+        case TEXTURE_WRAP_MIRROR_REPEAT: return WGPUAddressMode_MirrorRepeat;
+        case TEXTURE_WRAP_MIRROR_CLAMP: return WGPUAddressMode_ClampToEdge;
+        default: return WGPUAddressMode_Repeat;
     }
 }
 

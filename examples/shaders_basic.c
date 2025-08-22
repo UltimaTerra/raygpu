@@ -24,8 +24,8 @@ int main(){
     DescribedBuffer* matrixbuffer = GenUniformBuffer(&matrix, sizeof(Matrix));
     DescribedBuffer* matrixbuffers = GenStorageBuffer(&identity, sizeof(Matrix));
     
-    Texture tex = LoadTexture(TextFormat("%s/tileset.png",FindDirectory("resources", 3)));
-    DescribedSampler sampler = LoadSampler(repeat, filter_linear);
+    Texture tex = LoadTexture(TextFormat("%s/tileset.png", FindDirectory("resources", 3)));
+    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     
     while(!WindowShouldClose()){
         BeginDrawing();

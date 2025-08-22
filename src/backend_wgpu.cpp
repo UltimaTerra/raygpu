@@ -166,7 +166,7 @@ extern "C" Texture3D LoadTexture3DPro(uint32_t width, uint32_t height, uint32_t 
     tDesc.viewFormats = &tDesc.format;
     
     WGPUTextureViewDescriptor textureViewDesc zeroinit;
-    textureViewDesc.aspect = ((format == Depth24 || format == Depth32) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All);
+    textureViewDesc.aspect = ((format == PIXELFORMAT_DEPTH_24_PLUS || format == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All);
     textureViewDesc.baseArrayLayer = 0;
     textureViewDesc.arrayLayerCount = 1;
     textureViewDesc.baseMipLevel = 0;
@@ -1307,13 +1307,13 @@ extern "C" Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat f
 
     WGPUTextureViewDescriptor textureViewDesc{};
     char potlabel[128]; 
-    if(format == Depth24){
+    if(format == PIXELFORMAT_DEPTH_24_PLUS){
         int len = snprintf(potlabel, 128, "Depftex %d x %d", width, height);
         textureViewDesc.label.data = potlabel;
         textureViewDesc.label.length = len;
     }
     textureViewDesc.usage = usage;
-    textureViewDesc.aspect = ((format == Depth24 || format == Depth32) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All);
+    textureViewDesc.aspect = ((format == PIXELFORMAT_DEPTH_24_PLUS || format == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All);
     textureViewDesc.baseArrayLayer = 0;
     textureViewDesc.arrayLayerCount = 1;
     textureViewDesc.baseMipLevel = 0;
@@ -1337,7 +1337,7 @@ extern "C" Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat f
     }
     return ret;
 }
-DescribedSampler LoadSamplerEx(addressMode amode, filterMode fmode, filterMode mipmapFilter, float maxAnisotropy){
+DescribedSampler LoadSamplerEx(TextureWrap amode, TextureFilter fmode, TextureFilter mipmapFilter, float maxAnisotropy){
     DescribedSampler ret zeroinit;
     ret.magFilter    = fmode;
     ret.minFilter    = fmode;
@@ -1490,7 +1490,7 @@ extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t newWidth, uint32_t
     }
     fsurface->renderTarget.depth = LoadTexturePro(newWidth,
                            newHeight, 
-                           Depth32, 
+                           PIXELFORMAT_DEPTH_32_FLOAT, 
                            WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 
                            (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
                            1
@@ -1761,7 +1761,7 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
     RenderTexture ret{
         .texture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true),
         .colorMultisample = Texture{}, 
-        .depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
+        .depth = LoadTexturePro(width, height, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
     };
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT){
         ret.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat,WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);

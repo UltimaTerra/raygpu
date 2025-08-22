@@ -51,7 +51,7 @@ extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t he
     UnloadTexture(fsurface->renderTarget.depth);
     fsurface->renderTarget.depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
     if(fsurface->renderTarget.depth.sampleCount > 1){
-        fsurface->renderTarget.colorMultisample = LoadTexturePro(width, height, BGRA8, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
+        fsurface->renderTarget.colorMultisample = LoadTexturePro(width, height, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
     }
 }
 
@@ -268,7 +268,7 @@ void negotiateSurfaceFormatAndPresentMode(WGPUAdapter adapter, const void* Surfa
     }
     for(uint32_t i = 0;i < surfaceCapabilities.formatCount;i++){
         if(surfaceCapabilities.formats[i] == WGPUTextureFormat_BGRA8Unorm){
-            g_renderstate.frameBufferFormat = BGRA8;
+            g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
             return;
         }
     }

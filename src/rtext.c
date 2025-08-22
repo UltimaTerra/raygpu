@@ -296,7 +296,7 @@ extern void LoadFontDefault(void)
     Image imFont = {
         .width = 128,
         .height = 128,
-        .format = RGBA8,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
         .data = calloc(128*128, 4)
     };
 
@@ -570,7 +570,7 @@ Font LoadFontFromImage(Image image, Color key, int firstChar)
     Image fontClear = {
         .width = image.width,
         .height = image.height,
-        .format = RGBA8,
+        .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
         .data = pixels
     };
 
