@@ -72,6 +72,9 @@ ShaderSourceType detectShaderLanguage(const void* data, size_t sizeInBytes){
     if(strstr(c_str, "@location") || strstr(c_str, "@location")){
         return sourceTypeWGSL;
     }
+    if(strstr(c_str, "@group(") || strstr(c_str, "@binding(")){
+        return sourceTypeWGSL;
+    }
     
     else if(strstr(c_str, "#version")){
         return sourceTypeGLSL;

@@ -176,7 +176,7 @@ if(SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER)
         set(FETCHCONTENT_QUIET FALSE)
         FetchContent_Declare(
             dawn
-            URL https://github.com/manuel5975p/dawn_monorepo/archive/refs/tags/chromium/7369.tar.gz
+            URL https://github.com/manuel5975p/dawn_monorepo/archive/refs/tags/chromium/7369-fixed.tar.gz
 
         )
         FetchContent_MakeAvailable(dawn)
