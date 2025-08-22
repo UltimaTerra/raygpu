@@ -37,6 +37,9 @@
 #include <raygpu.h>
 #include <algorithm>
 #include <vector>
+#include <cstdlib>
+#include <cstring>
+#include <cstdint>
 
 
 template<typename T>
@@ -624,18 +627,19 @@ static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap,
         return toEmplace;
     }
 }
+typedef struct ShaderImpl{
+    PipelineHashMap pipelineCache;
+    
+    ModifiablePipelineState state;
+    DescribedBindGroup bindGroup;
+}ShaderImpl;
+extern ShaderImpl* allocatedShaderIDs_shc;
 
 typedef struct DescribedPipeline{
     WGPURenderPipeline activePipeline;
-
-    ModifiablePipelineState state;
-    
     DescribedShaderModule shaderModule;
-    DescribedBindGroup bindGroup;
     DescribedPipelineLayout layout;
     DescribedBindGroupLayout bglayout;
-
-    PipelineHashMap pipelineCache;
 }DescribedPipeline;
 
 /**
@@ -643,9 +647,6 @@ typedef struct DescribedPipeline{
  * 
  * @return VertexBufferLayoutSet 
  */
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
 
 inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
     VertexBufferLayoutSet result;

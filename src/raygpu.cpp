@@ -546,6 +546,14 @@ RGAPI void EndPipelineMode(){
     g_renderstate.activePipeline = g_renderstate.defaultPipeline;
     //BindPipeline(g_renderstate.activePipeline, g_renderstate.activePipeline->lastUsedAs);
 }
+
+RGAPI void BeginShaderMode(Shader shader){
+    
+}
+RGAPI void EndShaderMode(void){
+
+}
+
 RGAPI void DisableDepthTest(cwoid){
     drawCurrentBatch();
     g_renderstate.currentSettings.depthTest = 0;
@@ -1429,6 +1437,7 @@ void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, Describe
     entry.size = buffer->size;
     UpdateBindGroupEntry(bg, index, entry);
 }
+
 void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
     WGPUBindGroupEntry entry{};
     entry.binding = index;
@@ -2553,3 +2562,19 @@ unsigned char *DecodeDataBase64(const unsigned char *data, int *outputSize)
 size_t telegrama_render_size1 = sizeof(telegrama_render1);
 size_t telegrama_render_size2 = sizeof(telegrama_render2);
 size_t telegrama_render_size3 = sizeof(telegrama_render3);
+
+ShaderImpl* allocatedShaderIDs_shc = NULL;
+uint32_t nextShaderID_shc = 0;
+uint32_t capacity_shc = 0;
+
+uint32_t getNextShaderID_shc(){
+    if(nextShaderID_shc >= capacity_shc){
+        uint32_t newCapacity = capacity_shc * 2 + (capacity_shc == 0) * 8;
+        ShaderImpl* newAllocatedShaderIDs_shc = RL_CALLOC(newCapacity, sizeof(ShaderImpl));
+        memcpy(newAllocatedShaderIDs_shc, allocatedShaderIDs_shc, capacity_shc * sizeof(ShaderImpl));
+        RL_FREE(allocatedShaderIDs_shc);
+        capacity_shc = newCapacity;
+        allocatedShaderIDs_shc = newAllocatedShaderIDs_shc; 
+    }
+    return nextShaderID_shc++;
+}

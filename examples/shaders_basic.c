@@ -16,6 +16,7 @@ void main() {
     outColor = (texColor * frag_color).yzxw + vec4(0.4f,0,0,0.4f);
 }
 )";
+
 int main(){
     InitWindow(800, 800, "Shaders example");
     Shader colorInverter = LoadShaderFromMemory(NULL, fragSourceGLSL);

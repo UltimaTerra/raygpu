@@ -305,8 +305,8 @@ typedef struct MaterialMap{
 }MaterialMap;
 
 typedef struct Shader {
-    DescribedPipeline* id;  // Pipeline
-    int *locs;              // Shader locations array (RL_MAX_SHADER_LOCATIONS)
+    unsigned int id;  // Pipeline
+    int *locs;        // Shader locations array (RL_MAX_SHADER_LOCATIONS)
 } Shader;
 
 typedef struct Material{
@@ -980,6 +980,8 @@ EXTERN_C_BEGIN
     RGAPI void EndRenderpassPro(DescribedRenderpass* renderPass, bool isRenderTexture);
     RGAPI void BeginPipelineMode(DescribedPipeline* pipeline);
     RGAPI void EndPipelineMode(cwoid);
+    RGAPI void BeginShaderMode(Shader shader);                        // Begin custom shader drawing
+    RGAPI void EndShaderMode(void);  
     RGAPI void DisableDepthTest(cwoid);
     RGAPI void BeginBlendMode(rlBlendMode blendMode);
     RGAPI void EndBlendMode(void);
@@ -1143,7 +1145,7 @@ EXTERN_C_BEGIN
     RGAPI void BeginWindowMode(SubWindow sw);
     RGAPI void EndWindowMode(cwoid);
 
-    RGAPI void BindPipeline(DescribedPipeline* pipeline, PrimitiveType drawMode);
+    RGAPI void BindPipeline(DescribedPipeline* pipeline);
     RGAPI void BindComputePipeline(DescribedComputePipeline* pipeline);
 
     RGAPI DescribedShaderModule LoadShaderModuleWGSL (ShaderSources sourcesWGSL);

@@ -335,15 +335,17 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
     return value;
 }
 
-extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
-    pipeline->state.primitiveType = drawMode;
-    pipeline->state.settings = settings;
-    PipelineHashMap_getOrCreate(&pipeline->pipelineCache,pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
+//extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
+//    pipeline->state.primitiveType = drawMode;
+//    pipeline->state.settings = settings;
+//    PipelineHashMap_getOrCreate(&pipeline->pipelineCache,pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
+//    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
+//    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, nullptr);
+//}
+
+extern "C" void BindPipeline(DescribedPipeline* pipeline){
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
-    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, nullptr);
-}
-extern "C" void BindPipeline(DescribedPipeline* pipeline, PrimitiveType drawMode){
-    BindPipelineWithSettings(pipeline, drawMode, g_renderstate.currentSettings);
+    //BindPipelineWithSettings(pipeline, drawMode, g_renderstate.currentSettings);
 
     //switch(drawMode){
     //    case RL_TRIANGLES:
@@ -364,8 +366,9 @@ extern "C" void BindPipeline(DescribedPipeline* pipeline, PrimitiveType drawMode
     //        abort();
     //}
     //pipeline->lastUsedAs = drawMode;
-    wgpuRenderPassEncoderSetBindGroup ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, 0);
+    //wgpuRenderPassEncoderSetBindGroup ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, 0);
 }
+
 void ResizeBuffer(DescribedBuffer* buffer, size_t newSize){
     if(newSize == buffer->size)return;
 
@@ -2077,8 +2080,8 @@ extern "C" DescribedPipeline* LoadPipelineEx(const char* shaderSource, const Att
 extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
 
     DescribedPipeline* retp = callocnewpp(DescribedPipeline);
-    
-    retp->state.settings = settings;
+    // TODO absorb this into LoadShader[...]
+    // retp->state.settings = settings;
     DescribedPipeline& ret = *retp;
     ret.shaderModule = mod;
 
@@ -2093,7 +2096,8 @@ extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const A
         bge[i] = WGPUBindGroupEntry{};
         bge[i].binding = uniforms[i].location;
     }
-    ret.bindGroup = LoadBindGroup(&ret.bglayout, bge.data(), bge.size());
+    // TODO absorb this into LoadShader[...]
+    // ret.bindGroup = LoadBindGroup(&ret.bglayout, bge.data(), bge.size());
     WGPUPipelineLayoutDescriptor layout_descriptor zeroinit;
 
     layout_descriptor.bindGroupLayoutCount = 1;
