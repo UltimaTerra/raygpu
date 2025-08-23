@@ -342,7 +342,11 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
 //    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
 //    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, nullptr);
 //}
-
+extern "C" void BindShader(Shader shader, PrimitiveType primitive){
+    ShaderImpl* impl = allocatedShaderIDs_shc + shader.id;
+    impl->state.primitiveType = primitive;
+    BindPipeline(PipelineHashMap_getOrCreate(impl->pipelineCache, impl->state, impl->shaderModule, impl->bindGroup, const DescribedPipelineLayout &pllayout))
+}
 extern "C" void BindPipeline(DescribedPipeline* pipeline){
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
     //BindPipelineWithSettings(pipeline, drawMode, g_renderstate.currentSettings);

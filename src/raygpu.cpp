@@ -290,39 +290,39 @@ RGAPI void EnableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
 RGAPI void DisableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
     VertexArray_disableAttribute(array, attribLocation);
 }
-RGAPI void DrawArrays(PrimitiveType drawMode, uint32_t vertexCount){
-    BindPipeline(GetActivePipeline(), drawMode);
-
-    if(GetActivePipeline()->bindGroup.needsUpdate){
-        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-    }
-    RenderPassDraw(GetActiveRenderPass(), vertexCount, 1, 0, 0);
-}
-RGAPI void DrawArraysIndexed(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount){
-    BindPipeline(GetActivePipeline(), drawMode);
-    //PreparePipeline(GetActivePipeline(), VertexArray *va)
-    //TRACELOG(LOG_INFO, "a oooo");
-    //auto& rp = g_renderstate.renderpass.rpEncoder;  
-    if(GetActivePipeline()->bindGroup.needsUpdate){
-        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-    }
-    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
-    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, 1, 0, 0, 0);
-}
-RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount, uint32_t instanceCount){
-    BindPipeline(GetActivePipeline(), drawMode);
-    if(GetActivePipeline()->bindGroup.needsUpdate){
-        UpdateBindGroup(&GetActivePipeline()->bindGroup);
-    }
-    RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
-    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
-}
-
-RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount){
-    BindPipeline(GetActivePipeline(), drawMode);
-    RenderPassDraw(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0);
-}
+//RGAPI void DrawArrays(PrimitiveType drawMode, uint32_t vertexCount){
+//    BindPipeline(GetActivePipeline(), drawMode);
+//
+//    if(GetActivePipeline()->bindGroup.needsUpdate){
+//        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
+//    }
+//    RenderPassDraw(GetActiveRenderPass(), vertexCount, 1, 0, 0);
+//}
+//RGAPI void DrawArraysIndexed(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount){
+//    BindPipeline(GetActivePipeline(), drawMode);
+//    //PreparePipeline(GetActivePipeline(), VertexArray *va)
+//    //TRACELOG(LOG_INFO, "a oooo");
+//    //auto& rp = g_renderstate.renderpass.rpEncoder;  
+//    if(GetActivePipeline()->bindGroup.needsUpdate){
+//        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
+//    }
+//    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+//    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, 1, 0, 0, 0);
+//}
+//RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount, uint32_t instanceCount){
+//    BindPipeline(GetActivePipeline(), drawMode);
+//    if(GetActivePipeline()->bindGroup.needsUpdate){
+//        UpdateBindGroup(&GetActivePipeline()->bindGroup);
+//    }
+//    RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
+//    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+//    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
+//}
+//
+//RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount){
+//    BindPipeline(GetActivePipeline(), drawMode);
+//    RenderPassDraw(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0);
+//}
 
 RGAPI Texture GetDepthTexture(){
     return g_renderstate.renderTargetStack.peek().depth;
@@ -1477,7 +1477,25 @@ extern "C" void SetBindgroupSampler(DescribedBindGroup* bg, uint32_t index, Desc
 
 
 
+void SetShaderTexture             (Shader shader, uint32_t index, Texture tex){
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
 
+}
+void SetShaderSampler             (Shader shader, uint32_t index, DescribedSampler sampler){
+
+}
+void SetShaderUniformBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer){
+
+}
+void SetShaderStorageBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer){
+
+}
+void SetShaderUniformBufferData   (Shader shader, uint32_t index, const void* data, size_t size){
+
+}
+void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* data, size_t size){
+
+}
 void SetPipelineUniformBuffer(DescribedPipeline* pl, uint32_t index, DescribedBuffer* buffer){
     SetBindgroupUniformBuffer(&pl->bindGroup, index, buffer);
 }

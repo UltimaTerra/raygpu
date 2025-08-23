@@ -629,7 +629,7 @@ static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap,
 }
 typedef struct ShaderImpl{
     PipelineHashMap pipelineCache;
-    
+    DescribedShaderModule shaderModule;
     ModifiablePipelineState state;
     DescribedBindGroup bindGroup;
 }ShaderImpl;
@@ -637,7 +637,7 @@ extern ShaderImpl* allocatedShaderIDs_shc;
 
 typedef struct DescribedPipeline{
     WGPURenderPipeline activePipeline;
-    DescribedShaderModule shaderModule;
+    
     DescribedPipelineLayout layout;
     DescribedBindGroupLayout bglayout;
 }DescribedPipeline;

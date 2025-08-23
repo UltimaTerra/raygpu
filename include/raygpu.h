@@ -1229,7 +1229,7 @@ EXTERN_C_BEGIN
     RGAPI void BindVertexBuffer(const DescribedBuffer* buffer);
 
     RGAPI DescribedRenderpass* GetActiveRenderPass(cwoid);
-    RGAPI DescribedPipeline* GetActivePipeline(cwoid);
+    RGAPI Shader GetActiveShader(cwoid);
 
     RGAPI void RenderPassSetIndexBuffer (DescribedRenderpass* drp, DescribedBuffer* buffer, WGPUIndexFormat format, uint64_t offset);
     RGAPI void RenderPassSetVertexBuffer(DescribedRenderpass* drp, uint32_t slot, DescribedBuffer* buffer, uint64_t offset);
@@ -1243,12 +1243,12 @@ EXTERN_C_BEGIN
     RGAPI uint32_t GetUniformLocationCompute(const DescribedComputePipeline* pl,  const char* uniformName);
     RGAPI uint32_t rlGetLocationUniform     (const void* renderorcomputepipeline, const char* uniformName);
     RGAPI uint32_t rlGetLocationAttrib      (const void* renderorcomputepipeline, const char*  attribName);
-    RGAPI void SetPipelineTexture           (      DescribedPipeline* pl, uint32_t index, Texture tex);
-    RGAPI void SetPipelineSampler           (      DescribedPipeline* pl, uint32_t index, DescribedSampler sampler);
-    RGAPI void SetPipelineUniformBuffer     (      DescribedPipeline* pl, uint32_t index, DescribedBuffer* buffer);
-    RGAPI void SetPipelineStorageBuffer     (      DescribedPipeline* pl, uint32_t index, DescribedBuffer* buffer);
-    RGAPI void SetPipelineUniformBufferData (      DescribedPipeline* pl, uint32_t index, const void* data, size_t size);
-    RGAPI void SetPipelineStorageBufferData (      DescribedPipeline* pl, uint32_t index, const void* data, size_t size);
+    RGAPI void SetShaderTexture             (Shader shader, uint32_t index, Texture tex);
+    RGAPI void SetShaderSampler             (Shader shader, uint32_t index, DescribedSampler sampler);
+    RGAPI void SetShaderUniformBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer);
+    RGAPI void SetShaderStorageBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer);
+    RGAPI void SetShaderUniformBufferData   (Shader shader, uint32_t index, const void* data, size_t size);
+    RGAPI void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* data, size_t size);
 
     /**
      * These functions modify the bindgroup of the currently bound pipeline, 
