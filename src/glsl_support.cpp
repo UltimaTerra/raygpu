@@ -656,7 +656,7 @@ DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs){
     }
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
-extern "C" DescribedPipeline* rlLoadShaderCode(char const* vs, char const* fs){
+extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){
     return LoadPipelineGLSL(vs, fs);
 }
 #ifdef GLSL_TO_WGSL

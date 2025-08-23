@@ -49,7 +49,7 @@ extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t he
     width = fsurface->surface->images[0]->width;
     height = fsurface->surface->images[0]->height;
     UnloadTexture(fsurface->renderTarget.depth);
-    fsurface->renderTarget.depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
+    fsurface->renderTarget.depth = LoadTexturePro(width, height, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
     if(fsurface->renderTarget.depth.sampleCount > 1){
         fsurface->renderTarget.colorMultisample = LoadTexturePro(width, height, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8, WGPUTextureUsage_RenderAttachment, GetDefaultSettings().sampleCount, 1);
     }
@@ -140,14 +140,15 @@ extern "C" DescribedRenderpass LoadRenderpassEx(RenderSettings settings, bool co
     return ret;
 }
 
-DescribedSampler LoadSamplerEx(addressMode amode, filterMode fmode, filterMode mipmapFilter, float maxAnisotropy){
-    auto vkamode = [](addressMode a){
+DescribedSampler LoadSamplerEx(TextureWrap amode, TextureFilter fmode, TextureFilter mipmapFilter, float maxAnisotropy){
+    auto vkamode = [](TextureWrap a){
         switch(a){
-            case addressMode::clampToEdge:
+            case TEXTURE_WRAP_CLAMP:
+            case TEXTURE_WRAP_MIRROR_CLAMP:
                 return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-            case addressMode::mirrorRepeat:
+            case TEXTURE_WRAP_MIRROR_REPEAT:
                 return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-            case addressMode::repeat:
+            case TEXTURE_WRAP_REPEAT:
                 return VK_SAMPLER_ADDRESS_MODE_REPEAT;
             default:
                 rg_unreachable();
@@ -1191,7 +1192,7 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
     RenderTexture ret{
         .texture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true),
         .colorMultisample = Texture{}, 
-        .depth = LoadTexturePro(width, height, Depth32, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
+        .depth = LoadTexturePro(width, height, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1)
     };
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT){
         ret.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
@@ -1330,17 +1331,18 @@ extern "C" void BeginRenderpassEx(DescribedRenderpass *renderPass){
     //BindPipeline(g_renderstate.defaultPipeline, WGPUPrimitiveTopology_TriangleList);
 }
 
-extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
-    pipeline->state.primitiveType = drawMode;
-    pipeline->state.settings = settings;
-    pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
-    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, pipeline->activePipeline);
-    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, NULL);
+extern "C" void BindShaderWithSettings(Shader shader, PrimitiveType drawMode, RenderSettings settings){
+    
+    ShaderImpl* impl = allocatedShaderIDs_shc + shader.id;
+    impl->state.primitiveType = drawMode;
+    impl->state.settings = settings;
+    WGPURenderPipeline activePipeline = PipelineHashMap_getOrCreate(&impl->pipelineCache, impl->state, impl->shaderModule, impl->bglayout, impl->layout);
+    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, activePipeline);
+    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, UpdateAndGetNativeBindGroup(&impl->bindGroup), 0, NULL);
 }
 
-extern "C" void BindPipeline(DescribedPipeline* pipeline, PrimitiveType drawMode){
-    BindPipelineWithSettings(pipeline, drawMode, g_renderstate.currentSettings);
-    
+extern "C" void BindShader(Shader shader, PrimitiveType drawMode){
+    BindShaderWithSettings(shader, drawMode, g_renderstate.currentSettings);
     //pipeline->lastUsedAs = drawMode;
     //wgpuRenderPassEncoderSetBindGroup ((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)GetWGPUBindGroup(&pipeline->bindGroup), 0, 0);
 

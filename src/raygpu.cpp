@@ -355,31 +355,33 @@ RGAPI void drawCurrentBatch(){
 
     renderBatchVAO->buffers[0].buffer = vbo;
     SetStorageBuffer(3, g_renderstate.identityMatrix);
-    UpdateBindGroup(&GetActivePipeline()->bindGroup);
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    UpdateBindGroup(&activeShaderImpl->bindGroup);
     switch(current_drawmode){
         case RL_LINES:{
 
             //TODO: Line texturing is currently disable in all DrawLine... functions
             SetTexture(1, g_renderstate.whitePixel);
-            BindPipeline(GetActivePipeline(), RL_LINES);
-            BindPipelineVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShader(activeShader, RL_LINES);
+            BindPipelineVertexArray(activeShader, renderBatchVAO);
             DrawArrays(RL_LINES, vertexCount);
             //wgpuRenderPassEncoderSetBindGroup(g_renderstate.renderpass.rpEncoder, 0, GetWGPUBindGroup(&GetActivePipeline()->bindGroup), 0, 0);
             //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, wgpuBufferGetSize(vbo.buffer));
             //wgpuRenderPassEncoderDraw(g_renderstate.renderpass.rpEncoder, vertexCount, 1, 0, 0);
             
-            GetActivePipeline()->bindGroup.needsUpdate = true;
+            activeShaderImpl->bindGroup.needsUpdate = true;
         }break;
         case RL_TRIANGLE_STRIP:{
-            BindPipeline(GetActivePipeline(), RL_TRIANGLE_STRIP);
-            BindPipelineVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShader(activeShader, RL_TRIANGLE_STRIP);
+            BindPipelineVertexArray(activeShader, renderBatchVAO);
             DrawArrays(RL_TRIANGLE_STRIP, vertexCount);
             break;
         }
         
         case RL_TRIANGLES:{
             //SetTexture(1, g_renderstate.whitePixel);
-            BindPipeline(GetActivePipeline(), RL_TRIANGLES);
+            BindShader(GetActivePipeline(), RL_TRIANGLES);
             BindPipelineVertexArray(GetActivePipeline(), renderBatchVAO);
             DrawArrays(RL_TRIANGLES, vertexCount);
             //abort();
@@ -522,36 +524,30 @@ static inline bool RenderSettingsCompatible(const ModifiablePipelineState& state
            state.settings.depthTest == settings2.depthTest;
 }
 
-RGAPI void BeginPipelineMode(DescribedPipeline* pipeline){
+RGAPI void BeginShaderMode(Shader shader){
     drawCurrentBatch();
-    if(!RenderSettingsCompatible(pipeline->state, g_renderstate.renderpass.settings)){
+    ShaderImpl* impl = GetShaderImpl(shader);
+    if(!RenderSettingsCompatible(impl->state, g_renderstate.renderpass.settings)){
         EndRenderpass();
-        adaptRenderPass(&g_renderstate.renderpass, pipeline->state);
+        adaptRenderPass(&g_renderstate.renderpass, impl->state);
         BeginRenderpass();
     }
-    g_renderstate.activePipeline = pipeline;
-    uint32_t location = GetUniformLocation(pipeline, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
+    g_renderstate.activeShader = shader;
+    uint32_t location = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
     if(location != LOCATION_NOT_FOUND){
         SetUniformBufferData(location, &g_renderstate.matrixStack.peek().first, sizeof(Matrix));
     }
     //BindPipeline(pipeline, drawMode);
 }
-RGAPI void EndPipelineMode(){
+RGAPI void EndShaderMode(){
     drawCurrentBatch();
     if(!RenderSettingsCompatible(g_renderstate.defaultPipeline->state, g_renderstate.renderpass.settings)){
         EndRenderpass();
         adaptRenderPass(&g_renderstate.renderpass, g_renderstate.defaultPipeline->state);
         BeginRenderpass();
     }
-    g_renderstate.activePipeline = g_renderstate.defaultPipeline;
+    g_renderstate.activeShader = g_renderstate.defaultShader;
     //BindPipeline(g_renderstate.activePipeline, g_renderstate.activePipeline->lastUsedAs);
-}
-
-RGAPI void BeginShaderMode(Shader shader){
-    
-}
-RGAPI void EndShaderMode(void){
-
 }
 
 RGAPI void DisableDepthTest(cwoid){
@@ -662,14 +658,14 @@ RGAPI void BeginMode2D(Camera2D camera){
     mat = MatrixMultiply(ScreenMatrix(g_renderstate.renderExtentX, g_renderstate.renderExtentY), mat);
     PushMatrix();
     SetMatrix(mat);
-    uint32_t uniformLoc = GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
+    uint32_t uniformLoc = GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
     SetUniformBufferData(uniformLoc, &mat, sizeof(Matrix));
 }
 RGAPI void EndMode2D(){
     drawCurrentBatch();
     PopMatrix();
     //g_renderstate.activeScreenMatrix = ScreenMatrix(g_renderstate.renderExtentX, g_renderstate.renderExtentY);
-    SetUniformBufferData(GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW), GetMatrixPtr(), sizeof(Matrix));
+    SetUniformBufferData(GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW), GetMatrixPtr(), sizeof(Matrix));
 }
 RGAPI void BeginMode3D(Camera3D camera){
     drawCurrentBatch();
@@ -1222,22 +1218,23 @@ extern "C" FullSurface CreateHeadlessSurface(uint32_t width, uint32_t height, Pi
     return ret;
 }
 
-extern "C" DescribedPipeline* rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
-DescribedPipeline* rlGetShaderIdDefault(){
-    return DefaultPipeline();
+extern "C" Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
+uint32_t rlGetShaderIdDefault(){
+    return DefaultShader().id;
 }
-uint32_t GetUniformLocation(const DescribedPipeline* pl, const char* uniformName){
+RGAPI uint32_t GetUniformLocation(Shader shader, const char* uniformName){
     //Returns LOCATION_NOT_FOUND if not found
-    return pl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
+    
+    return GetShaderImpl(shader)->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
 }
-uint32_t GetAttributeLocation(const DescribedPipeline* pl, const char* attributeName){
+RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
     //Returns LOCATION_NOT_FOUND if not found
-    return pl->shaderModule.reflectionInfo.attributes->GetLocation(attributeName);
+    return GetShaderImpl(shader)->shaderModule.reflectionInfo.attributes->GetLocation(attributeName);
 }
-uint32_t GetUniformLocationCompute(const DescribedComputePipeline* pl, const char* uniformName){
-    //Returns LOCATION_NOT_FOUND if not found
-    return pl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
-}
+//RGAPI uint32_t GetUniformLocationCompute(const DescribedComputePipeline* pl, const char* uniformName){
+//    //Returns LOCATION_NOT_FOUND if not found
+//    return pl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
+//}
 extern "C" uint32_t rlGetLocationUniform(const void* renderorcomputepipeline, const char* uniformName){
     return GetUniformLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), uniformName);
 }
@@ -1250,7 +1247,7 @@ Shader LoadShaderFromMemory(const char *vsCode, const char *fsCode){
     #if SUPPORT_GLSL_PARSER == 1
     //shader.id = LoadPipelineGLSL(vsCode, fsCode);
     
-    shader.id = rlLoadShaderCode(vsCode, fsCode);
+    shader = rlLoadShaderCode(vsCode, fsCode);
 
     //if (shader.id == rlGetShaderIdDefault()) shader.locs = rlGetShaderLocsDefault();
     
@@ -2584,7 +2581,12 @@ size_t telegrama_render_size3 = sizeof(telegrama_render3);
 ShaderImpl* allocatedShaderIDs_shc = NULL;
 uint32_t nextShaderID_shc = 0;
 uint32_t capacity_shc = 0;
-
+ShaderImpl* GetShaderImplByID(uint32_t id){
+    return allocatedShaderIDs_shc + id;
+}
+ShaderImpl* GetShaderImpl(Shader shader){
+    return GetShaderImplByID(shader.id);
+}
 uint32_t getNextShaderID_shc(){
     if(nextShaderID_shc >= capacity_shc){
         uint32_t newCapacity = capacity_shc * 2 + (capacity_shc == 0) * 8;

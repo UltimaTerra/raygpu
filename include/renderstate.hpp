@@ -80,10 +80,9 @@ struct renderstate{
 
     PixelFormat frameBufferFormat;
 
-    DescribedPipeline* defaultPipeline;
     Shader defaultShader;
     RenderSettings currentSettings;
-    DescribedPipeline* activePipeline;
+    Shader activeShader;
 
     DescribedRenderpass clearPass;
     DescribedRenderpass renderpass;

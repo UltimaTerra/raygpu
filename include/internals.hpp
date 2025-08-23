@@ -632,14 +632,15 @@ typedef struct ShaderImpl{
     DescribedShaderModule shaderModule;
     ModifiablePipelineState state;
     DescribedBindGroup bindGroup;
+    DescribedPipelineLayout layout;
+    DescribedBindGroupLayout bglayout;
 }ShaderImpl;
 extern ShaderImpl* allocatedShaderIDs_shc;
-
+ShaderImpl* GetShaderImpl(Shader shader);
+ShaderImpl* GetShaderImplByID(uint32_t id);
 typedef struct DescribedPipeline{
     WGPURenderPipeline activePipeline;
     
-    DescribedPipelineLayout layout;
-    DescribedBindGroupLayout bglayout;
 }DescribedPipeline;
 
 /**
