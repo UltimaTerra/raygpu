@@ -9,7 +9,7 @@ void mainloop(cwoid){
     BeginDrawing();
     ClearBackground(BLACK);
     BeginPipelineMode(pipeline);
-    BindPipelineVertexArray(pipeline, vao);
+    BindShaderVertexArray(pipeline, vao);
     DrawArrays(RL_TRIANGLES, 3);
     EndPipelineMode();
     DrawFPS(0,0);

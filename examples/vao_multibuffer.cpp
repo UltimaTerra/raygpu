@@ -96,14 +96,14 @@ int main(){
     //DescribedPipeline* pl = LoadPipelineEx(source, attributes, 4, nullptr, 0, settings);
     //DescribedPipeline* pl = DefaultPipeline();
     //DescribedPipeline* pl = LoadPipelinePro(/*source, vao, nullptr, 0, settings*/);
-    PreparePipeline(pl, vao);
+    PrepareShader(pl, vao);
     while(!WindowShouldClose()){
         BeginDrawing();
         ClearBackground(BLANK);
         UseNoTexture();
         BeginMode3D(cam);
         BeginPipelineMode(pl);
-        BindPipelineVertexArray(pl, vao);
+        BindShaderVertexArray(pl, vao);
         DrawArrays(RL_TRIANGLES, 3);
         EndPipelineMode();
         EndMode3D();

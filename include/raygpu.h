@@ -1241,8 +1241,8 @@ EXTERN_C_BEGIN
 
     RGAPI uint32_t GetUniformLocation       (Shader shader, const char* uniformName);
     RGAPI uint32_t GetUniformLocationCompute(Shader shader, const char* uniformName);
-    RGAPI uint32_t rlGetLocationUniform     (const void* renderorcomputepipeline, const char* uniformName);
-    RGAPI uint32_t rlGetLocationAttrib      (const void* renderorcomputepipeline, const char*  attribName);
+    RGAPI uint32_t rlGetLocationUniform     (const uint32_t shaderID, const char* uniformName);
+    RGAPI uint32_t rlGetLocationAttrib      (const uint32_t shaderID, const char*  attribName);
     RGAPI void SetShaderTexture             (Shader shader, uint32_t index, Texture tex);
     RGAPI void SetShaderSampler             (Shader shader, uint32_t index, DescribedSampler sampler);
     RGAPI void SetShaderUniformBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer);
@@ -1284,14 +1284,14 @@ EXTERN_C_BEGIN
         The functions LoadVertexArray, VertexAttribPointer, EnableVertexAttribArray, DisableVertexAttribArray
         aim to replicate the behaviour of OpenGL as closely as possible.
      */
-    RGAPI VertexArray* LoadVertexArray (cwoid);
-    RGAPI void VertexAttribPointer     (VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, WGPUVertexFormat format, uint32_t offset, WGPUVertexStepMode stepmode);
-    RGAPI void EnableVertexAttribArray (VertexArray* array, uint32_t attribLocation);
-    RGAPI void DisableVertexAttribArray(VertexArray* array, uint32_t attribLocation);
+    RGAPI VertexArray* LoadVertexArray   (cwoid);
+    RGAPI void VertexAttribPointer       (VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, WGPUVertexFormat format, uint32_t offset, WGPUVertexStepMode stepmode);
+    RGAPI void EnableVertexAttribArray   (VertexArray* array, uint32_t attribLocation);
+    RGAPI void DisableVertexAttribArray  (VertexArray* array, uint32_t attribLocation);
 
-    RGAPI void PreparePipeline        (DescribedPipeline* pipeline, VertexArray* va);
-    RGAPI void BindPipelineVertexArray(DescribedPipeline* pipeline, VertexArray* va);
-    RGAPI void BindVertexArray        (VertexArray* va);
+    RGAPI void PrepareShader             (Shader pipeline, VertexArray* va);
+    RGAPI void BindShaderVertexArray     (Shader pipeline, VertexArray* va);
+    RGAPI void BindVertexArray           (VertexArray* va);
 
     RGAPI void DrawArrays                (PrimitiveType drawMode, uint32_t vertexCount);
     RGAPI void DrawArraysInstanced       (PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount);

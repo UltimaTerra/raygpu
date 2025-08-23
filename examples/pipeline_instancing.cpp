@@ -53,7 +53,7 @@ void mainloop(){
     BeginDrawing();
     //ClearBackground(BLUE);
     BeginPipelineMode(pl);
-    BindPipelineVertexArray(pl, vao);
+    BindShaderVertexArray(pl, vao);
     DrawArraysIndexedInstanced(RL_TRIANGLES, *ibo, 6, offsets.size());
     EndPipelineMode();
     DrawFPS(0, 0);

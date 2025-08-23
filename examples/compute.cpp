@@ -120,7 +120,7 @@ void mainloop(void){
     ClearBackground(BLACK);
 
     BeginPipelineMode(rpl);
-    BindPipelineVertexArray(rpl, vao);
+    BindShaderVertexArray(rpl, vao);
     DrawArraysInstanced(RL_TRIANGLE_STRIP, 4, parts);
     EndPipelineMode();
 

@@ -254,11 +254,11 @@ RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint
     VertexArray_add(array, buffer, attribLocation, format, offset, stepmode);
 }
 RGAPI void BindVertexArray(VertexArray* va){
-    BindPipelineVertexArray(GetActivePipeline(), va);
+    BindShaderVertexArray(GetActivePipeline(), va);
 }
 
-RGAPI void BindPipelineVertexArray(DescribedPipeline* pipeline, VertexArray* va){
-    PreparePipeline(pipeline, va);
+RGAPI void BindShaderVertexArray(Shader shader, VertexArray* va){
+    PreparePipeline(shader, va);
     for(unsigned i = 0; i < va->buffers_count; i++){
         bool shouldBind = false;
 
@@ -364,7 +364,7 @@ RGAPI void drawCurrentBatch(){
             //TODO: Line texturing is currently disable in all DrawLine... functions
             SetTexture(1, g_renderstate.whitePixel);
             BindShader(activeShader, RL_LINES);
-            BindPipelineVertexArray(activeShader, renderBatchVAO);
+            BindShaderVertexArray(activeShader, renderBatchVAO);
             DrawArrays(RL_LINES, vertexCount);
             //wgpuRenderPassEncoderSetBindGroup(g_renderstate.renderpass.rpEncoder, 0, GetWGPUBindGroup(&GetActivePipeline()->bindGroup), 0, 0);
             //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, wgpuBufferGetSize(vbo.buffer));
@@ -374,7 +374,7 @@ RGAPI void drawCurrentBatch(){
         }break;
         case RL_TRIANGLE_STRIP:{
             BindShader(activeShader, RL_TRIANGLE_STRIP);
-            BindPipelineVertexArray(activeShader, renderBatchVAO);
+            BindShaderVertexArray(activeShader, renderBatchVAO);
             DrawArrays(RL_TRIANGLE_STRIP, vertexCount);
             break;
         }
@@ -382,7 +382,7 @@ RGAPI void drawCurrentBatch(){
         case RL_TRIANGLES:{
             //SetTexture(1, g_renderstate.whitePixel);
             BindShader(GetActivePipeline(), RL_TRIANGLES);
-            BindPipelineVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShaderVertexArray(GetActivePipeline(), renderBatchVAO);
             DrawArrays(RL_TRIANGLES, vertexCount);
             //abort();
             //vboptr = vboptr_base;
@@ -417,7 +417,7 @@ RGAPI void drawCurrentBatch(){
             const DescribedBuffer* ibuf = g_renderstate.quadindicesCache;
             //BindPipeline(g_renderstate.activePipeline, WGPUPrimitiveTopology_TriangleList);
             //g_renderstate.activePipeline
-            BindPipelineVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShaderVertexArray(GetActivePipeline(), renderBatchVAO);
             DrawArraysIndexed(RL_TRIANGLES, *ibuf, quadCount * 6);
 
             //wgpuQueueWriteBuffer(GetQueue(), vbo.buffer, 0, vboptr_base, vertexCount * sizeof(vertex));
@@ -541,9 +541,10 @@ RGAPI void BeginShaderMode(Shader shader){
 }
 RGAPI void EndShaderMode(){
     drawCurrentBatch();
-    if(!RenderSettingsCompatible(g_renderstate.defaultPipeline->state, g_renderstate.renderpass.settings)){
+    ShaderImpl* defaultShaderImpl = GetShaderImpl(g_renderstate.defaultShader);
+    if(!RenderSettingsCompatible(defaultShaderImpl->state, g_renderstate.renderpass.settings)){
         EndRenderpass();
-        adaptRenderPass(&g_renderstate.renderpass, g_renderstate.defaultPipeline->state);
+        adaptRenderPass(&g_renderstate.renderpass, defaultShaderImpl->state);
         BeginRenderpass();
     }
     g_renderstate.activeShader = g_renderstate.defaultShader;
@@ -1235,11 +1236,14 @@ RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
 //    //Returns LOCATION_NOT_FOUND if not found
 //    return pl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
 //}
-extern "C" uint32_t rlGetLocationUniform(const void* renderorcomputepipeline, const char* uniformName){
-    return GetUniformLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), uniformName);
+extern "C" uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* uniformName){
+    ShaderImpl* impl = GetShaderImplByID(shaderID);
+    return impl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
 }
-extern "C" uint32_t rlGetLocationAttrib(const void* renderorcomputepipeline, const char* attributeName){
-    return GetAttributeLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), attributeName);
+extern "C" uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName){
+    ShaderImpl* impl = GetShaderImplByID(shaderID);
+    return impl->shaderModule.reflectionInfo.attributes->GetLocation(attributeName);
+    //return GetAttributeLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), attributeName);
 }
 // Load shader from code strings and bind default locations
 Shader LoadShaderFromMemory(const char *vsCode, const char *fsCode){
@@ -1322,10 +1326,11 @@ extern "C" const char* copyString(const char* str){
     return ret;
 }
 
-extern "C" void PreparePipeline(DescribedPipeline* pipeline, VertexArray* va){
-    pipeline->state.vertexAttributes = va->attributes;
-    pipeline->state.vertexAttributeCount = va->attributes_count;
-    pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
+extern "C" void PrepareShader(Shader shader, VertexArray* va){
+    ShaderImpl* impl = GetShaderImpl(shader);
+    impl->state.vertexAttributes = va->attributes;
+    impl->state.vertexAttributeCount = va->attributes_count;
+    //pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
 }
 
 constexpr char mipmapComputerSource[] = R"(
@@ -1402,27 +1407,27 @@ RenderTexture LoadRenderTextureEx(uint32_t width, uint32_t height, PixelFormat c
 DescribedRenderpass* GetActiveRenderPass(){
     return g_renderstate.activeRenderpass;
 }
-DescribedPipeline* GetActivePipeline(){
-    return g_renderstate.activePipeline;
+Shader GetActiveShader(){
+    return g_renderstate.activeShader;
 }
 
 void SetTexture                   (uint32_t index, Texture tex){
-    SetPipelineTexture(GetActivePipeline(), index, tex);
+    SetShaderTexture(GetActiveShader(), index, tex);
 }
 void SetSampler                   (uint32_t index, DescribedSampler sampler){
-    SetPipelineSampler (GetActivePipeline(), index, sampler);
+    SetShaderSampler (GetActiveShader(), index, sampler);
 }
 void SetUniformBuffer             (uint32_t index, DescribedBuffer* buffer){
-    SetPipelineUniformBuffer (GetActivePipeline(), index, buffer);
+    SetShaderUniformBuffer (GetActiveShader(), index, buffer);
 }
 void SetStorageBuffer             (uint32_t index, DescribedBuffer* buffer){
-    SetPipelineStorageBuffer(GetActivePipeline(), index, buffer);
+    SetShaderStorageBuffer(GetActiveShader(), index, buffer);
 }
 void SetUniformBufferData         (uint32_t index, const void* data, size_t size){
-    SetPipelineUniformBufferData(GetActivePipeline(), index, data, size);
+    SetShaderUniformBufferData(GetActiveShader(), index, data, size);
 }
 void SetStorageBufferData         (uint32_t index, const void* data, size_t size){
-    SetPipelineStorageBufferData(GetActivePipeline(), index, data, size);
+    SetShaderStorageBufferData(GetActiveShader(), index, data, size);
 }
 
 
@@ -1476,45 +1481,27 @@ extern "C" void SetBindgroupSampler(DescribedBindGroup* bg, uint32_t index, Desc
 
 void SetShaderTexture             (Shader shader, uint32_t index, Texture tex){
     ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
-
+    SetBindgroupTexture(&sh->bindGroup, index, tex);
 }
 void SetShaderSampler             (Shader shader, uint32_t index, DescribedSampler sampler){
-
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
+    SetBindgroupSampler(&sh->bindGroup, index, sampler);
 }
 void SetShaderUniformBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer){
-
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
+    SetBindgroupUniformBuffer(&sh->bindGroup, index, buffer);
 }
 void SetShaderStorageBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer){
-
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
+    SetBindgroupStorageBuffer(&sh->bindGroup, index, buffer);
 }
 void SetShaderUniformBufferData   (Shader shader, uint32_t index, const void* data, size_t size){
-
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
+    SetBindgroupUniformBufferData(&sh->bindGroup, index, data, size);
 }
 void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* data, size_t size){
-
-}
-void SetPipelineUniformBuffer(DescribedPipeline* pl, uint32_t index, DescribedBuffer* buffer){
-    SetBindgroupUniformBuffer(&pl->bindGroup, index, buffer);
-}
-
-void SetPipelineStorageBuffer(DescribedPipeline* pl, uint32_t index, DescribedBuffer* buffer){
-    SetBindgroupStorageBuffer(&pl->bindGroup, index, buffer);
-}
-
-void SetPipelineUniformBufferData(DescribedPipeline* pl, uint32_t index, const void* data, size_t size){
-    SetBindgroupUniformBufferData(&pl->bindGroup, index, data, size);
-}
-
-void SetPipelineStorageBufferData(DescribedPipeline* pl, uint32_t index, const void* data, size_t size){
-    SetBindgroupStorageBufferData(&pl->bindGroup, index, data, size);
-}
-
-extern "C" void SetPipelineTexture(DescribedPipeline* pl, uint32_t index, Texture tex){
-    SetBindgroupTexture(&pl->bindGroup, index, tex);
-}
-
-extern "C" void SetPipelineSampler(DescribedPipeline* pl, uint32_t index, DescribedSampler sampler){
-    SetBindgroupSampler(&pl->bindGroup, index, sampler);
+    ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
+    SetBindgroupUniformBufferData(&sh->bindGroup, index, data, size);
 }
 
 inline uint64_t bgEntryHash(const ResourceDescriptor& bge){
@@ -1791,25 +1778,21 @@ void SaveImage(Image _img, const char* filepath){
     UnloadImage(img);
 }
 void UseTexture(Texture tex){
-    uint32_t texture0loc = GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    uint32_t texture0loc = GetUniformLocation(activeShader, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);
     if(texture0loc == LOCATION_NOT_FOUND){
         texture0loc = 1;
         //return;
     }
-    if(g_renderstate.activePipeline->bindGroup.entries[texture0loc].textureView == tex.view)return;
+    if(activeShaderImpl->bindGroup.entries[texture0loc].textureView == tex.view)return;
     drawCurrentBatch();
     SetTexture(texture0loc, tex);
     
 }
 
 void UseNoTexture(){
-    uint32_t textureLocation = GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);
-    if(textureLocation == LOCATION_NOT_FOUND){
-        textureLocation = 1;
-    }
-    if(g_renderstate.activePipeline->bindGroup.entries[textureLocation].textureView == g_renderstate.whitePixel.view)return;
-    drawCurrentBatch();
-    SetTexture(textureLocation, g_renderstate.whitePixel);
+    UseTexture(g_renderstate.whitePixel);
 }
 
 UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
@@ -1826,16 +1809,16 @@ void UniformAccessor::operator=(DescribedBuffer* buf){
     SetBindgroupStorageBuffer(bindgroup, index, buf);
 }
 
-DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
-    pl->state.vertexAttributes = vao->attributes;
-    pl->activePipeline = PipelineHashMap_getOrCreate(&pl->pipelineCache, pl->state, pl->shaderModule, pl->bglayout, pl->layout);
-    return pl;
-}
+//DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
+//    pl->state.vertexAttributes = vao->attributes;
+//    pl->activePipeline = PipelineHashMap_getOrCreate(&pl->pipelineCache, pl->state, pl->shaderModule, pl->bglayout, pl->layout);
+//    return pl;
+//}
 
 
 // TODO 
 // BeginTextureAndPipelineMode and BeginTextureMode are very similar, maybe abstract away their common parts
-void BeginTextureAndPipelineMode(RenderTexture rtex, DescribedPipeline* pl){
+void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl){
     if(g_renderstate.activeRenderpass){
         EndRenderpass();
     }
@@ -1846,8 +1829,8 @@ void BeginTextureAndPipelineMode(RenderTexture rtex, DescribedPipeline* pl){
     Matrix mat = ScreenMatrix(g_renderstate.renderExtentX, g_renderstate.renderExtentY);
     SetMatrix(mat);
 
-    g_renderstate.activePipeline = pl;
-    uint32_t location = GetUniformLocation(g_renderstate.activePipeline, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
+    g_renderstate.activeShader = pl;
+    uint32_t location = GetUniformLocation(g_renderstate.activeShader, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
     if(location != LOCATION_NOT_FOUND){
         SetUniformBufferData(location, &g_renderstate.matrixStack.peek().first, sizeof(Matrix));
     }

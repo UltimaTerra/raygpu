@@ -46,7 +46,7 @@ void mainloop(){
     BeginPipelineMode(pl);
     UseNoTexture();
     BeginMode3D(cam);
-    BindPipelineVertexArray(pl, cubeMesh.vao);
+    BindShaderVertexArray(pl, cubeMesh.vao);
     DrawArraysIndexedInstanced(RL_TRIANGLES, *cubeMesh.ibo, 36, instancetransforms.size());
     //DrawMeshInstanced(cubeMesh, Material{}, instancetransforms.data(), instancetransforms.size());
     EndMode3D();

@@ -539,7 +539,7 @@ extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, Vertex
     
     DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
     //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-    PreparePipeline(pl, vao);
+    PrepareShader(pl, vao);
     return pl;
 }
 
