@@ -1504,6 +1504,49 @@ Shader LoadShader(const char *vsFileName, const char *fsFileName){
     return shader;
 }
 
+extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
+    ShaderSources sources zeroinit;
+    #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1 
+    sources.language = sourceTypeWGSL;
+    auto& src = sources.sources[sources.sourceCount++];
+    src.data = shaderSource;
+    src.sizeInBytes = std::strlen(shaderSource);
+    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
+
+    auto [attribs, attachmentState] = getAttributes(sources);
+    
+    std::vector<AttributeAndResidence> allAttribsInOneBuffer;
+    allAttribsInOneBuffer.reserve(attribs.size());
+    uint32_t offset = 0;
+    for(const auto& [name, attr] : attribs){
+        const auto& [format, location] = attr;
+        allAttribsInOneBuffer.push_back(AttributeAndResidence{
+            .attr = WGPUVertexAttribute{
+                .nextInChain = nullptr,
+                .format = format,
+                .offset = offset,
+                .shaderLocation = location
+            },
+            .bufferSlot = 0,
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .enabled = true}
+        );
+        offset += attributeSize(format);
+    }
+    std::vector<ResourceTypeDescriptor> values;
+    values.reserve(bindings.size());
+    for(const auto& [x,y] : bindings){
+        values.push_back(y);
+    }
+    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+        return x.location < y.location;
+    });
+    return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
+    #else
+    return CLITERAL(Shader){0};
+    #endif
+}
+
 extern "C" FullSurface CreateHeadlessSurface(uint32_t width, uint32_t height, PixelFormat format){
     FullSurface ret zeroinit;
     ret.headless = 1;

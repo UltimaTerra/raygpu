@@ -61,6 +61,7 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     };
     return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
 #else
+    #if RAYGPU_USE_X11 == 1
     if (drv == "x11") {
         Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
         Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
@@ -75,7 +76,9 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
-    else if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
+    else 
+    #endif
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
         struct wl_display *display = (struct wl_display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
         struct wl_surface *surface = (struct wl_surface *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
         if (display && surface) {
