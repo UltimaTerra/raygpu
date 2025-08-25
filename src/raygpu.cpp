@@ -254,11 +254,13 @@ RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint
     VertexArray_add(array, buffer, attribLocation, format, offset, stepmode);
 }
 RGAPI void BindVertexArray(VertexArray* va){
-    BindShaderVertexArray(GetActivePipeline(), va);
+    BindShaderVertexArray(GetActiveShader(), va);
 }
 
 RGAPI void BindShaderVertexArray(Shader shader, VertexArray* va){
-    PreparePipeline(shader, va);
+    GetShaderImpl(shader)->state.vertexAttributes = va->attributes;
+    GetShaderImpl(shader)->state.vertexAttributeCount = va->attributes_count;
+
     for(unsigned i = 0; i < va->buffers_count; i++){
         bool shouldBind = false;
 
@@ -381,8 +383,8 @@ RGAPI void drawCurrentBatch(){
         
         case RL_TRIANGLES:{
             //SetTexture(1, g_renderstate.whitePixel);
-            BindShader(GetActivePipeline(), RL_TRIANGLES);
-            BindShaderVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShader(GetActiveShader(), RL_TRIANGLES);
+            BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
             DrawArrays(RL_TRIANGLES, vertexCount);
             //abort();
             //vboptr = vboptr_base;
@@ -417,7 +419,7 @@ RGAPI void drawCurrentBatch(){
             const DescribedBuffer* ibuf = g_renderstate.quadindicesCache;
             //BindPipeline(g_renderstate.activePipeline, WGPUPrimitiveTopology_TriangleList);
             //g_renderstate.activePipeline
-            BindShaderVertexArray(GetActivePipeline(), renderBatchVAO);
+            BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
             DrawArraysIndexed(RL_TRIANGLES, *ibuf, quadCount * 6);
 
             //wgpuQueueWriteBuffer(GetQueue(), vbo.buffer, 0, vboptr_base, vertexCount * sizeof(vertex));
@@ -1858,7 +1860,7 @@ void EndTextureAndPipelineMode(){
     EndRenderpassPro(GetActiveRenderPass(), true);
 
     g_renderstate.renderTargetStack.pop();
-    g_renderstate.activePipeline = g_renderstate.defaultPipeline;
+    g_renderstate.activeShader = g_renderstate.defaultShader;
     PopMatrix();
     if(!g_renderstate.renderTargetStack.empty()){
         g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
@@ -2058,9 +2060,6 @@ Texture GetDefaultTexture(cwoid){
     return g_renderstate.whitePixel;
 }
 
-DescribedPipeline* DefaultPipeline(){
-    return g_renderstate.defaultPipeline;
-}
 Shader DefaultShader(){
     return g_renderstate.defaultShader;
 }
@@ -2573,7 +2572,7 @@ ShaderImpl* GetShaderImpl(Shader shader){
 uint32_t getNextShaderID_shc(){
     if(nextShaderID_shc >= capacity_shc){
         uint32_t newCapacity = capacity_shc * 2 + (capacity_shc == 0) * 8;
-        ShaderImpl* newAllocatedShaderIDs_shc = RL_CALLOC(newCapacity, sizeof(ShaderImpl));
+        ShaderImpl* newAllocatedShaderIDs_shc = (ShaderImpl*)RL_CALLOC(newCapacity, sizeof(ShaderImpl));
         memcpy(newAllocatedShaderIDs_shc, allocatedShaderIDs_shc, capacity_shc * sizeof(ShaderImpl));
         RL_FREE(allocatedShaderIDs_shc);
         capacity_shc = newCapacity;

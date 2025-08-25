@@ -115,9 +115,9 @@ extern "C" void DrawMeshInstanced(Mesh mesh, Material material, const Matrix* tr
         trfBuffer = GenStorageBuffer(transforms, instances * sizeof(Matrix));
     }
 
-    SetPipelineStorageBuffer(GetActivePipeline(), GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_UNIFORM_NAME_INSTANCE_TX), trfBuffer);
-    SetTexture(GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0), material.maps[MATERIAL_MAP_DIFFUSE].texture);
-    BindShaderVertexArray(GetActivePipeline(), mesh.vao);
+    SetShaderStorageBuffer(GetActiveShader(), GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_UNIFORM_NAME_INSTANCE_TX), trfBuffer);
+    SetTexture(GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0), material.maps[MATERIAL_MAP_DIFFUSE].texture);
+    BindShaderVertexArray(GetActiveShader(), mesh.vao);
     if(mesh.ibo){
         DrawArraysIndexedInstanced(RL_TRIANGLES, *mesh.ibo, mesh.triangleCount * 3, instances);
     }else{
@@ -127,8 +127,8 @@ extern "C" void DrawMeshInstanced(Mesh mesh, Material material, const Matrix* tr
 }
 extern "C" void DrawMesh(Mesh mesh, Material material, Matrix transform){
     SetStorageBufferData(3, &transform, sizeof(Matrix));
-    SetTexture(GetUniformLocation(GetActivePipeline(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0), material.maps[MATERIAL_MAP_DIFFUSE].texture);
-    BindShaderVertexArray(GetActivePipeline(), mesh.vao);
+    SetTexture(GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0), material.maps[MATERIAL_MAP_DIFFUSE].texture);
+    BindShaderVertexArray(GetActiveShader(), mesh.vao);
     if(mesh.ibo){
         DrawArraysIndexed(RL_TRIANGLES, *mesh.ibo, mesh.triangleCount * 3);
     }else{

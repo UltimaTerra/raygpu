@@ -343,7 +343,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     defaultGLSLSource.sources[1].data = fragmentSourceGLSL;
     defaultGLSLSource.sources[1].sizeInBytes = std::strlen(fragmentSourceGLSL);
     defaultGLSLSource.sources[1].stageMask = WGPUShaderStage_Fragment;
-    g_renderstate.defaultPipeline = LoadPipelineForVAOEx(defaultGLSLSource, renderBatchVAO, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), GetDefaultSettings());
+    //g_renderstate.defaultShader = LoadPipelineForVAOEx(defaultGLSLSource, renderBatchVAO, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), GetDefaultSettings());
     g_renderstate.defaultShader = LoadShaderFromMemory(vertexSourceGLSL, fragmentSourceGLSL);
     #elif SUPPORT_WGSL_PARSER == 1
     ShaderSources defaultWGSLSource zeroinit;
@@ -355,7 +355,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     #else
     #error "Must support either glsl or wgsl"
     #endif
-    g_renderstate.activePipeline = g_renderstate.defaultPipeline;
+    g_renderstate.activeShader = g_renderstate.defaultShader;
     size_t quadCount = 2000;
     g_renderstate.quadindicesCache = GenBufferEx(nullptr, quadCount * 6 * sizeof(uint32_t), WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);//allocnew(DescribedBuffer);    //WGPUBufferDescriptor vbmdesc{};
     std::vector<uint32_t> indices(6 * quadCount);

@@ -503,45 +503,45 @@ extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
 //    ret->activePipeline = ret->pipelineCache.getOrCreate(ret->state, ret->shaderModule, ret->bglayout, ret->layout);
 //}
 
-extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    DescribedPipeline* ret = callocnewpp(DescribedPipeline);
-    ret->state.settings = settings;
-    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
-    ret->state.vertexAttributeCount = attribCount; 
-    ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
-    ret->shaderModule = mod;
-    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
-
-    std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
-    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
-    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
-    
-    WGPUPipelineLayoutDescriptor pldesc zeroinit;
-    pldesc.bindGroupLayoutCount = 1;
-    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
-    pldesc.bindGroupLayouts = bgls;
-
-    ret->layout.layout = wgpuDeviceCreatePipelineLayout(g_vulkanstate.device, &pldesc);
-    std::vector<WGPUBindGroupEntry> bge(uniformCount);
-
-    for(uint32_t i = 0;i < bge.size();i++){
-        bge[i] = WGPUBindGroupEntry{};
-        bge[i].binding = uniforms[i].location;
-    }
-    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
-    return ret;
-}
-
-extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    //detectShaderLanguage()
-    
-    DescribedShaderModule module = LoadShaderModule(sources);
-    
-    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
-    //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-    PrepareShader(pl, vao);
-    return pl;
-}
+//extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+//    DescribedPipeline* ret = callocnewpp(DescribedPipeline);
+//    ret->state.settings = settings;
+//    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
+//    ret->state.vertexAttributeCount = attribCount; 
+//    ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
+//    ret->shaderModule = mod;
+//    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
+//
+//    std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
+//    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
+//    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
+//    
+//    WGPUPipelineLayoutDescriptor pldesc zeroinit;
+//    pldesc.bindGroupLayoutCount = 1;
+//    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
+//    pldesc.bindGroupLayouts = bgls;
+//
+//    ret->layout.layout = wgpuDeviceCreatePipelineLayout(g_vulkanstate.device, &pldesc);
+//    std::vector<WGPUBindGroupEntry> bge(uniformCount);
+//
+//    for(uint32_t i = 0;i < bge.size();i++){
+//        bge[i] = WGPUBindGroupEntry{};
+//        bge[i].binding = uniforms[i].location;
+//    }
+//    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
+//    return ret;
+//}
+//
+//extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+//    //detectShaderLanguage()
+//    
+//    DescribedShaderModule module = LoadShaderModule(sources);
+//    
+//    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
+//    //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
+//    PrepareShader(pl, vao);
+//    return pl;
+//}
 
 extern "C" void UpdateBindGroupEntry(DescribedBindGroup* bg, size_t location, WGPUBindGroupEntry entry){
 
