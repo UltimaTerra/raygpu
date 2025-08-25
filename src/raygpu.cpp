@@ -125,6 +125,7 @@ void addScreenshot(GIFRecordState* grst, WGPUTexture tex){
     //#endif
     grst->lastFrameTimestamp = NanoTime();
     Image fb = LoadImageFromTextureEx(tex, 0);
+    ImageFormat(&fb, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     //#ifndef __EMSCRIPTEN__
     msf_gif_frame(&grst->msf_state, (uint8_t*)fb.data, grst->delayInCentiseconds, 8, fb.rowStrideInBytes);
     //#endif
@@ -1012,10 +1013,10 @@ void rlBegin(PrimitiveType mode){
 RGAPI void rlEnd(){
     
 }
-RGAPI uint32_t RoundUpToNextMultipleOf256(uint32_t x) {
+RGAPI uint64_t RoundUpToNextMultipleOf256(uint64_t x) {
     return (x + 255) & ~0xFF;
 }
-RGAPI uint32_t RoundUpToNextMultipleOf16(uint32_t x) {
+RGAPI uint64_t RoundUpToNextMultipleOf16(uint64_t x) {
     return (x + 15) & ~0xF;
 }
 #ifdef __EMSCRIPTEN__
@@ -1023,65 +1024,356 @@ RGAPI uint32_t RoundUpToNextMultipleOf16(uint32_t x) {
 #endif 
 
 
+// --- Channel conversion helpers --------------------------------------------
 
-template<typename from, typename to>
-to convert4(const from& fr){
-    to ret;
-    if constexpr(std::is_floating_point_v<decltype(ret.r)>){
+template <typename T>
+constexpr T clamp01(T v) {
+    if constexpr (std::is_floating_point_v<T>) {
+        return v < T(0) ? T(0) : (v > T(1) ? T(1) : v);
+    } else {
+        return v; // only used for float inputs
+    }
+}
 
+template <typename FromC, typename ToC>
+static inline ToC convert_channel(FromC x) {
+    if constexpr (std::is_floating_point_v<ToC>) {
+        // -> float
+        if constexpr (std::is_floating_point_v<FromC>) {
+            return static_cast<ToC>(x);
+        } else {
+            using UFrom = std::make_unsigned_t<FromC>;
+            constexpr double maxFrom = static_cast<double>(std::numeric_limits<UFrom>::max());
+            return static_cast<ToC>(static_cast<double>(static_cast<UFrom>(x)) / maxFrom);
+        }
+    } else {
+        // -> integer
+        using UTo = std::make_unsigned_t<ToC>;
+        constexpr double maxTo = static_cast<double>(std::numeric_limits<UTo>::max());
+
+        if constexpr (std::is_floating_point_v<FromC>) {
+            double y = std::round(clamp01(static_cast<double>(x)) * maxTo);
+            if (y < 0.0) y = 0.0;
+            if (y > maxTo) y = maxTo;
+            return static_cast<ToC>(static_cast<UTo>(y));
+        } else {
+            using UFrom = std::make_unsigned_t<FromC>;
+            constexpr double maxFrom = static_cast<double>(std::numeric_limits<UFrom>::max());
+            double y = std::round((static_cast<double>(static_cast<UFrom>(x)) / maxFrom) * maxTo);
+            if (y < 0.0) y = 0.0;
+            if (y > maxTo) y = maxTo;
+            return static_cast<ToC>(static_cast<UTo>(y));
+        }
     }
-    else{
-        ret.r = fr.r;
-        ret.g = fr.g;
-        ret.b = fr.b;
-        ret.a = fr.a;
+}
+
+
+static inline uint16_t float32_to_float16(float f) {
+    union { uint32_t u; float f; } v { .f = f };
+    uint32_t x = v.u;
+
+    uint32_t sign = (x >> 16) & 0x8000u;               // sign in half position
+    uint32_t mant = x & 0x007FFFFFu;
+    int32_t  exp  = int32_t((x >> 23) & 0xFF) - 127;   // unbiased
+
+    if (((x >> 23) & 0xFFu) == 0xFFu) {
+        // Inf/NaN
+        if (mant == 0) return uint16_t(sign | 0x7C00u);     // Inf
+        // Quiet NaN: set MSB of mantissa; keep some payload
+        return uint16_t(sign | 0x7C00u | (mant >> 13) | 0x200u);
     }
+
+    if (exp > 15) {
+        // Overflow -> Inf
+        return uint16_t(sign | 0x7C00u);
+    }
+
+    if (exp <= -15) {
+        // Might be subnormal or underflow to zero
+        if (exp < -24) {
+            // Too small -> signed zero
+            return uint16_t(sign);
+        }
+        // Subnormal half: implicit leading 1 for float32 mantissa
+        mant |= 0x00800000u;
+        // shift right with rounding to nearest even
+        int shift = (-exp) - 14; // how much to shift to put into 10 bits
+        uint32_t rnd = (mant >> (shift - 1)) & 1u;
+        uint32_t sticky = ((mant & ((1u << (shift - 1)) - 1u)) != 0u);
+        uint32_t halfMant = mant >> shift;
+        // round to nearest even
+        halfMant += (rnd & (sticky | (halfMant & 1u)));
+        return uint16_t(sign | halfMant);
+    }
+
+    // Normal case
+    uint32_t halfExp  = uint32_t(exp + 15);
+    // Round to nearest even when dropping 13 bits
+    uint32_t halfMant = mant + 0x00001000u; // add round bit (1<<12)
+    if (halfMant & 0x00800000u) { // mantissa overflow from rounding
+        halfMant = 0;
+        ++halfExp;
+        if (halfExp >= 31) { // overflow to Inf
+            return uint16_t(sign | 0x7C00u);
+        }
+    }
+    return uint16_t(sign | (halfExp << 10) | (halfMant >> 13));
+}
+
+static inline float float16_to_float32(uint16_t h) {
+    uint32_t sign = (h & 0x8000u) << 16;
+    uint32_t exp  = (h >> 10) & 0x1Fu;
+    uint32_t mant =  h & 0x03FFu;
+
+    uint32_t out;
+    if (exp == 0) {
+        if (mant == 0) {
+            // zero
+            out = sign;
+        } else {
+            // subnormal -> normalize
+            int e = -1;
+            uint32_t m = mant;
+            while ((m & 0x0400u) == 0) { m <<= 1; --e; }
+            m &= 0x03FFu; // drop leading 1
+            uint32_t exp32  = uint32_t(127 - 15 + 1 + e);
+            uint32_t mant32 = m << 13;
+            out = sign | (exp32 << 23) | mant32;
+        }
+    } else if (exp == 31) {
+        // Inf/NaN
+        uint32_t mant32 = mant ? (mant << 13) | 0x400000u : 0; // make it quiet NaN
+        out = sign | 0x7F800000u | mant32;
+    } else {
+        // normal
+        uint32_t exp32  = exp + (127 - 15);
+        uint32_t mant32 = mant << 13;
+        out = sign | (exp32 << 23) | mant32;
+    }
+    union { uint32_t u; float f; } v { .u = out };
+    return v.f;
+}
+
+
+// --- 4-channel pixel converter ---------------------------------------------
+
+template<typename From, typename To>
+inline To convert4(const From& fr) {
+    To ret{};
+    ret.r = convert_channel<decltype(fr.r), decltype(ret.r)>(fr.r);
+    ret.g = convert_channel<decltype(fr.g), decltype(ret.g)>(fr.g);
+    ret.b = convert_channel<decltype(fr.b), decltype(ret.b)>(fr.b);
+    ret.a = convert_channel<decltype(fr.a), decltype(ret.a)>(fr.a);
     return ret;
 }
-template<typename from, typename to>
-void FormatRange(const from* source, to* dest, size_t count){
-    const from* fr = reinterpret_cast<const from*>(source);
-    to* top = reinterpret_cast<to*>(dest);
 
-    for(size_t i = 0;i < count;i++){
-        top[i] = convert4<from, to>(fr[i]);
+// ---- Specializations for RGBA16FColor --------------------------------------
+// float32 <-> half16 (no clamping)
+template<>
+inline RGBA16FColor convert4<RGBA32FColor, RGBA16FColor>(const RGBA32FColor& fr) {
+    RGBA16FColor ret{};
+    ret.r = float32_to_float16(fr.r);
+    ret.g = float32_to_float16(fr.g);
+    ret.b = float32_to_float16(fr.b);
+    ret.a = float32_to_float16(fr.a);
+    return ret;
+}
+template<>
+inline RGBA32FColor convert4<RGBA16FColor, RGBA32FColor>(const RGBA16FColor& fr) {
+    RGBA32FColor ret{};
+    ret.r = float16_to_float32(fr.r);
+    ret.g = float16_to_float32(fr.g);
+    ret.b = float16_to_float32(fr.b);
+    ret.a = float16_to_float32(fr.a);
+    return ret;
+}
+
+// 8-bit UNORM <-> half16  (map int<->[0,1] then pack/unpack)
+template<>
+inline RGBA16FColor convert4<RGBA8Color, RGBA16FColor>(const RGBA8Color& fr) {
+    RGBA16FColor ret{};
+    ret.r = float32_to_float16(static_cast<float>(fr.r) / 255.0f);
+    ret.g = float32_to_float16(static_cast<float>(fr.g) / 255.0f);
+    ret.b = float32_to_float16(static_cast<float>(fr.b) / 255.0f);
+    ret.a = float32_to_float16(static_cast<float>(fr.a) / 255.0f);
+    return ret;
+}
+template<>
+inline RGBA16FColor convert4<BGRA8Color, RGBA16FColor>(const BGRA8Color& fr) {
+    RGBA16FColor ret{};
+    // NOTE: field names in BGRA8Color already expose r,g,b,a logically.
+    ret.r = float32_to_float16(static_cast<float>(fr.r) / 255.0f);
+    ret.g = float32_to_float16(static_cast<float>(fr.g) / 255.0f);
+    ret.b = float32_to_float16(static_cast<float>(fr.b) / 255.0f);
+    ret.a = float32_to_float16(static_cast<float>(fr.a) / 255.0f);
+    return ret;
+}
+template<>
+inline RGBA8Color convert4<RGBA16FColor, RGBA8Color>(const RGBA16FColor& fr) {
+    RGBA8Color ret{};
+    auto q = [](uint16_t h)->uint8_t {
+        float f = float16_to_float32(h);
+        float c = std::round(std::fmax(0.0f, std::fmin(1.0f, f)) * 255.0f);
+        return static_cast<uint8_t>(c);
+    };
+    ret.r = q(fr.r); ret.g = q(fr.g); ret.b = q(fr.b); ret.a = q(fr.a);
+    return ret;
+}
+template<>
+inline BGRA8Color convert4<RGBA16FColor, BGRA8Color>(const RGBA16FColor& fr) {
+    BGRA8Color ret{};
+    auto q = [](uint16_t h)->uint8_t {
+        float f = float16_to_float32(h);
+        float c = std::round(std::fmax(0.0f, std::fmin(1.0f, f)) * 255.0f);
+        return static_cast<uint8_t>(c);
+    };
+    ret.r = q(fr.r); ret.g = q(fr.g); ret.b = q(fr.b); ret.a = q(fr.a);
+    return ret;
+}
+
+// --- Range & image converters -----------------------------------------------
+
+template<typename From, typename To>
+void FormatRange(const From* source, To* dest, size_t count){
+    const From* fr = reinterpret_cast<const From*>(source);
+    To* top = reinterpret_cast<To*>(dest);
+
+    for(size_t i = 0; i < count; ++i){
+        top[i] = convert4<From, To>(fr[i]);
     }
 }
-template<typename from, typename to>
+
+template<typename From, typename To>
 void FormatImage_Impl(const Image& source, Image& dest){
-    for(uint32_t i = 0;i < source.height;i++){
-        const from* dataptr = (const from*)(static_cast<const uint8_t*>(source.data) + source.rowStrideInBytes * i);
-        to* destptr = (to*)(static_cast<uint8_t*>(dest.data) + dest.rowStrideInBytes * i);
-        FormatRange<from, to>(dataptr, destptr, source.width);
+    for(uint32_t i = 0; i < source.height; ++i){
+        const From* dataptr = reinterpret_cast<const From*>(
+            static_cast<const uint8_t*>(source.data) + source.rowStrideInBytes * i
+        );
+        To* destptr = reinterpret_cast<To*>(
+            static_cast<uint8_t*>(dest.data) + dest.rowStrideInBytes * i
+        );
+        FormatRange<From, To>(dataptr, destptr, source.width);
     }
 }
+
+static inline void CopyImageRows(const Image& src, Image& dst) {
+    const uint8_t* s = static_cast<const uint8_t*>(src.data);
+    uint8_t* d = static_cast<uint8_t*>(dst.data);
+    const uint64_t rowBytes = std::min<uint64_t>(src.rowStrideInBytes, dst.rowStrideInBytes);
+    for (uint32_t i = 0; i < src.height; ++i) {
+        std::memcpy(d + dst.rowStrideInBytes * i, s + src.rowStrideInBytes * i, rowBytes);
+    }
+}
+
+
+// --- Format matrix -----------------------------------------------------------
+// Assumes the following pixel structs exist (field names matter, layout maps
+// memory order):
+//   struct RGBA8Color   { uint8_t  r,g,b,a; };
+//   struct BGRA8Color   { uint8_t  b,g,r,a; };
+//   struct RGBA32FColor { float    r,g,b,a; };
+
 RGAPI void ImageFormat(Image* img, PixelFormat newFormat){
-    uint32_t psize = GetPixelSizeInBytes(newFormat);
-    Image newimg zeroinit;
+    if (!img) return;
+    if (img->format == newFormat) return;
+
+    const uint32_t psize = GetPixelSizeInBytes(newFormat);
+
+    Image newimg{};
     newimg.format = newFormat;
     newimg.width = img->width;
     newimg.height = img->height;
     newimg.mipmaps = img->mipmaps;
-    newimg.rowStrideInBytes = newimg.width * psize;
-    newimg.data = calloc(img->width * img->height, psize);
-    switch(img->format){
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:{
-            if(newFormat == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8){
-                FormatImage_Impl<BGRA8Color, RGBA8Color>(*img, newimg);
+    newimg.rowStrideInBytes = static_cast<uint64_t>(newimg.width) * psize;
+    newimg.data = RL_CALLOC(static_cast<uint64_t>(img->width) * img->height, psize);
+    if (!newimg.data) return;
+
+    auto do_convert = [&](auto fromTag, auto toTag) {
+        using FromT = decltype(fromTag);
+        using ToT   = decltype(toTag);
+        FormatImage_Impl<FromT, ToT>(*img, newimg);
+    };
+
+    bool converted = true;
+    
+    switch (img->format) {
+        // ----------------- RGBA8 -> *
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8: {
+            switch (newFormat) {
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    CopyImageRows(*img, newimg); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    do_convert(RGBA8Color{},  BGRA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    do_convert(RGBA8Color{},  RGBA32FColor{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    do_convert(RGBA8Color{},  RGBA16FColor{}); break;
+                default: converted = false; break;
             }
-            if(newFormat == PIXELFORMAT_UNCOMPRESSED_R32G32B32A32){
-                FormatImage_Impl<BGRA8Color, RGBA32FColor>(*img, newimg);
+        } break;
+
+        // ----------------- BGRA8 -> *
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8: {
+            switch (newFormat) {
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    do_convert(BGRA8Color{},  RGBA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    CopyImageRows(*img, newimg); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    do_convert(BGRA8Color{},  RGBA32FColor{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    do_convert(BGRA8Color{},  RGBA16FColor{}); break;
+                default: converted = false; break;
             }
-        }break;
+        } break;
+
+        // ----------------- RGBA32F -> *
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32: {
+            switch (newFormat) {
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    do_convert(RGBA32FColor{}, RGBA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    do_convert(RGBA32FColor{}, BGRA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    CopyImageRows(*img, newimg); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    do_convert(RGBA32FColor{}, RGBA16FColor{}); break;
+                default: converted = false; break;
+            }
+        } break;
+
+        // ----------------- RGBA16 -> *
+        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16: {
+            switch (newFormat) {
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    do_convert(RGBA16FColor{}, RGBA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    do_convert(RGBA16FColor{}, BGRA8Color{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    do_convert(RGBA16FColor{}, RGBA32FColor{}); break;
+                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    CopyImageRows(*img, newimg); break;
+                default: converted = false; break;
+            }
+        } break;
+
         default:
-        //abort();
+            converted = false; break;
+    }
+
+    if (!converted) {
+        RL_FREE(newimg.data);
         return;
     }
-    free(img->data);
+
+    RL_FREE(img->data);
     img->data = newimg.data;
     img->rowStrideInBytes = newimg.rowStrideInBytes;
-    
+    img->format = newFormat;
 }
+
+
+
 RGAPI Color* LoadImageColors(Image img){
     Image copy = ImageFromImage(img, Rectangle{0,0,(float)img.width, (float)img.height});
     ImageFormat(&copy, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);

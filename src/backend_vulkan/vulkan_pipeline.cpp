@@ -503,7 +503,7 @@ extern "C" Shader LoadPipeline(const char* shaderSource){
 //    ret->activePipeline = ret->pipelineCache.getOrCreate(ret->state, ret->shaderModule, ret->bglayout, ret->layout);
 //}
 
-extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
     
     
     Shader retS = {

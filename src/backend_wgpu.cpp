@@ -325,6 +325,7 @@ extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, co
     return quartet;
 }
 */
+
 inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
     const uint32_t rotation = (bge.binding * 7) & 63;
     uint64_t value = ROT_BYTES((uint64_t)bge.buffer, rotation);
@@ -335,17 +336,18 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
     return value;
 }
 
-//extern "C" void BindPipelineWithSettings(DescribedPipeline* pipeline, PrimitiveType drawMode, RenderSettings settings){
-//    pipeline->state.primitiveType = drawMode;
-//    pipeline->state.settings = settings;
-//    PipelineHashMap_getOrCreate(&pipeline->pipelineCache,pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
-//    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
-//    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, nullptr);
-//}
-extern "C" void BindShader(Shader shader, PrimitiveType primitive){
+extern "C" void BindShaderWithSettings(Shader shader, PrimitiveType drawMode, RenderSettings settings){
+    
     ShaderImpl* impl = allocatedShaderIDs_shc + shader.id;
-    impl->state.primitiveType = primitive;
-    BindPipeline(PipelineHashMap_getOrCreate(impl->pipelineCache, impl->state, impl->shaderModule, impl->bindGroup, const DescribedPipelineLayout &pllayout))
+    impl->state.primitiveType = drawMode;
+    impl->state.settings = settings;
+    WGPURenderPipeline activePipeline = PipelineHashMap_getOrCreate(&impl->pipelineCache, impl->state, impl->shaderModule, impl->bglayout, impl->layout);
+    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, activePipeline);
+    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, 0, UpdateAndGetNativeBindGroup(&impl->bindGroup), 0, NULL);
+}
+
+extern "C" void BindShader(Shader shader, PrimitiveType drawMode){
+    BindShaderWithSettings(shader, drawMode, g_renderstate.currentSettings);
 }
 extern "C" void BindPipeline(DescribedPipeline* pipeline){
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
@@ -1602,8 +1604,8 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
 wgpu::Buffer readtex zeroinit;
 volatile bool waitflag = false;
 Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
-    
-    size_t formatSize = GetPixelSizeInBytes(fromWGPUPixelFormat(wgpuTextureGetFormat(tex)));
+    WGPUTextureFormat wFormat = wgpuTextureGetFormat(tex);
+    size_t formatSize = GetPixelSizeInBytes(fromWGPUPixelFormat(wFormat));
     uint32_t width = wgpuTextureGetWidth(tex);
     uint32_t height = wgpuTextureGetHeight(tex);
     Image ret {
@@ -1611,7 +1613,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
         wgpuTextureGetWidth(tex), 
         wgpuTextureGetHeight(tex), 
         1,
-        fromWGPUPixelFormat(wgpuTextureGetFormat(tex)), 
+        fromWGPUPixelFormat(wFormat), 
         RoundUpToNextMultipleOf256(formatSize * width), 
     };
     WGPUBufferDescriptor b{};
@@ -1645,10 +1647,6 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     wgpuCommandEncoderRelease(encoder);
     wgpuQueueSubmit((WGPUQueue)GetQueue(), 1, &command);
     wgpuCommandBufferRelease(command);
-    //#ifdef WEBGPU_BACKEND_DAWN
-    //wgpuDeviceTick((WGPUDevice)GetDevice());
-    //#else
-    //#endif
     ret.format = ret.format;
     waitflag = true;
     auto onBuffer2Mapped = [&ret](wgpu::MapAsyncStatus status, const char* userdata){
@@ -1674,43 +1672,8 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
     #else
     GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
-    //readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::AllowSpontaneous, onBuffer2Mapped);
     
-    //while(waitflag){
-    //    
-    //}
-    //readtex.MapAsync(wgpu::MapMode::Read, 0, size_t(std::ceil(4.0 * width / 256.0) * 256) * height, onBuffer2Mapped, &ibpair);
-    //wgpu::Future fut = readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped);
-    //WGPUFutureWaitInfo winfo{};
-    //winfo.future = fut;
-    //wgpuInstanceWaitAny(g_renderstate.instance, 1, &winfo, 1000000000);
-
-    //while(!done){
-        //emscripten_sleep(20);
-    //}
-    //wgpuInstanceWaitAny(g_renderstate.instance, 1, &winfo, 1000000000);
-    //emscripten_sleep(20);
     #endif
-    //wgpuBufferMapAsyncF(readtex, WGPUMapMode_Read, 0, 4 * tex.width * tex.height, onBuffer2Mapped);
-    /*while(ibpair.first->data == nullptr){
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
-        WGPUCommandBufferDescriptor cmdBufferDescriptor2{};
-        cmdBufferDescriptor.label = "Command buffer";
-        WGPUCommandEncoderDescriptor commandEncoderDesc2{};
-        commandEncoderDesc.label = "Command Encode2";
-        WGPUCommandEncoder encoder2 = wgpuDeviceCreateCommandEncoder(device, &commandEncoderDesc);
-        WGPUCommandBuffer command2 = wgpuCommandEncoderFinish(encoder2, &cmdBufferDescriptor);
-        wgpuQueueSubmit(g_renderstate.queue, 1, &command2);
-        wgpuCommandBufferRelease(command);
-        #ifdef WEBGPU_BACKEND_DAWN
-        wgpuDeviceTick(device);
-        #endif
-    }
-    #ifdef WEBGPU_BACKEND_DAWN
-    wgpuInstanceProcessEvents(g_renderstate.instance);
-    wgpuDeviceTick(device);
-    #endif*/
-    //readtex.Destroy();
     return ret;
 }
 extern "C" void BufferData(DescribedBuffer* buffer, const void* data, size_t size){
@@ -1842,35 +1805,35 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
 }*/
 
 
-extern "C" DescribedPipeline* LoadPipelineForVAO(const char* shaderSource, VertexArray* vao){
-    ShaderSources sources zeroinit;
-    sources.sourceCount = 1;
-    sources.language = sourceTypeWGSL;
+//extern "C" Shader LoadShaderForVAO(const char* shaderSource, VertexArray* vao){
+//    ShaderSources sources zeroinit;
+//    sources.sourceCount = 1;
+//    sources.language = sourceTypeWGSL;
+//
+//    sources.sources[0].stageMask = (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment);
+//    sources.sources[0].data = shaderSource;
+//    sources.sources[0].sizeInBytes = std::strlen(shaderSource);
+//
+//    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
+//    std::vector<ResourceTypeDescriptor> values;
+//    values.reserve(bindings.size());
+//    for(const auto& [x,y] : bindings){
+//        values.push_back(y);
+//    }
+//    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+//        return x.location < y.location;
+//    });
+//    return LoadShaderForVAOEx(sources, vao, values.data(), values.size(), GetDefaultSettings());
+//
+//}
 
-    sources.sources[0].stageMask = (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment);
-    sources.sources[0].data = shaderSource;
-    sources.sources[0].sizeInBytes = std::strlen(shaderSource);
+//DescribedPipeline* LoadShaderForVAOEx(const char* shaderSource, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+//    DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
+//    PreparePipeline(pl, vao);
+//    return pl;
+//}
 
-    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
-    std::vector<ResourceTypeDescriptor> values;
-    values.reserve(bindings.size());
-    for(const auto& [x,y] : bindings){
-        values.push_back(y);
-    }
-    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
-        return x.location < y.location;
-    });
-    DescribedPipeline* pl = LoadPipelineForVAOEx(sources, vao, values.data(), values.size(), GetDefaultSettings());
-
-    return pl;
-}
-
-DescribedPipeline* LoadPipelineForVAOEx(const char* shaderSource, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-    PreparePipeline(pl, vao);
-    return pl;
-}
-extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
+extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
     ShaderSources sources zeroinit;
     sources.language = sourceTypeWGSL;
     auto& src = sources.sources[sources.sourceCount++];
@@ -1906,9 +1869,7 @@ extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
     std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
         return x.location < y.location;
     });
-    DescribedPipeline* pl = LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
-    
-    return pl;
+    return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
 }
 DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv){
     DescribedShaderModule ret zeroinit;
@@ -2013,12 +1974,12 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     fragmentState.constantCount = 0;
     fragmentState.constants = nullptr;
 
-    blendState.color.srcFactor = (WGPUBlendFactor   )settings.blendState.color.srcFactor;
-    blendState.color.dstFactor = (WGPUBlendFactor   )settings.blendState.color.dstFactor;
-    blendState.color.operation = (WGPUBlendOperation)settings.blendState.color.operation;
-    blendState.alpha.srcFactor = (WGPUBlendFactor   )settings.blendState.alpha.srcFactor;
-    blendState.alpha.dstFactor = (WGPUBlendFactor   )settings.blendState.alpha.dstFactor;
-    blendState.alpha.operation = (WGPUBlendOperation)settings.blendState.alpha.operation;
+    blendState.color.srcFactor = settings.blendState.color.srcFactor;
+    blendState.color.dstFactor = settings.blendState.color.dstFactor;
+    blendState.color.operation = settings.blendState.color.operation;
+    blendState.alpha.srcFactor = settings.blendState.alpha.srcFactor;
+    blendState.alpha.dstFactor = settings.blendState.alpha.dstFactor;
+    blendState.alpha.operation = settings.blendState.alpha.operation;
     WGPUColorTargetState colorTarget{};
 
     colorTarget.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
@@ -2064,55 +2025,53 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     return wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
 }
 
-extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    //detectShaderLanguage()
-    
-    DescribedShaderModule module = LoadShaderModule(sources);
-    
-    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
-    //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-    PreparePipeline(pl, vao);
-    return pl;
-}
-extern "C" DescribedPipeline* LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-    
-    ShaderSources sources = dualStage(shaderSource, detectShaderLanguage(shaderSource, std::strlen(shaderSource)), WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
+//extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+//    //detectShaderLanguage()
+//    
+//    DescribedShaderModule module = LoadShaderModule(sources);
+//    
+//    DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
+//    //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
+//    PreparePipeline(pl, vao);
+//    return pl;
+//}
+RGAPI Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+    ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     DescribedShaderModule mod = LoadShaderModule(sources);
-
     return LoadPipelineMod(mod, attribs, attribCount, uniforms, uniformCount, settings);
 }
 extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-
     
     
-    DescribedPipeline* retp = callocnewpp(DescribedPipeline);
-    // TODO absorb this into LoadShader[...]
-    // retp->state.settings = settings;
-    DescribedPipeline& ret = *retp;
-    ret.shaderModule = mod;
+    Shader retS = {
+        .id = getNextShaderID_shc()
+    };
+    ShaderImpl* ret = GetShaderImpl(retS);
+    ret->state.settings = settings;
+    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
+    ret->state.vertexAttributeCount = attribCount; 
+    ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
+    ret->shaderModule = mod;
+    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
 
-    //TODO
-    //ret.state.vertexAttributes;    
+    std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
+    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
+    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
+    
+    WGPUPipelineLayoutDescriptor pldesc zeroinit;
+    pldesc.bindGroupLayoutCount = 1;
+    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
+    pldesc.bindGroupLayouts = bgls;
 
-
-    ret.bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
-
+    ret->layout.layout = wgpuDeviceCreatePipelineLayout(GetDevice(), &pldesc);
     std::vector<WGPUBindGroupEntry> bge(uniformCount);
+
     for(uint32_t i = 0;i < bge.size();i++){
         bge[i] = WGPUBindGroupEntry{};
         bge[i].binding = uniforms[i].location;
     }
-    // TODO absorb this into LoadShader[...]
-    // ret.bindGroup = LoadBindGroup(&ret.bglayout, bge.data(), bge.size());
-    WGPUPipelineLayoutDescriptor layout_descriptor zeroinit;
-
-    layout_descriptor.bindGroupLayoutCount = 1;
-    layout_descriptor.bindGroupLayouts = (WGPUBindGroupLayout*) (&ret.bglayout.layout);
-    ret.layout.layout = wgpuDeviceCreatePipelineLayout((WGPUDevice)GetDevice(), &layout_descriptor);
-    
-    //UpdatePipeline(retp);
-    //TRACELOG(LOG_INFO, "Pipeline with %d attributes and %d uniforms was loaded", attribCount, uniformCount);
-    return retp;
+    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
+    return retS;
 }
 
 WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage){
@@ -2256,18 +2215,19 @@ Shader LoadShaderFromMemoryOld(const char *vertexSource, const char *fragmentSou
     //shader.locs[SHADER_LOC_VERTEX_INSTANCE_TX] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCE_TX);
 
     // Get handles to GLSL uniform locations (vertex shader)
-    shader.locs[SHADER_LOC_MATRIX_MVP] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MVP);
-    shader.locs[SHADER_LOC_MATRIX_VIEW] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW);
-    shader.locs[SHADER_LOC_MATRIX_PROJECTION] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION);
-    shader.locs[SHADER_LOC_MATRIX_MODEL] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL);
-    shader.locs[SHADER_LOC_MATRIX_NORMAL] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL);
-    shader.locs[SHADER_LOC_BONE_MATRICES] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES);
+    
+    shader.locs[SHADER_LOC_MATRIX_MVP] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_MVP);
+    shader.locs[SHADER_LOC_MATRIX_VIEW] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW);
+    shader.locs[SHADER_LOC_MATRIX_PROJECTION] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION);
+    shader.locs[SHADER_LOC_MATRIX_MODEL] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL);
+    shader.locs[SHADER_LOC_MATRIX_NORMAL] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL);
+    shader.locs[SHADER_LOC_BONE_MATRICES] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES);
 
     // Get handles to GLSL uniform locations (fragment shader)
-    shader.locs[SHADER_LOC_COLOR_DIFFUSE] = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR);
-    shader.locs[SHADER_LOC_MAP_DIFFUSE]   = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);  // SHADER_LOC_MAP_ALBEDO
-    shader.locs[SHADER_LOC_MAP_SPECULAR]  = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1); // SHADER_LOC_MAP_METALNESS
-    shader.locs[SHADER_LOC_MAP_NORMAL]    = GetUniformLocation(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2);
+    shader.locs[SHADER_LOC_COLOR_DIFFUSE] = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR);
+    shader.locs[SHADER_LOC_MAP_DIFFUSE]   = GetUniformLocation(shader, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);  // SHADER_LOC_MAP_ALBEDO
+    shader.locs[SHADER_LOC_MAP_SPECULAR]  = GetUniformLocation(shader, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1); // SHADER_LOC_MAP_METALNESS
+    shader.locs[SHADER_LOC_MAP_NORMAL]    = GetUniformLocation(shader, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2);
     #else
     TRACELOG(LOG_ERROR, "GLSL Shader requested but compiled without GLSL support");
     TRACELOG(LOG_ERROR, "Configure CMake with -DSUPPORT_GLSL_PARSER=ON");

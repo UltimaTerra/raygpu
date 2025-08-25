@@ -1,5 +1,5 @@
 #include <raygpu.h>
-#include <msf_gif.h>
+#include <external/msf_gif.h>
 
 int main(){
     InitWindow(640, 480, "Gif Recording");

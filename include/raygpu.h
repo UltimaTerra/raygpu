@@ -101,6 +101,10 @@ typedef struct BGRA8Color{
     uint8_t b, g, r, a;
 } BGRA8Color;
 
+struct RGBA16FColor { 
+    uint16_t r, g, b, a;
+};
+
 struct RGBA32FColor{
     float r, g, b, a;
 };
@@ -1021,7 +1025,7 @@ EXTERN_C_BEGIN
     RGAPI Color* LoadImageColors(Image img);
     RGAPI void UnloadImageColors(Color* cols);
     
-    RGAPI uint32_t RoundUpToNextMultipleOf256(uint32_t x);
+    RGAPI uint64_t RoundUpToNextMultipleOf256(uint64_t x);
     RGAPI void UnloadImage(Image img);
     RGAPI void UnloadTexture(Texture tex);
     RGAPI Image LoadImageFromMemory(const char* extension, const void* data, size_t dataSize);
@@ -1157,8 +1161,9 @@ EXTERN_C_BEGIN
     RGAPI uint32_t    GetReflectionUniformLocation   (ShaderReflectionInfo reflectionInfo, const char* name );
     RGAPI uint32_t    GetReflectionAttributeLocation (ShaderReflectionInfo reflectionInfo, const char* name );
 
-    RGAPI Shader LoadShader          (const char *vsFileName, const char *fsFileName);
-    RGAPI Shader LoadShaderFromMemory(const char *vsCode    , const char *fsCode    );
+    RGAPI Shader LoadShader            (const char *vsFileName, const char *fsFileName);
+    RGAPI Shader LoadShaderSingleSource(const char* shaderSource);
+    RGAPI Shader LoadShaderFromMemory  (const char *vsCode    , const char *fsCode    );
 
 
     RGAPI DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, bool compute);

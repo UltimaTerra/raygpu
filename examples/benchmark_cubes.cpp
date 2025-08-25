@@ -31,7 +31,7 @@ struct VertexOutput {
     return vec4f((in.color * dot(in.normal, vec3f(-0.3,0.8,-0.55))).xyz, 1.0f);
     
 })";
-DescribedPipeline* pl;
+Shader shader;
 Mesh cubeMesh;
 Camera3D cam;
 std::vector<Vector4> instancetransforms;
@@ -43,14 +43,14 @@ void mainloop(){
     //TRACELOG(LOG_WARNING, "GetActivePipeline %ull", GetActivePipeline());
     //TRACELOG(LOG_WARNING, "Setting storig buffer");
 
-    BeginPipelineMode(pl);
+    BeginShaderMode(shader);
     UseNoTexture();
     BeginMode3D(cam);
-    BindShaderVertexArray(pl, cubeMesh.vao);
+    BindShaderVertexArray(shader, cubeMesh.vao);
     DrawArraysIndexedInstanced(RL_TRIANGLES, *cubeMesh.ibo, 36, instancetransforms.size());
     //DrawMeshInstanced(cubeMesh, Material{}, instancetransforms.data(), instancetransforms.size());
     EndMode3D();
-    EndPipelineMode();
+    EndShaderMode();
     DrawFPS(0, 10);
     if(IsKeyPressed(KEY_P)){
         TakeScreenshot("screenshot.png");
@@ -77,16 +77,16 @@ int main(){
         .up = Vector3{0,1,0},
         .fovy = 60.0f
     };
-    pl = LoadPipeline(shaderSource);
+    shader = LoadShaderSingleSource(shaderSource);
     auto smp = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
-    SetPipelineSampler(pl, 2, smp);
+    SetShaderSampler(shader, 2, smp);
     for(int i = -0;i < 2000;i++){
         for(int j = 0;j < 2000;j++){
             instancetransforms.push_back(Vector4(i, std::sin(2 * M_PI * i / 10.0f) + 15.0f * -std::cos(2 * M_PI * j / 90.0f), j));
         }
     }
     DescribedBuffer* persistent = GenStorageBuffer(instancetransforms.data(), instancetransforms.size() * sizeof(Vector4));
-    SetPipelineStorageBuffer(pl, 3, persistent);
+    SetShaderStorageBuffer(shader, 3, persistent);
     //TRACELOG(LOG_WARNING, "OOO: %llu", (unsigned long long)persistent.buffer);
     #ifndef __EMSCRIPTEN__
     while(!WindowShouldClose()){
