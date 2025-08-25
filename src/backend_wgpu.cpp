@@ -2081,8 +2081,10 @@ extern "C" DescribedPipeline* LoadPipelineEx(const char* shaderSource, const Att
 
     return LoadPipelineMod(mod, attribs, attribCount, uniforms, uniformCount, settings);
 }
-extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
 
+    
+    
     DescribedPipeline* retp = callocnewpp(DescribedPipeline);
     // TODO absorb this into LoadShader[...]
     // retp->state.settings = settings;

@@ -292,39 +292,45 @@ RGAPI void EnableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
 RGAPI void DisableVertexAttribArray(VertexArray* array, uint32_t attribLocation){
     VertexArray_disableAttribute(array, attribLocation);
 }
-//RGAPI void DrawArrays(PrimitiveType drawMode, uint32_t vertexCount){
-//    BindPipeline(GetActivePipeline(), drawMode);
-//
-//    if(GetActivePipeline()->bindGroup.needsUpdate){
-//        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-//    }
-//    RenderPassDraw(GetActiveRenderPass(), vertexCount, 1, 0, 0);
-//}
-//RGAPI void DrawArraysIndexed(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount){
-//    BindPipeline(GetActivePipeline(), drawMode);
-//    //PreparePipeline(GetActivePipeline(), VertexArray *va)
-//    //TRACELOG(LOG_INFO, "a oooo");
-//    //auto& rp = g_renderstate.renderpass.rpEncoder;  
-//    if(GetActivePipeline()->bindGroup.needsUpdate){
-//        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-//    }
-//    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
-//    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, 1, 0, 0, 0);
-//}
-//RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount, uint32_t instanceCount){
-//    BindPipeline(GetActivePipeline(), drawMode);
-//    if(GetActivePipeline()->bindGroup.needsUpdate){
-//        UpdateBindGroup(&GetActivePipeline()->bindGroup);
-//    }
-//    RenderPassSetBindGroup(GetActiveRenderPass(), 0, &GetActivePipeline()->bindGroup);
-//    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
-//    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
-//}
-//
-//RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount){
-//    BindPipeline(GetActivePipeline(), drawMode);
-//    RenderPassDraw(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0);
-//}
+RGAPI void DrawArrays(PrimitiveType drawMode, uint32_t vertexCount){
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    
+    BindShader(activeShader, drawMode);
+
+    if(activeShaderImpl->bindGroup.needsUpdate){
+        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &activeShaderImpl->bindGroup);
+    }
+    RenderPassDraw(GetActiveRenderPass(), vertexCount, 1, 0, 0);
+}
+RGAPI void DrawArraysIndexed(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount){
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    BindShader(activeShader, drawMode);
+
+    if(activeShaderImpl->bindGroup.needsUpdate){
+        RenderPassSetBindGroup(GetActiveRenderPass(), 0, &activeShaderImpl->bindGroup);
+    }
+    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, 1, 0, 0, 0);
+}
+RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount, uint32_t instanceCount){
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    BindShader(activeShader, drawMode);
+    
+    RenderPassSetBindGroup(GetActiveRenderPass(), 0, &activeShaderImpl->bindGroup);
+    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+    RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
+}
+
+RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uint32_t instanceCount){
+    Shader activeShader = GetActiveShader();
+    ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
+    BindShader(activeShader, drawMode);
+    
+    RenderPassDraw(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0);
+}
 
 RGAPI Texture GetDepthTexture(){
     return g_renderstate.renderTargetStack.peek().depth;
@@ -365,8 +371,8 @@ RGAPI void drawCurrentBatch(){
 
             //TODO: Line texturing is currently disable in all DrawLine... functions
             SetTexture(1, g_renderstate.whitePixel);
-            BindShader(activeShader, RL_LINES);
             BindShaderVertexArray(activeShader, renderBatchVAO);
+            BindShader(activeShader, RL_LINES);
             DrawArrays(RL_LINES, vertexCount);
             //wgpuRenderPassEncoderSetBindGroup(g_renderstate.renderpass.rpEncoder, 0, GetWGPUBindGroup(&GetActivePipeline()->bindGroup), 0, 0);
             //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, wgpuBufferGetSize(vbo.buffer));
@@ -383,8 +389,8 @@ RGAPI void drawCurrentBatch(){
         
         case RL_TRIANGLES:{
             //SetTexture(1, g_renderstate.whitePixel);
-            BindShader(GetActiveShader(), RL_TRIANGLES);
             BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
+            BindShader(GetActiveShader(), RL_TRIANGLES);
             DrawArrays(RL_TRIANGLES, vertexCount);
             //abort();
             //vboptr = vboptr_base;
@@ -2563,13 +2569,13 @@ size_t telegrama_render_size3 = sizeof(telegrama_render3);
 ShaderImpl* allocatedShaderIDs_shc = NULL;
 uint32_t nextShaderID_shc = 0;
 uint32_t capacity_shc = 0;
-ShaderImpl* GetShaderImplByID(uint32_t id){
+RGAPI ShaderImpl* GetShaderImplByID(uint32_t id){
     return allocatedShaderIDs_shc + id;
 }
-ShaderImpl* GetShaderImpl(Shader shader){
+RGAPI ShaderImpl* GetShaderImpl(Shader shader){
     return GetShaderImplByID(shader.id);
 }
-uint32_t getNextShaderID_shc(){
+RGAPI uint32_t getNextShaderID_shc(){
     if(nextShaderID_shc >= capacity_shc){
         uint32_t newCapacity = capacity_shc * 2 + (capacity_shc == 0) * 8;
         ShaderImpl* newAllocatedShaderIDs_shc = (ShaderImpl*)RL_CALLOC(newCapacity, sizeof(ShaderImpl));

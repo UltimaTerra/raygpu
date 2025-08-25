@@ -603,7 +603,7 @@ DescribedShaderModule LoadShaderModuleGLSL(ShaderSources sourcesGLSL){
     ret.reflectionInfo.colorAttachmentCount = attribs.attachments.size();
     return ret;
 }
-DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs){
+Shader LoadShaderGLSL(const char* vs, const char* fs){
     ShaderSources glslSources zeroinit;
     glslSources.language = sourceTypeGLSL;
     
@@ -657,7 +657,7 @@ DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs){
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
 extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){
-    return LoadPipelineGLSL(vs, fs);
+    return LoadShaderGLSL(vs, fs);
 }
 #ifdef GLSL_TO_WGSL
 extern "C" DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs){

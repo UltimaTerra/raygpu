@@ -1165,16 +1165,16 @@ EXTERN_C_BEGIN
     RGAPI DescribedBindGroupLayout LoadBindGroupLayoutMod(const DescribedShaderModule* shaderModule);
 
     //RGAPI WGPURaytracingPipeline LoadRTPipeline(const DescribedShaderModule* module);
-    RGAPI DescribedPipeline* ClonePipeline(const DescribedPipeline* pl);
-    RGAPI DescribedPipeline* ClonePipelineWithSettings(const DescribedPipeline* pl, RenderSettings settings);
-    RGAPI DescribedPipeline* LoadPipeline(const char* shaderSource);
-    RGAPI DescribedPipeline* LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI DescribedPipeline* LoadPipelineForVAO(const char* shaderSource, VertexArray* vao);
-    RGAPI DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs);
-    RGAPI DescribedPipeline* LoadPipelinePro(cwoid);
-    RGAPI DescribedPipeline* DefaultPipeline(cwoid);
+    RGAPI Shader ClonePipeline(const DescribedPipeline* pl);
+    RGAPI Shader ClonePipelineWithSettings(const DescribedPipeline* pl, RenderSettings settings);
+    RGAPI Shader LoadPipeline(const char* shaderSource);
+    RGAPI Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
+    RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
+    RGAPI Shader LoadPipelineForVAO(const char* shaderSource, VertexArray* vao);
+    RGAPI Shader LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
+    RGAPI Shader LoadPipelineGLSL(const char* vs, const char* fs);
+    RGAPI Shader LoadPipelinePro(cwoid);
+    RGAPI Shader DefaultPipeline(cwoid);
 
     RGAPI void UnloadBindGroupLayout(DescribedBindGroupLayout* bglayout);
     RGAPI DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const WGPUBindGroupEntry* entries, size_t entryCount);

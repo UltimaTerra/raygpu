@@ -636,8 +636,9 @@ typedef struct ShaderImpl{
     DescribedBindGroupLayout bglayout;
 }ShaderImpl;
 extern ShaderImpl* allocatedShaderIDs_shc;
-ShaderImpl* GetShaderImpl(Shader shader);
-ShaderImpl* GetShaderImplByID(uint32_t id);
+RGAPI uint32_t getNextShaderID_shc();
+RGAPI ShaderImpl* GetShaderImpl(Shader shader);
+RGAPI ShaderImpl* GetShaderImplByID(uint32_t id);
 typedef struct DescribedPipeline{
     WGPURenderPipeline activePipeline;
     

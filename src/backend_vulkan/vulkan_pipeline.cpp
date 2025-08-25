@@ -454,14 +454,14 @@ extern "C" RenderPipelineQuartet GetPipelinesForLayoutSet(DescribedPipeline* ret
 //    return GetPipelinesForLayoutSet(ret, layoutset);
 //}
 
-extern "C" DescribedPipeline* LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+extern "C" Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     
     DescribedShaderModule mod = LoadShaderModule(sources);
     //std::unordered_map<std::string, std::pair<VertexFormat, uint32_t>> attribs = getAttributes(shaderSource);
     return LoadPipelineMod(mod, attribs, attribCount, uniforms, uniformCount, settings);
 }
-extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
+extern "C" Shader LoadPipeline(const char* shaderSource){
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     auto [attribs, attachments] = getAttributesWGSL(sources);
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
@@ -503,34 +503,39 @@ extern "C" DescribedPipeline* LoadPipeline(const char* shaderSource){
 //    ret->activePipeline = ret->pipelineCache.getOrCreate(ret->state, ret->shaderModule, ret->bglayout, ret->layout);
 //}
 
-//extern "C" DescribedPipeline* LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-//    DescribedPipeline* ret = callocnewpp(DescribedPipeline);
-//    ret->state.settings = settings;
-//    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
-//    ret->state.vertexAttributeCount = attribCount; 
-//    ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
-//    ret->shaderModule = mod;
-//    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
-//
-//    std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
-//    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
-//    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
-//    
-//    WGPUPipelineLayoutDescriptor pldesc zeroinit;
-//    pldesc.bindGroupLayoutCount = 1;
-//    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
-//    pldesc.bindGroupLayouts = bgls;
-//
-//    ret->layout.layout = wgpuDeviceCreatePipelineLayout(g_vulkanstate.device, &pldesc);
-//    std::vector<WGPUBindGroupEntry> bge(uniformCount);
-//
-//    for(uint32_t i = 0;i < bge.size();i++){
-//        bge[i] = WGPUBindGroupEntry{};
-//        bge[i].binding = uniforms[i].location;
-//    }
-//    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
-//    return ret;
-//}
+extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+    
+    
+    Shader retS = {
+        .id = getNextShaderID_shc()
+    };
+    ShaderImpl* ret = GetShaderImpl(retS);
+    ret->state.settings = settings;
+    ret->state.vertexAttributes = (AttributeAndResidence*)attribs; 
+    ret->state.vertexAttributeCount = attribCount; 
+    ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
+    ret->shaderModule = mod;
+    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
+
+    std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
+    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
+    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
+    
+    WGPUPipelineLayoutDescriptor pldesc zeroinit;
+    pldesc.bindGroupLayoutCount = 1;
+    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
+    pldesc.bindGroupLayouts = bgls;
+
+    ret->layout.layout = wgpuDeviceCreatePipelineLayout(g_vulkanstate.device, &pldesc);
+    std::vector<WGPUBindGroupEntry> bge(uniformCount);
+
+    for(uint32_t i = 0;i < bge.size();i++){
+        bge[i] = WGPUBindGroupEntry{};
+        bge[i].binding = uniforms[i].location;
+    }
+    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
+    return retS;
+}
 //
 //extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
 //    //detectShaderLanguage()
