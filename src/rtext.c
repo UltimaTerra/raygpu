@@ -203,6 +203,8 @@ bool IsFileExtension(const char *fileName, const char *ext)
 
     return result;
 }
+
+
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------

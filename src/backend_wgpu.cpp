@@ -1943,11 +1943,13 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     blendState.alpha.srcFactor = settings.blendState.alpha.srcFactor;
     blendState.alpha.dstFactor = settings.blendState.alpha.dstFactor;
     blendState.alpha.operation = settings.blendState.alpha.operation;
-    WGPUColorTargetState colorTarget{};
-
-    colorTarget.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
-    colorTarget.blend = &blendState;
-    colorTarget.writeMask = WGPUColorWriteMask_All;
+    
+    const WGPUColorTargetState colorTarget = {
+        .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
+        .blend = &blendState,
+        .writeMask = WGPUColorWriteMask_All,
+    };    
+    
     fragmentState.targetCount = 1;
     fragmentState.targets = &colorTarget;
     pipelineDesc.fragment = &fragmentState;
@@ -1960,7 +1962,7 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
         // Deactivate the stencil alltogether
         WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
 
-        depthStencilState.depthCompare = (WGPUCompareFunction)settings.depthCompare;
+        depthStencilState.depthCompare = settings.depthCompare;
         depthStencilState.depthWriteEnabled = WGPUOptionalBool_True;
         depthStencilState.format = depthTextureFormat;
         depthStencilState.stencilReadMask = 0;
@@ -1970,7 +1972,7 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     }
     pipelineDesc.depthStencil = settings.depthTest ? &depthStencilState : nullptr;
     
-    pipelineDesc.primitive.frontFace = (WGPUFrontFace)settings.frontFace;
+    pipelineDesc.primitive.frontFace = settings.frontFace;
     pipelineDesc.primitive.cullMode = settings.faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
     auto toWebGPUPrimitive = [](PrimitiveType pt){

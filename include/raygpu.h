@@ -1007,6 +1007,7 @@ EXTERN_C_BEGIN
     RGAPI const char* GetDirectoryPath(const char* arg);
     RGAPI const char* FindDirectory(const char* directoryName, int maxOutwardSearch);
     RGAPI bool IsFileExtension(const char *fileName, const char *ext);
+    RGAPI bool FileExists(const char* path);
     
     RGAPI DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode);
     RGAPI DescribedSampler LoadSamplerEx(TextureWrap amode, TextureFilter fmode, TextureFilter mipmapFilter, float maxAnisotropy);

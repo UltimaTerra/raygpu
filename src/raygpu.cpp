@@ -1844,7 +1844,7 @@ void SetShaderUniformBufferData   (Shader shader, uint32_t index, const void* da
 }
 void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* data, size_t size){
     ShaderImpl* sh = allocatedShaderIDs_shc + shader.id;
-    SetBindgroupUniformBufferData(&sh->bindGroup, index, data, size);
+    SetBindgroupStorageBufferData(&sh->bindGroup, index, data, size);
 }
 
 inline uint64_t bgEntryHash(const ResourceDescriptor& bge){
@@ -2320,10 +2320,10 @@ DescribedBuffer* GenIndexBuffer(const void* data, size_t size){
     return GenBufferEx(data, size, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);
 }
 DescribedBuffer* GenUniformBuffer(const void* data, size_t size){
-    return GenBufferEx(data, size, WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform);
+    return GenBufferEx(data, size, WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform | WGPUBufferUsage_Storage);
 }
 DescribedBuffer* GenStorageBuffer(const void* data, size_t size){
-    return GenBufferEx(data, size, WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage);
+    return GenBufferEx(data, size, WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage | WGPUBufferUsage_Uniform);
 }
 
 
@@ -2756,6 +2756,10 @@ const char* FindDirectory(const char* directoryName, int maxOutwardSearch) {
     cfs_path_free_storage(&found_path);
 
     return return_val;
+}
+
+RGAPI bool FileExists(const char* filename){
+    return cfs_exists(filename);
 }
 
 const char *GetDirectoryPath(const char *filePath)
