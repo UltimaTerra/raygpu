@@ -425,8 +425,8 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     #endif
     
     window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
-    if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
-        glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
+    //if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
+    //    glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
     
     int wposx = 0, wposy = 0;
     if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
