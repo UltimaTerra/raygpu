@@ -150,7 +150,7 @@ extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineSta
         // Store the format in a variable as later parts of the code depend on it
         // Deactivate the stencil alltogether
         WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
-        depthStencilState = (WGPUDepthStencilState){
+        depthStencilState = WGPUDepthStencilState {
             .format = depthTextureFormat,
             .depthWriteEnabled = WGPUOptionalBool_True,
             .depthCompare = (WGPUCompareFunction)settings->depthCompare,
