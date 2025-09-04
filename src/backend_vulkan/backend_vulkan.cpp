@@ -1,9 +1,10 @@
-#include "internals.hpp"
-#include <wgvk.h>
-#include <config.h>
 #define Font rlFont
 #include <raygpu.h>
 #undef Font
+
+#include "internals.hpp"
+#include <wgvk.h>
+#include <config.h>
 #include <set>
 #include <external/volk.h>
 #include <renderstate.hpp>
@@ -38,7 +39,7 @@ extern "C" DescribedBuffer* GenBufferEx(const void* data, size_t size, WGPUBuffe
     return ret;
 }
 
-extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t height){
+extern "C" void ResizeSurface(FullSurface* fsurface, int width, int height){
     reinterpret_cast<WGPUSurface>(fsurface->surface)->device->functions.vkQueueWaitIdle(reinterpret_cast<WGPUSurface>(fsurface->surface)->device->queue->graphicsQueue);
     reinterpret_cast<WGPUSurface>(fsurface->surface)->device->functions.vkQueueWaitIdle(reinterpret_cast<WGPUSurface>(fsurface->surface)->device->queue->presentQueue);
     VkSemaphoreWaitInfo info;
@@ -1146,7 +1147,7 @@ void InitBackend(){
     createRenderPass();
 }
 
-extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
+extern "C" FullSurface CompleteSurface(void* nsurface, int width, int height){
     FullSurface ret = {
         .surface = (WGPUSurface)nsurface
     };

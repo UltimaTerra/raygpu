@@ -1547,7 +1547,7 @@ extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
     #endif
 }
 
-extern "C" FullSurface CreateHeadlessSurface(uint32_t width, uint32_t height, PixelFormat format){
+extern "C" FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format){
     FullSurface ret zeroinit;
     ret.headless = 1;
     ret.surfaceConfig.device = GetDevice();

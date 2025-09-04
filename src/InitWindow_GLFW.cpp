@@ -181,7 +181,7 @@ void setupGLFWCallbacks(GLFWwindow* window){
     #endif
 }
 
-uint32_t GetMonitorWidth_GLFW(cwoid){
+int GetMonitorWidth_GLFW(cwoid){
     glfwInit();
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     if(mode == nullptr){
@@ -189,7 +189,7 @@ uint32_t GetMonitorWidth_GLFW(cwoid){
     }
     return mode->width;
 }
-uint32_t GetMonitorHeight_GLFW(cwoid){
+int GetMonitorHeight_GLFW(cwoid){
     glfwInit();
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
     if(mode == nullptr){
@@ -445,7 +445,7 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     setupGLFWCallbacks((GLFWwindow*)ret.handle);
     return ret;
 }
-extern "C" SubWindow OpenSubWindow_GLFW(uint32_t width, uint32_t height, const char* title){
+extern "C" SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
     SubWindow ret{};
     #ifndef __EMSCRIPTEN__
     glfwInit();

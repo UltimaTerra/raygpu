@@ -57,11 +57,11 @@ void Initialize_SDL3(){
     }
 }
 
-extern "C" void* CreateSurfaceForWindow_SDL3(void* windowHandle){
+RGAPI void* CreateSurfaceForWindow_SDL3(void* windowHandle){
     return SDL3_GetWGPUSurface((WGPUInstance)GetInstance(), (SDL_Window*)windowHandle);
 }
 
-extern "C" SubWindow OpenSubWindow_SDL3(uint32_t width, uint32_t height, const char* title){
+RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
     SubWindow ret zeroinit;
     ret.type = windowType_sdl3;
     ret.handle = SDL_CreateWindow(title, width, height, 0);
@@ -72,7 +72,7 @@ extern "C" SubWindow OpenSubWindow_SDL3(uint32_t width, uint32_t height, const c
 }
 
 
-extern "C" SubWindow InitWindow_SDL3(uint32_t width, uint32_t height, const char *title) {
+RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     Initialize_SDL3();
     TRACELOG(LOG_INFO, "INITED SDL3!");
     SubWindow ret zeroinit;
@@ -264,7 +264,7 @@ static const KeyboardKey mapScancodeToKey[SCANCODE_MAPPED_NUM] = {
     KEY_RIGHT_SUPER     //SDL_SCANCODE_RGUI
 };
 
-uint32_t GetMonitorWidth_SDL3(cwoid){
+int GetMonitorWidth_SDL3(cwoid){
     Initialize_SDL3();
     int displayCount = 0;
     SDL_GetDisplays(&displayCount);
@@ -278,7 +278,7 @@ uint32_t GetMonitorWidth_SDL3(cwoid){
     return mode->w;
 }
 
-uint32_t GetMonitorHeight_SDL3(cwoid){
+int GetMonitorHeight_SDL3(cwoid){
     Initialize_SDL3();
     SDL_Point zeropoint{};
     SDL_DisplayID id = SDL_GetDisplayForPoint(&zeropoint);
@@ -349,7 +349,7 @@ void KeyDownCallback (SDL_Window* window, int key, int scancode, int mods){
     //    glfwSetWindowShouldClose(window, true);
     //}
 }
-extern "C" void PollEvents_SDL3() {
+RGAPI void PollEvents_SDL3() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {

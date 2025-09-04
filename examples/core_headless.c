@@ -25,6 +25,9 @@ int main(void){
             TakeScreenshot(TextFormat("frame%llu.png", GetFrameCount()));
             printf("FPS: %d\n", GetFPS());
         }
-        printf("FPS: %d\n", GetFPS());
+        //printf("FPS: %d\n", GetFPS());
+        if(GetFrameCount() > 4096){
+            break;
+        }
     }
 }

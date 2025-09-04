@@ -500,6 +500,6 @@ extern "C" void UnloadBuffer(DescribedBuffer* buf);
 
 extern "C" void UpdateBindGroupEntry(DescribedBindGroup* bg, size_t index, WGPUBindGroupEntry entry);
 extern "C" void GetNewTexture(FullSurface *fsurface);
-extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t width, uint32_t height);
+extern "C" void ResizeSurface(FullSurface* fsurface, int width, int height);
 
 #endif

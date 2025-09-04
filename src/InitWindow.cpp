@@ -444,7 +444,7 @@ extern "C" void* CreateSurfaceForWindow(SubWindow window){
 extern "C" void CharCallback(void* window, unsigned int codePoint){
     g_renderstate.input_map[window].charQueue.push_back((int)codePoint);
 }
-extern "C" SubWindow OpenSubWindow(uint32_t width, uint32_t height, const char* title){
+extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
     SubWindow createdWindow zeroinit;
     #ifdef MAIN_WINDOW_GLFW
     createdWindow = OpenSubWindow_GLFW(width, height, title);

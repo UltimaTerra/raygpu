@@ -569,33 +569,38 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* unifo
 
 
 
-extern "C" FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
+RGAPI FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
     FullSurface ret{};
     ret.surface = (WGPUSurface)nsurface;
     negotiateSurfaceFormatAndPresentMode(nsurface);
     WGPUSurfaceCapabilities capa{};
     WGPUAdapter adapter = (WGPUAdapter)GetAdapter();
 
-    wgpuSurfaceGetCapabilities((WGPUSurface)ret.surface, adapter, &capa);
-    WGPUSurfaceConfiguration config{};
-    WGPUPresentMode thm = (WGPUPresentMode)g_renderstate.throttled_PresentMode;
-    WGPUPresentMode um = (WGPUPresentMode)g_renderstate.unthrottled_PresentMode;
+    wgpuSurfaceGetCapabilities(ret.surface, adapter, &capa);
+
+    WGPUPresentMode presentMode = WGPUPresentMode_Undefined;
+    WGPUPresentMode thm = g_renderstate.throttled_PresentMode;
+    WGPUPresentMode um = g_renderstate.unthrottled_PresentMode;
     if (g_renderstate.windowFlags & FLAG_VSYNC_LOWLATENCY_HINT) {
-        config.presentMode = (((g_renderstate.unthrottled_PresentMode == WGPUPresentMode_Mailbox) ? um : thm));
+        presentMode = (((g_renderstate.unthrottled_PresentMode == WGPUPresentMode_Mailbox) ? um : thm));
     } else if (g_renderstate.windowFlags & FLAG_VSYNC_HINT) {
-        config.presentMode = thm;
+        presentMode = thm;
     } else {
-        config.presentMode = um;
+        presentMode = um;
     }
-    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(config.presentMode).c_str());
-    config.alphaMode = WGPUCompositeAlphaMode_Opaque;
-    config.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
-    config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
-    config.width = width;
-    config.height = height;
-    config.viewFormats = &config.format;
-    config.viewFormatCount = 1;
-    config.device = (WGPUDevice)GetDevice();
+    
+    
+    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
+    WGPUSurfaceConfiguration config = {
+        .device = (WGPUDevice)GetDevice(),
+        .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
+        .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc,
+        .width = width,
+        .height = height,
+        .viewFormatCount = 1,
+        .viewFormats = &config.format,
+        .alphaMode = WGPUCompositeAlphaMode_Opaque,
+    };
 
     ret.surfaceConfig.presentMode = config.presentMode;
     ret.surfaceConfig.device = config.device;

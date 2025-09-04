@@ -280,11 +280,11 @@ void setupRGFWCallbacks(RGFW_window* window){
     RGFW_setMousePosCallback(mouseMotionfunc_rgfw);
     RGFW_setWindowQuitCallback(windowQuitfunc_rgfw);
 }
-extern "C" void* CreateSurfaceForWindow_RGFW(void* windowHandle){
-    
+
+RGAPI void* CreateSurfaceForWindow_RGFW(void* windowHandle){    
     #if SUPPORT_VULKAN_BACKEND == 1
-    WGVKSurface retp = callocnew(WGVKSurfaceImpl);
-    RGFW_window_createVKSurface((RGFW_window*)windowHandle, ((WGVKInstance)GetInstance())->instance, &retp->surface);
+    WGPUSurface retp = callocnew(WGPUSurfaceImpl);
+    RGFW_window_createVKSurface((RGFW_window*)windowHandle, ((WGPUInstance)GetInstance())->instance, &retp->surface);
     return retp;
     #else
     WGPUSurface surf = (WGPUSurface)RGFW_GetWGPUSurface(GetInstance(), (RGFW_window*) windowHandle);
@@ -295,7 +295,7 @@ extern "C" void* CreateSurfaceForWindow_RGFW(void* windowHandle){
 SubWindow InitWindow_RGFW(int width, int height, const char* title){
     SubWindow ret{};
     ret.type = windowType_rgfw;
-    ret.handle = RGFW_createWindow(title, RGFW_rect{0, 0, width, height}, RGFW_windowCenter | RGFW_windowNoInitAPI);
+    ret.handle = RGFW_createWindow(title, RGFW_rect{0, 0, width, height}, RGFW_windowCenter | RGFW_windowNoInitAPI | RGFW_windowNoInitAPI);
     
     setupRGFWCallbacks((RGFW_window*)ret.handle);
     return ret;

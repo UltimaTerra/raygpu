@@ -831,13 +831,13 @@ EXTERN_C_BEGIN
     RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int/* unused */, int/* unused */);
     RGAPI void SetWindowShouldClose(cwoid);
     RGAPI bool WindowShouldClose(cwoid);
-    RGAPI SubWindow OpenSubWindow          (uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow InitWindow_SDL2        (uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow InitWindow_SDL3        (uint32_t width, uint32_t height, const char* title);
+    RGAPI SubWindow OpenSubWindow          (int width, int height, const char* title);
+    RGAPI SubWindow InitWindow_SDL2        (int width, int height, const char* title);
+    RGAPI SubWindow InitWindow_SDL3        (int width, int height, const char* title);
     RGAPI void CloseSubWindow              (SubWindow subWindow);
-    RGAPI FullSurface CompleteSurface      (void* nsurface, uint32_t width, uint32_t height);
-    RGAPI FullSurface CreateHeadlessSurface(uint32_t width, uint32_t height, PixelFormat format);
-    RGAPI void ResizeSurface               (FullSurface* fsurface, uint32_t width, uint32_t height);
+    RGAPI FullSurface CompleteSurface      (void* nsurface, int width, int height);
+    RGAPI FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format);
+    RGAPI void ResizeSurface               (FullSurface* fsurface, int width, int height);
     RGAPI void GetNewTexture               (FullSurface* fsurface);
     RGAPI void PresentSurface              (FullSurface* fsurface);
     RGAPI void DummySubmitOnQueue(cwoid);
@@ -881,12 +881,12 @@ EXTERN_C_BEGIN
     RGAPI void PollEvents_SDL3(cwoid);
     RGAPI void PollEvents_GLFW(cwoid);
     RGAPI void PollEvents_RGFW(cwoid);
-    RGAPI uint32_t GetMonitorWidth_GLFW(cwoid);
-    RGAPI uint32_t GetMonitorWidth_SDL2(cwoid);
-    RGAPI uint32_t GetMonitorWidth_SDL3(cwoid);
-    RGAPI uint32_t GetMonitorHeight_SDL3(cwoid);
-    RGAPI uint32_t GetMonitorHeight_GLFW(cwoid);
-    RGAPI uint32_t GetMonitorHeight_SDL2(cwoid);
+    RGAPI int GetMonitorWidth_GLFW(cwoid);
+    RGAPI int GetMonitorWidth_SDL2(cwoid);
+    RGAPI int GetMonitorWidth_SDL3(cwoid);
+    RGAPI int GetMonitorHeight_SDL3(cwoid);
+    RGAPI int GetMonitorHeight_GLFW(cwoid);
+    RGAPI int GetMonitorHeight_SDL2(cwoid);
     RGAPI int GetTouchPointCount_SDL2(cwoid);
     RGAPI Vector2 GetTouchPosition_SDL2(int);
     RGAPI void SetWindowShouldClose_GLFW(GLFWwindow* win);
@@ -900,9 +900,9 @@ EXTERN_C_BEGIN
     RGAPI void ToggleFullscreen_GLFW(cwoid);
     RGAPI void ToggleFullscreen_SDL2(cwoid);
     RGAPI void ToggleFullscreen_SDL3(cwoid);
-    RGAPI SubWindow OpenSubWindow_GLFW(uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow OpenSubWindow_SDL2(uint32_t width, uint32_t height, const char* title);
-    RGAPI SubWindow OpenSubWindow_SDL3(uint32_t width, uint32_t height, const char* title);
+    RGAPI SubWindow OpenSubWindow_GLFW(int width, int height, const char* title);
+    RGAPI SubWindow OpenSubWindow_SDL2(int width, int height, const char* title);
+    RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title);
 
     /**
      * @brief Get the time elapsed since InitWindow() in seconds since 
