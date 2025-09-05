@@ -115,15 +115,15 @@ constexpr float RAD2DEG = 180.0 / M_PI;
 #elif defined(_WIN32)
     #if defined(RG_EXPORTS) && RG_EXPORTS != 0
         #ifdef __cplusplus
-            #define RGAPI __declspec(dllexport)
-        #else
             #define RGAPI extern "C" __declspec(dllexport)
+        #else
+            #define RGAPI __declspec(dllexport)
         #endif
     #else
         #ifdef __cplusplus
-            #define RGAPI __declspec(dllimport)
-        #else
             #define RGAPI extern "C" __declspec(dllimport)
+        #else
+            #define RGAPI __declspec(dllimport)
         #endif
     #endif
 #else
