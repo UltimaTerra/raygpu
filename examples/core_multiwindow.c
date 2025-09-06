@@ -12,27 +12,34 @@ int main(void){
     SubWindow third = OpenSubWindow(secondWidth, secondHeight, "Third Window");
     RenderTexture rtex = LoadRenderTexture(800, 800);
     while(!WindowShouldClose()){
-        
-        //BeginRenderpass();
-        //EndRenderpass();
 
-        
-        
+        // Start drawing with the third window
+        // Input functions, e.g. GetMouseX() are specific to this window
+        // inside BeginWindowMode() / EndWindowMode() 
         BeginWindowMode(third);
-        ClearBackground(RED);
-        DrawCircle(GetMouseX(), GetMouseY(), 50.0f, GREEN);
+            ClearBackground(RED);
+            DrawCircle(GetMouseX(), GetMouseY(), 50.0f, GREEN);
         EndWindowMode();
+
+        // Draw second window
         BeginWindowMode(second);
-        BeginTextureMode(rtex);
-        ClearBackground(GREEN);
-        DrawCircle(GetMouseX(), GetMouseY(), 50.0f, WHITE);
-        EndTextureMode();
-        DrawTexturePro(rtex.texture, (Rectangle){0,0,800,800}, (Rectangle){300,300,100,100}, (Vector2){0,0}, 0.0f, WHITE);
+            BeginTextureMode(rtex);
+            ClearBackground(GREEN);
+            DrawCircle(GetMouseX(), GetMouseY(), 50.0f, WHITE);
+            EndTextureMode();
+            DrawTexturePro(
+                rtex.texture,
+                (Rectangle){0,0,800,800},
+                (Rectangle){200,200,300,300},
+                (Vector2){0,0}, 0.0f, WHITE
+            );
         EndWindowMode();
+
+        // Draw primary window
         BeginDrawing();
-        
-        ClearBackground(DARKBLUE);
-        DrawCircle(GetMouseX(), GetMouseY(), 50.0f, RED);
+            ClearBackground(DARKBLUE);
+            DrawCircle(GetMouseX(), GetMouseY(), 50.0f, RED);
         EndDrawing();
+
     }
 }
