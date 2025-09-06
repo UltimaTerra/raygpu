@@ -2918,8 +2918,12 @@ RGAPI uint32_t getNextShaderID_shc(){
     if(nextShaderID_shc >= capacity_shc){
         uint32_t newCapacity = capacity_shc * 2 + (capacity_shc == 0) * 8;
         ShaderImpl* newAllocatedShaderIDs_shc = (ShaderImpl*)RL_CALLOC(newCapacity, sizeof(ShaderImpl));
-        memcpy(newAllocatedShaderIDs_shc, allocatedShaderIDs_shc, capacity_shc * sizeof(ShaderImpl));
-        RL_FREE(allocatedShaderIDs_shc);
+        if(capacity_shc){
+            memcpy(newAllocatedShaderIDs_shc, allocatedShaderIDs_shc, capacity_shc * sizeof(ShaderImpl));
+        }
+        if(allocatedShaderIDs_shc){
+            RL_FREE(allocatedShaderIDs_shc);
+        }
         capacity_shc = newCapacity;
         allocatedShaderIDs_shc = newAllocatedShaderIDs_shc; 
     }
