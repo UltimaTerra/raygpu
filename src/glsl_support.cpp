@@ -369,6 +369,7 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
     }
     ret.attachmentCount = pouts;
     uint32_t attributeInsertionIndex = 0;
+    memset(ret.vertexAttributes, 0, MAX_VERTEX_ATTRIBUTES * sizeof(ReflectionVertexAttribute));
     for(int32_t i = 0;i < attributeCount;i++){
         int glattrib = program.getAttributeType(i);
         std::string attribname = program.getAttributeName(i);
@@ -646,6 +647,17 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     std::sort(flatAttributes, flatAttributes + acount, [](const ReflectionVertexAttribute& a, const ReflectionVertexAttribute& b){
         return a.location < b.location;
     });
+    // ----> ADD THIS DEBUGGING CODE <----
+    printf("--- Shader Reflection Info ---\n");
+    printf("Found %u vertex attributes:\n", acount);
+    for (uint32_t i = 0; i < acount; i++) {
+        printf("  Attribute[%u]: name='%s', location=%u, format=%d\n",
+               i,
+               flatAttributes[i].name,
+               flatAttributes[i].location,
+               flatAttributes[i].format);
+    }
+    printf("----------------------------\n");
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
 
     allAttribsInOneBuffer.reserve(acount);
@@ -667,6 +679,11 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
         );
         offset += attributeSize(format);
     }
+    // ----> ADD THIS DEBUGGING CODE <----
+    printf("--- Pipeline Vertex Stride ---\n");
+    printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
+    printf("----------------------------\n");
+    // ----> END DEBUGGING CODE <----
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
 extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){

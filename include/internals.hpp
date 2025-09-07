@@ -727,10 +727,13 @@ static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* 
     if(name == NULL){
         return LOCATION_NOT_FOUND;
     }
-    for(uint32_t i = 0;i < MAX_VERTEX_ATTRIBUTES;i++){
+    for(uint32_t i = 0;i < attributes->vertexAttributeCount;i++){
         int equal = 1;
         for(size_t j = 0;j < MAX_VERTEX_ATTRIBUTE_NAME_LENGTH;j++){
             if(name[j] == '\0'){
+                if(attributes->vertexAttributes[i].name[j] != '\0'){
+                    equal = 0;
+                }
                 break;
             }
             else if(attributes->vertexAttributes[i].name[j] != name[j]){
@@ -739,7 +742,7 @@ static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* 
             }
         }
         if(equal){
-            return i;
+            return attributes->vertexAttributes[i].location;
         }
     }
     return LOCATION_NOT_FOUND;
