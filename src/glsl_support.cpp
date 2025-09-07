@@ -23,6 +23,7 @@
  */
 
 
+#include "config.h"
 #include <memory>
 #include <map>
 #include <unordered_map>
@@ -338,11 +339,11 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
         //TRACELOG(LOG_INFO, "Program linked successfully");
     }
     program.buildReflection();
-    std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>>& retInputs = ret.vertexAttributes;
+    ReflectionVertexAttribute* retInputs = ret.vertexAttributes;
     uint32_t attributeCount = program.getNumLiveAttributes();
 
     int pouts = program.getNumPipeOutputs();
-    ret.attachments.resize(pouts);
+    rassert(pouts <= MAX_COLOR_ATTACHMENTS, "Too many pipe outputs: %d", pouts);
     for(int i = 0;i < pouts;i++){
         int vectorsize = -1;
         format_or_sample_type sample_type = format_or_sample_type::we_dont_know;
@@ -361,8 +362,12 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
         const char* tstr_cstr = tstr.c_str();
         rassert(vectorsize != -1, "Could not make sense of this type: %s", tstr_cstr);
         
-        ret.attachments[i] = {};
+        ret.attachments[i] = ReflectionFragmentOutput{
+            .number_of_components = (uint32_t)vectorsize,
+            .type = sample_type,
+        };
     }
+    uint32_t attributeInsertionIndex = 0;
     for(int32_t i = 0;i < attributeCount;i++){
         int glattrib = program.getAttributeType(i);
         std::string attribname = program.getAttributeName(i);
@@ -370,9 +375,14 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
         {
             uint32_t location = program.getAttributeTType(i)->getQualifier().layoutLocation;
             
-            WGPUVertexFormat type = fromGLVertexFormat(glattrib);
-            if(!attribname.starts_with("gl_")){
-                retInputs[attribname] = {type, location};
+            WGPUVertexFormat format = fromGLVertexFormat(glattrib);
+            rassert(attribname.size() <= MAX_VERTEX_ATTRIBUTE_NAME_LENGTH, "Vertex attribute name longer than MAX_VERTEX_ATTRIBUTE_NAME_LENGTH: %s", attribname.c_str());
+
+            if(!attribname.starts_with("gl_") && attribname.size() <= MAX_VERTEX_ATTRIBUTE_NAME_LENGTH){
+                ReflectionVertexAttribute* insert = ret.vertexAttributes + (attributeInsertionIndex++);
+                memcpy(insert->name, attribname.c_str(), attribname.size());
+                insert->name[attribname.size()] = '\0';
+                insert->format = format;
             }
         }
 
@@ -599,8 +609,7 @@ DescribedShaderModule LoadShaderModuleGLSL(ShaderSources sourcesGLSL){
     ret.reflectionInfo.uniforms->uniforms = getBindingsGLSL(sourcesGLSL);
     
     InOutAttributeInfo attribs = getAttributesGLSL(sourcesGLSL);
-    ret.reflectionInfo.attributes->attributes = attribs.vertexAttributes;
-    ret.reflectionInfo.colorAttachmentCount = attribs.attachments.size();
+    ret.reflectionInfo.attributes = attribs;
     return ret;
 }
 Shader LoadShaderGLSL(const char* vs, const char* fs){

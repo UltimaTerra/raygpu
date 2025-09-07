@@ -27,14 +27,13 @@
 
 #ifndef INTERNALS_HPP_INCLUDED
 #define INTERNALS_HPP_INCLUDED
+#include "config.h"
 #include <cstring>
 #if SUPPORT_VULKAN_BACKEND == 1
 #include <wgvk.h>
 #endif
-
-#include "pipeline.h"
+#include "raygpu.h"
 #include <memory>
-#include <raygpu.h>
 #include <algorithm>
 #include <vector>
 #include <cstdlib>
@@ -133,24 +132,23 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSo
 std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources source);
 std::unordered_map<std::string, ResourceTypeDescriptor> getBindings(ShaderSources source);
 
+
+
+
+
 /**
  * @brief returning a map from 
  * Attribute name -> Attribute format (vec2f, vec3f, etc.) and attribute location
  * @param shaderSource 
  * @return std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>> 
  */
-struct InOutAttributeInfo{
-    std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>> vertexAttributes;
-    std::vector<std::pair<uint32_t, format_or_sample_type>> attachments;    
-};
-
 InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
 InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
 InOutAttributeInfo getAttributes    (ShaderSources sources);
 
-extern "C" void PrepareFrameGlobals();
-extern "C" DescribedBuffer* UpdateVulkanRenderbatch();
-extern "C" void PushUsedBuffer(void* nativeBuffer);
+void PrepareFrameGlobals();
+DescribedBuffer* UpdateVulkanRenderbatch();
+void PushUsedBuffer(void* nativeBuffer);
 typedef struct VertexBufferLayout{
     uint64_t arrayStride;
     WGPUVertexStepMode stepMode;

@@ -44,7 +44,7 @@
 *
 **********************************************************************************************/
 
-#include "raygpu.h"     // Declares module functions
+#include <raygpu.h>     // Declares module functions
 //#include <webgpu/webgpu_cpp.h>
 // Check if config flags have been externally provided on compilation line
 //#if !defined(EXTERNAL_CONFIG_FLAGS)
@@ -54,8 +54,8 @@
 #if defined(SUPPORT_MODULE_RSHAPES)
 
 
-#include <cmath>       // Required for: std::sin(), astd::sin(),std::cos(),std::acos(),std::sqrt(),std::abs()
-#include <limits>       // Required for: std::sin(), astd::sin(),std::cos(),std::acos(),std::sqrt(),std::abs()
+#include <math.h>       // Required for: sinf()
+#include <limits.h>     
 #include <stdlib.h>     // Required for: RL_FREE
 
 //----------------------------------------------------------------------------------
@@ -78,11 +78,11 @@
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-using Texture2D = Texture;
-extern "C" Texture2D texShapes;                // Texture used on shapes drawing (white pixel loaded by rlgl)
+typedef Texture Texture2D;
+extern Texture2D texShapes;                // Texture used on shapes drawing (white pixel loaded by rlgl)
 Texture2D texShapes;
 static Rectangle texShapesRec = {0.0f, 0.0f, 1.0f, 1.0f};    // Texture source rectangle used on shapes drawing
-constexpr float PI = M_PI;
+
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ void SetShapesTexture(Texture2D texture, Rectangle source)
     if ((texture.id == 0) || (source.width == 0) || (source.height == 0))
     {
         //texShapes = (Texture2D){1, 1, 1, 1, 7};
-        texShapesRec = Rectangle{0.0f, 0.0f, 1.0f, 1.0f};
+        texShapesRec = CLITERAL(Rectangle){0.0f, 0.0f, 1.0f, 1.0f};
     }
     else
     {
@@ -130,7 +130,7 @@ Rectangle GetShapesTextureRectangle(void)
 // Draw a pixel
 void DrawPixel(int posX, int posY, Color color)
 {
-    DrawPixelV(Vector2{(float)posX, (float)posY}, color);
+    DrawPixelV(CLITERAL(Vector2){(float)posX, (float)posY}, color);
 }
 
 // Draw a pixel (Vector version)
@@ -263,7 +263,7 @@ void DrawLineBezier(Vector2 startPos, Vector2 endPos, float thick, Color color)
 
         float dy = current.y - previous.y;
         float dx = current.x - previous.x;
-        float size = 0.5f*thick/std::sqrt(dx*dx+dy*dy);
+        float size = 0.5f*thick/ sqrtf(dx*dx+dy*dy);
 
         if (i == 1)
         {
@@ -288,7 +288,7 @@ void DrawLineBezier(Vector2 startPos, Vector2 endPos, float thick, Color color)
 void DrawLineEx(Vector2 startPos, Vector2 endPos, float thick, Color color)
 {
     Vector2 delta = {endPos.x - startPos.x, endPos.y - startPos.y};
-    float length =std::sqrt(delta.x*delta.x + delta.y*delta.y);
+    float length = sqrtf(delta.x*delta.x + delta.y*delta.y);
 
     if ((length > 0) && (thick > 0))
     {
@@ -309,7 +309,7 @@ void DrawLineEx(Vector2 startPos, Vector2 endPos, float thick, Color color)
 // Draw a color-filled circle
 void DrawCircle(int centerX, int centerY, float radius, Color color)
 {
-    DrawCircleV(Vector2{(float)centerX, (float)centerY}, radius, color);
+    DrawCircleV(CLITERAL(Vector2){(float)centerX, (float)centerY}, radius, color);
 }
 
 // Draw a color-filled circle (Vector version)
@@ -333,13 +333,13 @@ void DrawCircleSector(Vector2 center, float radius, float startAngle, float endA
         endAngle = tmp;
     }
 
-    int minSegments = (int)std::ceil((endAngle - startAngle)/90);
+    int minSegments = (int)ceilf((endAngle - startAngle)/90);
 
     if (segments < minSegments)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
-        segments = (int)((endAngle - startAngle)*std::ceil(2*PI/th)/360);
+        float th = acosf(2 * powf(1.0f - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
+        segments = (int)((endAngle - startAngle)*ceilf(2*M_PI/th)/360);
 
         if (segments <= 0) segments = minSegments;
     }
@@ -362,13 +362,13 @@ void DrawCircleSector(Vector2 center, float radius, float startAngle, float endA
             rlVertex2f(center.x, center.y);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength*2.0f))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength*2.0f))*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength*2.0f))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength*2.0f))*radius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
 
             angle += (stepLength*2.0f);
         }
@@ -382,10 +382,10 @@ void DrawCircleSector(Vector2 center, float radius, float startAngle, float endA
             rlVertex2f(center.x, center.y);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
             rlVertex2f(center.x, center.y);
@@ -401,8 +401,8 @@ void DrawCircleSector(Vector2 center, float radius, float startAngle, float endA
             rlColor4ub(color.r, color.g, color.b, color.a);
 
             rlVertex2f(center.x, center.y);
-            rlVertex2f(center.x + std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
-            rlVertex2f(center.x + std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x +  cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
+            rlVertex2f(center.x +  cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
 
             angle += stepLength;
         }
@@ -424,13 +424,13 @@ void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float
         endAngle = tmp;
     }
 
-    int minSegments = (int)std::ceil((endAngle - startAngle)/90);
+    int minSegments = (int)ceilf((endAngle - startAngle)/90);
 
     if (segments < minSegments)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
-        segments = (int)((endAngle - startAngle)*std::ceil(2*PI/th)/360);
+        float th = acosf(2*powf(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
+        segments = (int)((endAngle - startAngle)*ceilf(2*M_PI/th)/360);
 
         if (segments <= 0) segments = minSegments;
     }
@@ -444,15 +444,15 @@ void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
             rlVertex2f(center.x, center.y);
-            rlVertex2f(center.x + std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x +  cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
         }
 
         for (int i = 0; i < segments; i++)
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
 
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
 
             angle += stepLength;
         }
@@ -461,7 +461,7 @@ void DrawCircleSectorLines(Vector2 center, float radius, float startAngle, float
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
             rlVertex2f(center.x, center.y);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
         }
     rlEnd();
 }
@@ -475,9 +475,9 @@ void DrawCircleGradient(int centerX, int centerY, float radius, Color inner, Col
             rlColor4ub(inner.r, inner.g, inner.b, inner.a);
             rlVertex2f((float)centerX, (float)centerY);
             rlColor4ub(outer.r, outer.g, outer.b, outer.a);
-            rlVertex2f((float)centerX +std::cos(DEG2RAD*(i + 10))*radius, (float)centerY + std::sin(DEG2RAD*(i + 10))*radius);
+            rlVertex2f((float)centerX + cosf(DEG2RAD*(i + 10))*radius, (float)centerY +  sinf(DEG2RAD*(i + 10))*radius);
             rlColor4ub(outer.r, outer.g, outer.b, outer.a);
-            rlVertex2f((float)centerX +std::cos(DEG2RAD*i)*radius, (float)centerY + std::sin(DEG2RAD*i)*radius);
+            rlVertex2f((float)centerX + cosf(DEG2RAD*i)*radius, (float)centerY +  sinf(DEG2RAD*i)*radius);
         }
     rlEnd();
 }
@@ -485,7 +485,7 @@ void DrawCircleGradient(int centerX, int centerY, float radius, Color inner, Col
 // Draw circle outline
 void DrawCircleLines(int centerX, int centerY, float radius, Color color)
 {
-    DrawCircleLinesV(Vector2{(float)centerX, (float)centerY}, radius, color);
+    DrawCircleLinesV(CLITERAL(Vector2){(float)centerX, (float)centerY}, radius, color);
 }
 
 // Draw circle outline (Vector version)
@@ -497,8 +497,8 @@ void DrawCircleLinesV(Vector2 center, float radius, Color color)
         // NOTE: Circle outline is drawn pixel by pixel every degree (0 to 360)
         for (int i = 0; i < 360; i += 10)
         {
-            rlVertex2f(center.x +std::cos(DEG2RAD*i)*radius, center.y + std::sin(DEG2RAD*i)*radius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(i + 10))*radius, center.y + std::sin(DEG2RAD*(i + 10))*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*i)*radius, center.y +  sinf(DEG2RAD*i)*radius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(i + 10))*radius, center.y +  sinf(DEG2RAD*(i + 10))*radius);
         }
     rlEnd();
 }
@@ -511,8 +511,8 @@ void DrawEllipse(int centerX, int centerY, float radiusH, float radiusV, Color c
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
             rlVertex2f((float)centerX, (float)centerY);
-            rlVertex2f((float)centerX +std::cos(DEG2RAD*(i + 10))*radiusH, (float)centerY + std::sin(DEG2RAD*(i + 10))*radiusV);
-            rlVertex2f((float)centerX +std::cos(DEG2RAD*i)*radiusH, (float)centerY + std::sin(DEG2RAD*i)*radiusV);
+            rlVertex2f((float)centerX + cosf(DEG2RAD*(i + 10))*radiusH, (float)centerY +  sinf(DEG2RAD*(i + 10))*radiusV);
+            rlVertex2f((float)centerX + cosf(DEG2RAD*i)*radiusH, (float)centerY +  sinf(DEG2RAD*i)*radiusV);
         }
     rlEnd();
 }
@@ -524,8 +524,8 @@ void DrawEllipseLines(int centerX, int centerY, float radiusH, float radiusV, Co
         for (int i = 0; i < 360; i += 10)
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
-            rlVertex2f(centerX +std::cos(DEG2RAD*(i + 10))*radiusH, centerY + std::sin(DEG2RAD*(i + 10))*radiusV);
-            rlVertex2f(centerX +std::cos(DEG2RAD*i)*radiusH, centerY + std::sin(DEG2RAD*i)*radiusV);
+            rlVertex2f(centerX + cosf(DEG2RAD*(i + 10))*radiusH, centerY +  sinf(DEG2RAD*(i + 10))*radiusV);
+            rlVertex2f(centerX + cosf(DEG2RAD*i)*radiusH, centerY +  sinf(DEG2RAD*i)*radiusV);
         }
     rlEnd();
 }
@@ -554,13 +554,13 @@ void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startA
         endAngle = tmp;
     }
 
-    int minSegments = (int)std::ceil((endAngle - startAngle)/90);
+    int minSegments = (int)ceilf((endAngle - startAngle)/90);
 
     if (segments < minSegments)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/outerRadius, 2) - 1);
-        segments = (int)((endAngle - startAngle)*std::ceil(2*PI/th)/360);
+        float th = acosf(2*powf(1 - SMOOTH_CIRCLE_ERROR_RATE/outerRadius, 2) - 1);
+        segments = (int)((endAngle - startAngle)*ceilf(2*M_PI/th)/360);
 
         if (segments <= 0) segments = minSegments;
     }
@@ -585,16 +585,16 @@ void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startA
             rlColor4ub(color.r, color.g, color.b, color.a);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
 
             angle += stepLength;
         }
@@ -607,13 +607,13 @@ void DrawRing(Vector2 center, float innerRadius, float outerRadius, float startA
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
 
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
             angle += stepLength;
         }
@@ -645,13 +645,13 @@ void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float s
         endAngle = tmp;
     }
 
-    int minSegments = (int)std::ceil((endAngle - startAngle)/90);
+    int minSegments = (int)ceilf((endAngle - startAngle)/90);
 
     if (segments < minSegments)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/outerRadius, 2) - 1);
-        segments = (int)((endAngle - startAngle)*std::ceil(2*PI/th)/360);
+        float th = acosf(2*powf(1 - SMOOTH_CIRCLE_ERROR_RATE/outerRadius, 2) - 1);
+        segments = (int)((endAngle - startAngle)*ceilf(2*M_PI/th)/360);
 
         if (segments <= 0) segments = minSegments;
     }
@@ -670,19 +670,19 @@ void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float s
         if (showCapLines)
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
         }
 
         for (int i = 0; i < segments; i++)
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
 
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
 
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
 
             angle += stepLength;
         }
@@ -690,8 +690,8 @@ void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float s
         if (showCapLines)
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
-            rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
+            rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
         }
     rlEnd();
 }
@@ -699,20 +699,20 @@ void DrawRingLines(Vector2 center, float innerRadius, float outerRadius, float s
 // Draw a color-filled rectangle
 void DrawRectangle(int posX, int posY, int width, int height, Color color)
 {
-    DrawRectangleV(Vector2{(float)posX, (float)posY}, Vector2{(float)width, (float)height}, color);
+    DrawRectangleV(CLITERAL(Vector2){(float)posX, (float)posY}, CLITERAL(Vector2){(float)width, (float)height}, color);
 }
 
 // Draw a color-filled rectangle (Vector version)
 // NOTE: On OpenGL 3.3 and ES2 we use QUADS to avoid drawing order issues
 void DrawRectangleV(Vector2 position, Vector2 size, Color color)
 {
-    DrawRectanglePro(Rectangle{position.x, position.y, size.x, size.y}, Vector2{0.0f, 0.0f}, 0.0f, color);
+    DrawRectanglePro(CLITERAL(Rectangle){position.x, position.y, size.x, size.y}, CLITERAL(Vector2){0.0f, 0.0f}, 0.0f, color);
 }
 
 // Draw a color-filled rectangle
 void DrawRectangleRec(Rectangle rec, Color color)
 {
-    DrawRectanglePro(rec, Vector2{0.0f, 0.0f}, 0.0f, color);
+    DrawRectanglePro(rec, CLITERAL(Vector2){0.0f, 0.0f}, 0.0f, color);
 }
 
 // Draw a color-filled rectangle with pro parameters
@@ -728,15 +728,15 @@ void DrawRectanglePro(Rectangle rec, Vector2 origin, float rotation, Color color
     {
         float x = rec.x - origin.x;
         float y = rec.y - origin.y;
-        topLeft = Vector2{x, y};
-        topRight = Vector2{x + rec.width, y};
-        bottomLeft = Vector2{x, y + rec.height};
-        bottomRight = Vector2{x + rec.width, y + rec.height};
+        topLeft = CLITERAL(Vector2){x, y};
+        topRight = CLITERAL(Vector2){x + rec.width, y};
+        bottomLeft = CLITERAL(Vector2){x, y + rec.height};
+        bottomRight = CLITERAL(Vector2){x + rec.width, y + rec.height};
     }
     else
     {
-        float sinRotation = std::sin(rotation*DEG2RAD);
-        float cosRotation =std::cos(rotation*DEG2RAD);
+        float sinRotation =  sinf(rotation*DEG2RAD);
+        float cosRotation = cosf(rotation*DEG2RAD);
         float x = rec.x;
         float y = rec.y;
         float dx = -origin.x;
@@ -800,13 +800,13 @@ void DrawRectanglePro(Rectangle rec, Vector2 origin, float rotation, Color color
 // Draw a vertical-gradient-filled rectangle
 void DrawRectangleGradientV(int posX, int posY, int width, int height, Color top, Color bottom)
 {
-    DrawRectangleGradientEx(Rectangle{(float)posX, (float)posY, (float)width, (float)height}, top, bottom, bottom, top);
+    DrawRectangleGradientEx(CLITERAL(Rectangle){(float)posX, (float)posY, (float)width, (float)height}, top, bottom, bottom, top);
 }
 
 // Draw a horizontal-gradient-filled rectangle
 void DrawRectangleGradientH(int posX, int posY, int width, int height, Color left, Color right)
 {
-    DrawRectangleGradientEx(Rectangle{(float)posX, (float)posY, (float)width, (float)height}, left, left, right, right);
+    DrawRectangleGradientEx(CLITERAL(Rectangle){(float)posX, (float)posY, (float)width, (float)height}, left, left, right, right);
 }
 
 // Draw a gradient-filled rectangle
@@ -931,8 +931,8 @@ void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color co
     if (segments < 4)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
-        segments = (int)(std::ceil(2*PI/th)/4.0f);
+        float th = acosf(2*powf(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
+        segments = (int)(ceilf(2*M_PI/th)/4.0f);
         if (segments <= 0) segments = 4;
     }
 
@@ -985,13 +985,13 @@ void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color co
                 rlVertex2f(center.x, center.y);
 
                 rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-                rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength*2))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength*2))*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength*2))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength*2))*radius);
 
                 rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
 
                 rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
 
                 angle += (stepLength*2);
             }
@@ -1004,10 +1004,10 @@ void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color co
                 rlVertex2f(center.x, center.y);
 
                 rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
 
                 rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
 
                 rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
                 rlVertex2f(center.x, center.y);
@@ -1083,8 +1083,8 @@ void DrawRectangleRounded(Rectangle rec, float roundness, int segments, Color co
             {
                 rlColor4ub(color.r, color.g, color.b, color.a);
                 rlVertex2f(center.x, center.y);
-                rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*radius, center.y + std::sin(DEG2RAD*(angle + stepLength))*radius);
-                rlVertex2f(center.x +std::cos(DEG2RAD*angle)*radius, center.y + std::sin(DEG2RAD*angle)*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*radius, center.y +  sinf(DEG2RAD*(angle + stepLength))*radius);
+                rlVertex2f(center.x + cosf(DEG2RAD*angle)*radius, center.y +  sinf(DEG2RAD*angle)*radius);
                 angle += stepLength;
             }
         }
@@ -1152,7 +1152,7 @@ void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, f
     // Not a rounded rectangle
     if (roundness <= 0.0f)
     {
-        DrawRectangleLinesEx(Rectangle{rec.x-lineThick, rec.y-lineThick, rec.width+2*lineThick, rec.height+2*lineThick}, lineThick, color);
+        DrawRectangleLinesEx(CLITERAL(Rectangle){rec.x-lineThick, rec.y-lineThick, rec.width+2*lineThick, rec.height+2*lineThick}, lineThick, color);
         return;
     }
 
@@ -1166,8 +1166,8 @@ void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, f
     if (segments < 4)
     {
         // Calculate the maximum angle between segments based on the error rate (usually 0.5f)
-        float th =std::acos(2*std::pow(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
-        segments = (int)(std::ceil(2*PI/th)/2.0f);
+        float th = acosf(2*powf(1 - SMOOTH_CIRCLE_ERROR_RATE/radius, 2) - 1);
+        segments = (int)(ceilf(2*M_PI/th)/2.0f);
         if (segments <= 0) segments = 4;
     }
 
@@ -1225,16 +1225,16 @@ void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, f
                     rlColor4ub(color.r, color.g, color.b, color.a);
 
                     rlTexCoord2f(shapeRect.x/texShapes.width, shapeRect.y/texShapes.height);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
 
                     rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
 
                     rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
 
                     rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
                     angle += stepLength;
                 }
@@ -1299,13 +1299,13 @@ void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, f
                 {
                     rlColor4ub(color.r, color.g, color.b, color.a);
 
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*innerRadius, center.y + std::sin(DEG2RAD*angle)*innerRadius);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius, center.y +  sinf(DEG2RAD*angle)*innerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*innerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*innerRadius);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*innerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
 
                     angle += stepLength;
                 }
@@ -1363,8 +1363,8 @@ void DrawRectangleRoundedLinesEx(Rectangle rec, float roundness, int segments, f
                 for (int i = 0; i < segments; i++)
                 {
                     rlColor4ub(color.r, color.g, color.b, color.a);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*angle)*outerRadius, center.y + std::sin(DEG2RAD*angle)*outerRadius);
-                    rlVertex2f(center.x +std::cos(DEG2RAD*(angle + stepLength))*outerRadius, center.y + std::sin(DEG2RAD*(angle + stepLength))*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius, center.y +  sinf(DEG2RAD*angle)*outerRadius);
+                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius, center.y +  sinf(DEG2RAD*(angle + stepLength))*outerRadius);
                     angle += stepLength;
                 }
             }
@@ -1514,13 +1514,13 @@ void DrawPoly(Vector2 center, int sides, float radius, float rotation, Color col
             rlVertex2f(center.x, center.y);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(nextAngle)*radius, center.y + std::sin(nextAngle)*radius);
+            rlVertex2f(center.x + cosf(nextAngle)*radius, center.y +  sinf(nextAngle)*radius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
 
             centralAngle = nextAngle;
         }
@@ -1533,8 +1533,8 @@ void DrawPoly(Vector2 center, int sides, float radius, float rotation, Color col
             rlColor4ub(color.r, color.g, color.b, color.a);
 
             rlVertex2f(center.x, center.y);
-            rlVertex2f(center.x +std::cos(centralAngle + angleStep)*radius, center.y + std::sin(centralAngle + angleStep)*radius);
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle + angleStep)*radius, center.y +  sinf(centralAngle + angleStep)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
 
             centralAngle += angleStep;
         }
@@ -1554,8 +1554,8 @@ void DrawPolyLines(Vector2 center, int sides, float radius, float rotation, Colo
         {
             rlColor4ub(color.r, color.g, color.b, color.a);
 
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
-            rlVertex2f(center.x +std::cos(centralAngle + angleStep)*radius, center.y + std::sin(centralAngle + angleStep)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle + angleStep)*radius, center.y +  sinf(centralAngle + angleStep)*radius);
 
             centralAngle += angleStep;
         }
@@ -1567,7 +1567,7 @@ void DrawPolyLinesEx(Vector2 center, int sides, float radius, float rotation, fl
     if (sides < 3) sides = 3;
     float centralAngle = rotation*DEG2RAD;
     float exteriorAngle = 360.0f/(float)sides*DEG2RAD;
-    float innerRadius = radius - (lineThick*std::cos(DEG2RAD*exteriorAngle/2.0f));
+    float innerRadius = radius - (lineThick* cosf(DEG2RAD*exteriorAngle/2.0f));
 
     UseTexture(GetShapesTexture());
 #if defined(SUPPORT_QUADS_DRAW_MODE)
@@ -1580,16 +1580,16 @@ void DrawPolyLinesEx(Vector2 center, int sides, float radius, float rotation, fl
             float nextAngle = centralAngle + exteriorAngle;
 
             rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
 
             rlTexCoord2f(shapeRect.x/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(centralAngle)*innerRadius, center.y + std::sin(centralAngle)*innerRadius);
+            rlVertex2f(center.x + cosf(centralAngle)*innerRadius, center.y +  sinf(centralAngle)*innerRadius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-            rlVertex2f(center.x +std::cos(nextAngle)*innerRadius, center.y + std::sin(nextAngle)*innerRadius);
+            rlVertex2f(center.x + cosf(nextAngle)*innerRadius, center.y +  sinf(nextAngle)*innerRadius);
 
             rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-            rlVertex2f(center.x +std::cos(nextAngle)*radius, center.y + std::sin(nextAngle)*radius);
+            rlVertex2f(center.x + cosf(nextAngle)*radius, center.y +  sinf(nextAngle)*radius);
 
             centralAngle = nextAngle;
         }
@@ -1602,13 +1602,13 @@ void DrawPolyLinesEx(Vector2 center, int sides, float radius, float rotation, fl
             rlColor4ub(color.r, color.g, color.b, color.a);
             float nextAngle = centralAngle + exteriorAngle;
 
-            rlVertex2f(center.x +std::cos(nextAngle)*radius, center.y + std::sin(nextAngle)*radius);
-            rlVertex2f(center.x +std::cos(centralAngle)*radius, center.y + std::sin(centralAngle)*radius);
-            rlVertex2f(center.x +std::cos(centralAngle)*innerRadius, center.y + std::sin(centralAngle)*innerRadius);
+            rlVertex2f(center.x + cosf(nextAngle)*radius, center.y +  sinf(nextAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*radius, center.y +  sinf(centralAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*innerRadius, center.y +  sinf(centralAngle)*innerRadius);
 
-            rlVertex2f(center.x +std::cos(centralAngle)*innerRadius, center.y + std::sin(centralAngle)*innerRadius);
-            rlVertex2f(center.x +std::cos(nextAngle)*innerRadius, center.y + std::sin(nextAngle)*innerRadius);
-            rlVertex2f(center.x +std::cos(nextAngle)*radius, center.y + std::sin(nextAngle)*radius);
+            rlVertex2f(center.x + cosf(centralAngle)*innerRadius, center.y +  sinf(centralAngle)*innerRadius);
+            rlVertex2f(center.x + cosf(nextAngle)*innerRadius, center.y +  sinf(nextAngle)*innerRadius);
+            rlVertex2f(center.x + cosf(nextAngle)*radius, center.y +  sinf(nextAngle)*radius);
 
             centralAngle = nextAngle;
         }
@@ -1626,8 +1626,8 @@ void DrawSplineLinear(const Vector2 *points, int pointCount, float thick, Color 
     if (pointCount < 2) return;
 
 #if defined(SUPPORT_SPLINE_MITERS)
-    Vector2 prevNormal = Vector2{-(points[1].y - points[0].y), (points[1].x - points[0].x)};
-    float prevLength =std::sqrt(prevNormal.x*prevNormal.x + prevNormal.y*prevNormal.y);
+    Vector2 prevNormal = CLITERAL(Vector2){-(points[1].y - points[0].y), (points[1].x - points[0].x)};
+    float prevLength = sqrtf(prevNormal.x*prevNormal.x + prevNormal.y*prevNormal.y);
 
     if (prevLength > 0.0f)
     {
@@ -1648,8 +1648,8 @@ void DrawSplineLinear(const Vector2 *points, int pointCount, float thick, Color 
 
         if (i < pointCount - 2)
         {
-            normal = Vector2{-(points[i + 2].y - points[i + 1].y), (points[i + 2].x - points[i + 1].x)};
-            float normalLength =std::sqrt(normal.x*normal.x + normal.y*normal.y);
+            normal = CLITERAL(Vector2){-(points[i + 2].y - points[i + 1].y), (points[i + 2].x - points[i + 1].x)};
+            float normalLength = sqrtf(normal.x*normal.x + normal.y*normal.y);
 
             if (normalLength > 0.0f)
             {
@@ -1668,7 +1668,7 @@ void DrawSplineLinear(const Vector2 *points, int pointCount, float thick, Color 
         }
 
         Vector2 radius = {prevNormal.x + normal.x, prevNormal.y + normal.y};
-        float radiusLength =std::sqrt(radius.x*radius.x + radius.y*radius.y);
+        float radiusLength = sqrtf(radius.x*radius.x + radius.y*radius.y);
 
         if (radiusLength > 0.0f)
         {
@@ -1715,8 +1715,8 @@ void DrawSplineLinear(const Vector2 *points, int pointCount, float thick, Color 
 
     for (int i = 0; i < pointCount - 1; i++)
     {
-        delta = Vector2{points[i + 1].x - points[i].x, points[i + 1].y - points[i].y};
-        length =std::sqrt(delta.x*delta.x + delta.y*delta.y);
+        delta = CLITERAL(Vector2){points[i + 1].x - points[i].x, points[i + 1].y - points[i].y};
+        length = sqrtf(delta.x*delta.x + delta.y*delta.y);
 
         if (length > 0) scale = thick/(2*length);
 
@@ -1789,7 +1789,7 @@ void DrawSplineBasis(const Vector2 *points, int pointCount, float thick, Color c
 
             dy = nextPoint.y - currentPoint.y;
             dx = nextPoint.x - currentPoint.x;
-            size = 0.5f*thick/std::sqrt(dx*dx+dy*dy);
+            size = 0.5f*thick/ sqrtf(dx*dx+dy*dy);
 
             if ((i == 0) && (j == 1))
             {
@@ -1856,7 +1856,7 @@ void DrawSplineCatmullRom(const Vector2 *points, int pointCount, float thick, Co
 
             dy = nextPoint.y - currentPoint.y;
             dx = nextPoint.x - currentPoint.x;
-            size = (0.5f*thick)/std::sqrt(dx*dx + dy*dy);
+            size = (0.5f*thick)/ sqrtf(dx*dx + dy*dy);
 
             if ((i == 0) && (j == 1))
             {
@@ -1911,7 +1911,7 @@ void DrawSplineSegmentLinear(Vector2 p1, Vector2 p2, float thick, Color color)
     // NOTE: For the linear spline we don't use subdivisions, just a single quad
 
     Vector2 delta = {p2.x - p1.x, p2.y - p1.y};
-    float length =std::sqrt(delta.x*delta.x + delta.y*delta.y);
+    float length = sqrtf(delta.x*delta.x + delta.y*delta.y);
 
     if ((length > 0) && (thick > 0))
     {
@@ -1965,7 +1965,7 @@ void DrawSplineSegmentBasis(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4, floa
 
         float dy = nextPoint.y - currentPoint.y;
         float dx = nextPoint.x - currentPoint.x;
-        float size = (0.5f*thick)/std::sqrt(dx*dx + dy*dy);
+        float size = (0.5f*thick)/ sqrtf(dx*dx + dy*dy);
 
         if (i == 1)
         {
@@ -2011,7 +2011,7 @@ void DrawSplineSegmentCatmullRom(Vector2 p1, Vector2 p2, Vector2 p3, Vector2 p4,
 
         float dy = nextPoint.y - currentPoint.y;
         float dx = nextPoint.x - currentPoint.x;
-        float size = (0.5f*thick)/std::sqrt(dx*dx + dy*dy);
+        float size = (0.5f*thick)/ sqrtf(dx*dx + dy*dy);
 
         if (i == 1)
         {
@@ -2047,9 +2047,9 @@ void DrawSplineSegmentBezierQuadratic(Vector2 p1, Vector2 c2, Vector2 p3, float 
     {
         t = step*(float)i;
 
-        float a = std::pow(1.0f - t, 2);
+        float a = powf(1.0f - t, 2);
         float b = 2.0f*(1.0f - t)*t;
-        float c = std::pow(t, 2);
+        float c = powf(t, 2);
 
         // NOTE: The easing functions aren't suitable here because they don't take a control point
         current.y = a*p1.y + b*c2.y + c*p3.y;
@@ -2057,7 +2057,7 @@ void DrawSplineSegmentBezierQuadratic(Vector2 p1, Vector2 c2, Vector2 p3, float 
 
         float dy = current.y - previous.y;
         float dx = current.x - previous.x;
-        float size = 0.5f*thick/std::sqrt(dx*dx+dy*dy);
+        float size = 0.5f*thick/ sqrtf(dx*dx+dy*dy);
 
         if (i == 1)
         {
@@ -2093,17 +2093,17 @@ void DrawSplineSegmentBezierCubic(Vector2 p1, Vector2 c2, Vector2 c3, Vector2 p4
     {
         t = step*(float)i;
 
-        float a = std::pow(1.0f - t, 3);
-        float b = 3.0f*std::pow(1.0f - t, 2)*t;
-        float c = 3.0f*(1.0f - t)*std::pow(t, 2);
-        float d = std::pow(t, 3);
+        float a = powf(1.0f - t, 3);
+        float b = 3.0f*powf(1.0f - t, 2)*t;
+        float c = 3.0f*(1.0f - t)*powf(t, 2);
+        float d = powf(t, 3);
 
         current.y = a*p1.y + b*c2.y + c*c3.y + d*p4.y;
         current.x = a*p1.x + b*c2.x + c*c3.x + d*p4.x;
 
         float dy = current.y - previous.y;
         float dx = current.x - previous.x;
-        float size = 0.5f*thick/std::sqrt(dx*dx+dy*dy);
+        float size = 0.5f*thick/ sqrtf(dx*dx+dy*dy);
 
         if (i == 1)
         {
@@ -2180,9 +2180,9 @@ Vector2 GetSplinePointBezierQuad(Vector2 startPos, Vector2 controlPos, Vector2 e
 {
     Vector2 point zeroinit;
 
-    float a = std::pow(1.0f - t, 2);
+    float a = powf(1.0f - t, 2);
     float b = 2.0f*(1.0f - t)*t;
-    float c = std::pow(t, 2);
+    float c = powf(t, 2);
 
     point.y = a*startPos.y + b*controlPos.y + c*endPos.y;
     point.x = a*startPos.x + b*controlPos.x + c*endPos.x;
@@ -2195,10 +2195,10 @@ Vector2 GetSplinePointBezierCubic(Vector2 startPos, Vector2 startControlPos, Vec
 {
     Vector2 point zeroinit;
 
-    float a = std::pow(1.0f - t, 3);
-    float b = 3.0f*std::pow(1.0f - t, 2)*t;
-    float c = 3.0f*(1.0f - t)*std::pow(t, 2);
-    float d = std::pow(t, 3);
+    float a = powf(1.0f - t, 3);
+    float b = 3.0f*powf(1.0f - t, 2)*t;
+    float c = 3.0f*(1.0f - t)*powf(t, 2);
+    float d = powf(t, 3);
 
     point.y = a*startPos.y + b*startControlPos.y + c*endControlPos.y + d*endPos.y;
     point.x = a*startPos.x + b*startControlPos.x + c*endControlPos.x + d*endPos.x;
@@ -2307,8 +2307,8 @@ bool CheckCollisionCircleRec(Vector2 center, float radius, Rectangle rec)
     float recCenterX = rec.x + rec.width/2.0f;
     float recCenterY = rec.y + rec.height/2.0f;
 
-    float dx =std::abs(center.x - recCenterX);
-    float dy =std::abs(center.y - recCenterY);
+    float dx = fabsf(center.x - recCenterX);
+    float dy = fabsf(center.y - recCenterY);
 
     if (dx > (rec.width/2.0f + radius)) {return false;}
     if (dy > (rec.height/2.0f + radius)) {return false;}
@@ -2323,7 +2323,12 @@ bool CheckCollisionCircleRec(Vector2 center, float radius, Rectangle rec)
 
     return collision;
 }
-
+static inline float rsh_minf(float x, float y){
+    return x < y ? x : y;
+}
+static inline float rsh_maxf(float x, float y){
+    return x > y ? x : y;
+}
 // Check the collision between two lines defined by two points each, returns collision point by reference
 bool CheckCollisionLines(Vector2 startPos1, Vector2 endPos1, Vector2 startPos2, Vector2 endPos2, Vector2 *collisionPoint)
 {
@@ -2331,17 +2336,17 @@ bool CheckCollisionLines(Vector2 startPos1, Vector2 endPos1, Vector2 startPos2, 
 
     float div = (endPos2.y - startPos2.y)*(endPos1.x - startPos1.x) - (endPos2.x - startPos2.x)*(endPos1.y - startPos1.y);
 
-    if (std::abs(div) >= std::numeric_limits<float>::epsilon())
+    if (fabsf(div) >= 1e-7f)
     {
         collision = true;
 
         float xi = ((startPos2.x - endPos2.x)*(startPos1.x*endPos1.y - startPos1.y*endPos1.x) - (startPos1.x - endPos1.x)*(startPos2.x*endPos2.y - startPos2.y*endPos2.x))/div;
         float yi = ((startPos2.y - endPos2.y)*(startPos1.x*endPos1.y - startPos1.y*endPos1.x) - (startPos1.y - endPos1.y)*(startPos2.x*endPos2.y - startPos2.y*endPos2.x))/div;
 
-        if (((std::abs(startPos1.x - endPos1.x) > std::numeric_limits<float>::epsilon()) && (xi < std::min(startPos1.x, endPos1.x) || (xi > std::max(startPos1.x, endPos1.x)))) ||
-            ((std::abs(startPos2.x - endPos2.x) > std::numeric_limits<float>::epsilon()) && (xi < std::min(startPos2.x, endPos2.x) || (xi > std::max(startPos2.x, endPos2.x)))) ||
-            ((std::abs(startPos1.y - endPos1.y) > std::numeric_limits<float>::epsilon()) && (yi < std::min(startPos1.y, endPos1.y) || (yi > std::max(startPos1.y, endPos1.y)))) ||
-            ((std::abs(startPos2.y - endPos2.y) > std::numeric_limits<float>::epsilon()) && (yi < std::min(startPos2.y, endPos2.y) || (yi > std::max(startPos2.y, endPos2.y))))) collision = false;
+        if (((fabsf(startPos1.x - endPos1.x) > 1e-7f) && (xi < rsh_minf(startPos1.x, endPos1.x) || (xi > rsh_maxf(startPos1.x, endPos1.x)))) ||
+            ((fabsf(startPos2.x - endPos2.x) > 1e-7f) && (xi < rsh_minf(startPos2.x, endPos2.x) || (xi > rsh_maxf(startPos2.x, endPos2.x)))) ||
+            ((fabsf(startPos1.y - endPos1.y) > 1e-7f) && (yi < rsh_minf(startPos1.y, endPos1.y) || (yi > rsh_maxf(startPos1.y, endPos1.y)))) ||
+            ((fabsf(startPos2.y - endPos2.y) > 1e-7f) && (yi < rsh_minf(startPos2.y, endPos2.y) || (yi > rsh_maxf(startPos2.y, endPos2.y))))) collision = false;
 
         if (collision && (collisionPoint != 0))
         {
@@ -2364,9 +2369,9 @@ bool CheckCollisionPointLine(Vector2 point, Vector2 p1, Vector2 p2, int threshol
     float dyl = p2.y - p1.y;
     float cross = dxc*dyl - dyc*dxl;
 
-    if (std::abs(cross) < (threshold*std::max(std::abs(dxl), std::abs(dyl))))
+    if (fabsf(cross) < (threshold*rsh_maxf(fabsf(dxl), fabsf(dyl))))
     {
-        if (std::abs(dxl) >= std::abs(dyl)) collision = (dxl > 0)? ((p1.x <= point.x) && (point.x <= p2.x)) : ((p2.x <= point.x) && (point.x <= p1.x));
+        if (fabsf(dxl) >= fabsf(dyl)) collision = (dxl > 0)? ((p1.x <= point.x) && (point.x <= p2.x)) : ((p2.x <= point.x) && (point.x <= p1.x));
         else collision = (dyl > 0)? ((p1.y <= point.y) && (point.y <= p2.y)) : ((p2.y <= point.y) && (point.y <= p1.y));
     }
 
@@ -2378,7 +2383,7 @@ bool CheckCollisionCircleLine(Vector2 center, float radius, Vector2 p1, Vector2 
 {
     float dx = p1.x - p2.x;
     float dy = p1.y - p2.y;
-    if ((std::abs(dx) + std::abs(dy)) <= std::numeric_limits<float>::epsilon())
+    if ((fabsf(dx) + fabsf(dy)) <= 1e-7f)
     {
         return CheckCollisionCircles(p1, 0, center, radius);
     }
@@ -2443,11 +2448,6 @@ static float EaseCubicInOut(float t, float b, float c, float d)
 
 #endif      // SUPPORT_MODULE_RSHAPES
 
-
-#include "raygpu.h"
-#include <cmath>
-using std::sin;
-using std::cos;
 void DrawTexture(Texture texture, int posX, int posY, Color tint)
 {
     DrawTextureEx(texture, CLITERAL(Vector2){ (float)posX, (float)posY }, 0.0f, 1.0f, tint);
@@ -2479,7 +2479,7 @@ void DrawTextureRec(Texture texture, Rectangle source, Vector2 position, Color t
 }
 void DrawTexturePro(Texture texture, Rectangle source, Rectangle dest, Vector2 origin, float rotation, Color tint){
     // Check if texture is valid
-    if (texture.id != nullptr){
+    if (texture.id != NULL){
         float width = (float)texture.width;
         float height = (float)texture.height;
 
@@ -2488,25 +2488,25 @@ void DrawTexturePro(Texture texture, Rectangle source, Rectangle dest, Vector2 o
         if (source.width < 0) { flipX = true; source.width *= -1; }
         if (source.height < 0) source.y -= source.height;
 
-        Vector2 topLeft{};
-        Vector2 topRight{};
-        Vector2 bottomLeft{};
-        Vector2 bottomRight{};
+        Vector2 topLeft = {0};
+        Vector2 topRight = {0};
+        Vector2 bottomLeft = {0};
+        Vector2 bottomRight = {0};
 
         // Only calculate rotation if needed
         if (rotation == 0.0f)
         {
             float x = dest.x - origin.x;
             float y = dest.y - origin.y;
-            topLeft = Vector2{ x, y };
-            topRight = Vector2{ x + dest.width, y };
-            bottomLeft = Vector2{ x, y + dest.height };
-            bottomRight = Vector2{ x + dest.width, y + dest.height };
+            topLeft = CLITERAL(Vector2){ x, y };
+            topRight = CLITERAL(Vector2){ x + dest.width, y };
+            bottomLeft = CLITERAL(Vector2){ x, y + dest.height };
+            bottomRight = CLITERAL(Vector2){ x + dest.width, y + dest.height };
         }
         else
         {
-            float sinRotation = sin(rotation * DEG2RAD);
-            float cosRotation = cos(rotation * DEG2RAD);
+            float sinRotation = sinf(rotation * (float)DEG2RAD);
+            float cosRotation = cosf(rotation * (float)DEG2RAD);
             float x = dest.x;
             float y = dest.y;
             float dx = -origin.x;
@@ -2528,10 +2528,10 @@ void DrawTexturePro(Texture texture, Rectangle source, Rectangle dest, Vector2 o
         UseTexture(texture);
         rlBegin(RL_QUADS);
 
-            rlColor4f(float(tint.r) / 255.0f,
-                      float(tint.g) / 255.0f,
-                      float(tint.b) / 255.0f,
-                      float(tint.a) / 255.0f
+            rlColor4f(((float)(tint.r)) / 255.0f,
+                      ((float)(tint.g)) / 255.0f,
+                      ((float)(tint.b)) / 255.0f,
+                      ((float)(tint.a)) / 255.0f
                     );
 
             //TODO: Handle normal

@@ -27,13 +27,13 @@
 #endif
 
 
-constexpr float v3_zero [3] = {0,0,0};
-constexpr float v3_xunit[3] = {1,0,0};
-constexpr float v3_yunit[3] = {0,1,0};
-constexpr float v3_zunit[3] = {0,0,1};
-constexpr float v3_xunit_negative[3] = {-1,0,0};
-constexpr float v3_yunit_negative[3] = {0,-1,0};
-constexpr float v3_zunit_negative[3] = {0,0,-1};
+const float v3_zero [3] = {0,0,0};
+const float v3_xunit[3] = {1,0,0};
+const float v3_yunit[3] = {0,1,0};
+const float v3_zunit[3] = {0,0,1};
+const float v3_xunit_negative[3] = {-1,0,0};
+const float v3_yunit_negative[3] = {0,-1,0};
+const float v3_zunit_negative[3] = {0,0,-1};
 
 cgltf_result LoadFileGLTFCallback(const struct cgltf_memory_options *memoryOptions, const struct cgltf_file_options *fileOptions, const char *path, cgltf_size *size, void **data){
     size_t filesize;
@@ -53,15 +53,15 @@ static void ReleaseFileGLTFCallback(const struct cgltf_memory_options *memoryOpt
 }
 
 void UploadMesh(Mesh *mesh, bool dynamic){
-    if(mesh->colors == nullptr){
+    if(mesh->colors == NULL){
         mesh->colors = (uint8_t*)RL_CALLOC(mesh->vertexCount, sizeof(RGBA8Color));
         for(size_t i = 0;i < mesh->vertexCount * 4;i++){
             mesh->colors[i] = 255;
         }
     }
-    if(mesh->vbos == nullptr){
+    if(mesh->vbos == NULL){
         
-        mesh->vbos = (DescribedBuffer**)std::calloc(MAX_MESH_VERTEX_BUFFERS, sizeof(DescribedBuffer*));
+        mesh->vbos = (DescribedBuffer**)RL_CALLOC(MAX_MESH_VERTEX_BUFFERS, sizeof(DescribedBuffer*));
         mesh->vbos[0] = GenVertexBuffer(mesh->vertices , mesh->vertexCount * sizeof(float  ) * 3);
         mesh->vbos[1] = GenVertexBuffer(mesh->texcoords, mesh->vertexCount * sizeof(float  ) * 2);
         mesh->vbos[2] = GenVertexBuffer(mesh->normals  , mesh->vertexCount * sizeof(float  ) * 3);
@@ -107,7 +107,7 @@ void UploadMesh(Mesh *mesh, bool dynamic){
         }
     }
 }
-DescribedBuffer* trfBuffer = nullptr;
+DescribedBuffer* trfBuffer = NULL;
 RGAPI void DrawMeshInstanced(Mesh mesh, Material material, const Matrix* transforms, int instances){
     if(trfBuffer && trfBuffer->buffer){
         BufferData(trfBuffer, transforms, instances * sizeof(Matrix));
@@ -417,7 +417,7 @@ Model LoadOBJ(const char *fileName){
 
             model.meshes[meshIndex].texcoords[localMeshVertexCount*2 + 1] = 1.0f - model.meshes[meshIndex].texcoords[localMeshVertexCount*2 + 1];
 
-            for (int i = 0; i < 4; i++) model.meshes[meshIndex].colors[localMeshVertexCount * 4 + i] = uint8_t(255);
+            for (int i = 0; i < 4; i++) model.meshes[meshIndex].colors[localMeshVertexCount * 4 + i] = (uint8_t)255;
 
             faceVertIndex++;
             localMeshVertexCount++;
@@ -471,7 +471,7 @@ static Image LoadImageFromCgltfImage(cgltf_image *cgltfImage, const char *texPat
                 int outSize = numberOfEncodedBits/8 ;                           // Actual encoded bytes
                 void *data = NULL;
 
-                cgltf_options options = zeroinit;
+                cgltf_options options = {0};
                 options.file.read = LoadFileGLTFCallback;
                 options.file.release = ReleaseFileGLTFCallback;
                 cgltf_result result = cgltf_load_buffer_base64(&options, outSize, cgltfImage->uri + i + 1, &data);
@@ -518,7 +518,7 @@ static Image LoadImageFromCgltfImage(cgltf_image *cgltfImage, const char *texPat
 Model LoadGLTFFromMemory(const void* fileData, size_t size){
     Model ret zeroinit;
     cgltf_options options zeroinit;
-    cgltf_data* data = nullptr;
+    cgltf_data* data = NULL;
     cgltf_result result = cgltf_parse(&options, fileData, size, &data);
     if (result == cgltf_result_success){
     	/* TODO make awesome stuff */
@@ -980,8 +980,8 @@ Model LoadGLTF(const char *fileName)
 
     // glTF data loading
     cgltf_options options zeroinit;
-    options.file.read =    nullptr;//LoadFileGLTFCallback;
-    options.file.release = nullptr;//ReleaseFileGLTFCallback;
+    options.file.read =    NULL;//LoadFileGLTFCallback;
+    options.file.release = NULL;//ReleaseFileGLTFCallback;
     cgltf_data *data = NULL;
     cgltf_result result = cgltf_parse(&options, fileData, dataSize, &data);
 
@@ -1182,8 +1182,8 @@ Model LoadGLTF(const char *fileName)
                             float *vertices = model.meshes[meshIndex].vertices;
                             for (unsigned int k = 0; k < attribute->count; k++)
                             {
-                                Vector3 vt = worldMatrix * Vector3{ vertices[3*k], vertices[3*k+1], vertices[3*k+2] };
-                                //Vector3 vt = Vector3Transform((Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] }, worldMatrix);
+                                //Vector3 vt = worldMatrix * CLITERAL(Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] };
+                                Vector3 vt = Vector3Transform((Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] }, worldMatrix);
                                 vertices[3*k] = vt.x;
                                 vertices[3*k+1] = vt.y;
                                 vertices[3*k+2] = vt.z;
@@ -1207,7 +1207,8 @@ Model LoadGLTF(const char *fileName)
                             float *normals = model.meshes[meshIndex].normals;
                             for (unsigned int k = 0; k < attribute->count; k++)
                             {
-                                Vector3 nt = worldMatrixNormals * Vector3{ normals[3*k], normals[3*k+1], normals[3*k+2] };
+                                //Vector3 nt = worldMatrixNormals * CLITERAL(Vector3){ normals[3*k], normals[3*k+1], normals[3*k+2] };
+                                Vector3 nt = Vector3Transform(CLITERAL(Vector3){ normals[3*k], normals[3*k+1], normals[3*k+2] }, worldMatrixNormals);
                                 normals[3*k] = nt.x;
                                 normals[3*k+1] = nt.y;
                                 normals[3*k+2] = nt.z;
@@ -1231,7 +1232,8 @@ Model LoadGLTF(const char *fileName)
                             float *tangents = model.meshes[meshIndex].tangents;
                             for (unsigned int k = 0; k < attribute->count; k++)
                             {
-                                Vector3 tt = worldMatrix * Vector3{tangents[3*k], tangents[3*k+1], tangents[3*k+2]};
+                                //Vector3 tt = worldMatrix * CLITERAL(Vector3){tangents[3*k], tangents[3*k+1], tangents[3*k+2]};
+                                Vector3 tt =  Vector3Transform(CLITERAL(Vector3){tangents[3*k], tangents[3*k+1], tangents[3*k+2]}, worldMatrix);
                                 tangents[3*k] = tt.x;
                                 tangents[3*k+1] = tt.y;
                                 tangents[3*k+2] = tt.z;
@@ -1341,7 +1343,7 @@ Model LoadGLTF(const char *fileName)
                                     model.meshes[meshIndex].colors[c] = (unsigned char)(((float)temp[k] / 255));
                                     model.meshes[meshIndex].colors[c + 1] = (unsigned char)(((float)temp[k + 1] / 255));
                                     model.meshes[meshIndex].colors[c + 2] = (unsigned char)(((float)temp[k + 2] / 255));
-                                    model.meshes[meshIndex].colors[c + 3] = uint8_t(255);
+                                    model.meshes[meshIndex].colors[c + 3] = (uint8_t)(255);
                                 }
 
                                 RL_FREE(temp);
@@ -1361,7 +1363,7 @@ Model LoadGLTF(const char *fileName)
                                     model.meshes[meshIndex].colors[c]     = (unsigned char)(temp[k]     * 255.0f);
                                     model.meshes[meshIndex].colors[c + 1] = (unsigned char)(temp[k + 1] * 255.0f);
                                     model.meshes[meshIndex].colors[c + 2] = (unsigned char)(temp[k + 2] * 255.0f);
-                                    model.meshes[meshIndex].colors[c + 3] = uint8_t(255);
+                                    model.meshes[meshIndex].colors[c + 3] = (uint8_t)(255);
                                 }
 
                                 RL_FREE(temp);
@@ -1405,7 +1407,7 @@ Model LoadGLTF(const char *fileName)
                                 LOAD_ATTRIBUTE(attribute, 4, float, temp)
 
                                 // Convert data to raylib color data type (4 bytes), we expect the color data normalized
-                                for (unsigned int c = 0; c < attribute->count*4; c++) model.meshes[meshIndex].colors[c] = uint8_t(temp[c] * 255);
+                                for (unsigned int c = 0; c < attribute->count*4; c++) model.meshes[meshIndex].colors[c] = (uint8_t)(temp[c] * 255);
 
                                 RL_FREE(temp);
                             }

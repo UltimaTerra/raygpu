@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <macros_and_constants.h>
 #include <mathutils.h>
-#include <pipeline.h>
 #ifdef __cplusplus
 #include <vector>
 #include <cassert>
@@ -166,6 +165,85 @@ typedef struct RenderTexture{
     uint32_t colorAttachmentCount;
 }RenderTexture;
 
+/**
+ * @brief This struct handles the settings that GL handles with global functions
+ * 
+ * GL_DEPTH_TEST
+ * GL_BLEND
+ * GL_CULL_FACE
+ * 
+ */
+typedef struct RenderSettings{
+    WGPUBool depthTest;
+    WGPUBool faceCull;
+    uint32_t sampleCount;
+    uint32_t lineWidth;
+    WGPUBlendState blendState;    
+    WGPUFrontFace frontFace;
+    WGPUCompareFunction depthCompare;
+    #ifdef __cplusplus
+    bool operator==(const RenderSettings& rs) const noexcept{
+        return
+               depthTest    == rs.depthTest     && 
+               faceCull     == rs.faceCull      && 
+               sampleCount  == rs.sampleCount   && 
+               lineWidth    == rs.lineWidth     && 
+               //blendState   == rs.blendState    && 
+               frontFace    == rs.frontFace     && 
+               depthCompare == rs.depthCompare  &&
+        true;
+    }
+    #endif
+}RenderSettings;
+
+
+
+
+
+
+typedef struct DescribedBindGroupLayout{
+    WGPUBindGroupLayout layout;
+    uint32_t entryCount;
+    WGPUBindGroupLayoutEntry* entries;
+}DescribedBindGroupLayout;
+
+typedef struct DescribedBindGroup{
+    //Cached handles
+    WGPUBindGroup bindGroup;
+    const DescribedBindGroupLayout* layout;
+    int needsUpdate; //Cached handles valid?
+
+    //Description: entryCount and actual entries
+    uint32_t entryCount;
+    WGPUBindGroupEntry* entries;
+
+
+    uint64_t descriptorHash; //currently unused
+    
+}DescribedBindGroup;
+
+typedef struct AttributeAndResidence{
+    WGPUVertexAttribute attr;
+    uint32_t bufferSlot; //Describes the actual buffer it will reside in
+    WGPUVertexStepMode stepMode;
+    uint32_t enabled;
+}AttributeAndResidence;
+
+
+
+typedef struct DescribedPipelineLayout{
+    WGPUPipelineLayout layout;
+
+    uint32_t bindgroupCount;
+    DescribedBindGroupLayout bindgroupLayouts[4]; //4 is a reasonable max
+}DescribedPipelineLayout;
+
+typedef struct RenderPipelineQuartet{
+    WGPURenderPipeline pipeline_TriangleList;
+    WGPURenderPipeline pipeline_TriangleStrip;
+    WGPURenderPipeline pipeline_LineList;
+    WGPURenderPipeline pipeline_PointList;
+}RenderPipelineQuartet;
 
 typedef struct DescribedRenderpass{
     RenderSettings settings;
@@ -347,6 +425,40 @@ typedef struct BoundingBox {
     Vector3 min;            // Minimum vertex box-corner
     Vector3 max;            // Maximum vertex box-corner
 } BoundingBox;
+
+
+typedef struct StringToUniformMap StringToUniformMap;
+typedef struct StringToAttributeMap StringToAttributeMap;
+typedef struct VertexStateToPipelineMap VertexStateToPipelineMap;
+typedef enum ShaderSourceType{
+    sourceTypeUnknown = 0,
+    sourceTypeSPIRV   = 1,
+    sourceTypeWGSL    = 2,
+    sourceTypeGLSL    = 3,
+    shaderSourceForce32 = 0x8fffffff
+}ShaderSourceType;
+
+
+
+
+
+typedef struct DescribedPipeline DescribedPipeline;
+typedef struct DescribedComputePipeline DescribedComputePipeline;
+typedef struct DescribedRaytracingPipeline DescribedRaytracingPipeline;
+typedef struct DescribedShaderModule DescribedShaderModule;
+
+typedef struct DescribedBuffer DescribedBuffer;
+#ifdef __cplusplus
+struct UniformAccessor{
+    uint32_t index;
+    DescribedBindGroup* bindgroup;
+    void operator=(DescribedBuffer* buf);
+};
+#endif
+
+
+typedef struct VertexArray VertexArray;
+
 #ifdef __cplusplus
 #define externcvar extern "C"
 #else 
@@ -755,10 +867,27 @@ typedef struct ShaderEntryPoint{
     char name[16];
 }ShaderEntryPoint;
 
+typedef struct ReflectionVertexAttribute{
+    char name[MAX_VERTEX_ATTRIBUTE_NAME_LENGTH + 1];
+    WGPUVertexFormat format;
+    uint32_t location;
+}ReflectionVertexAttribute;
+
+typedef struct ReflectionFragmentOutput{
+    uint32_t number_of_components;
+    format_or_sample_type type;
+}ReflectionFragmentOutput;
+
+typedef struct InOutAttributeInfo{
+    ReflectionVertexAttribute vertexAttributes[MAX_VERTEX_ATTRIBUTES];
+    ReflectionFragmentOutput attachments[MAX_COLOR_ATTACHMENTS];    
+}InOutAttributeInfo;
+
 typedef struct ShaderReflectionInfo{
     ShaderEntryPoint ep[16];
     StringToUniformMap* uniforms;
-    StringToAttributeMap* attributes;
+    
+    InOutAttributeInfo attributes;
     uint32_t colorAttachmentCount;
 }ShaderReflectionInfo;
 
@@ -771,6 +900,7 @@ typedef struct DescribedShaderModule{
 
     ShaderReflectionInfo reflectionInfo;
 }DescribedShaderModule;
+
 typedef struct VertexBufferLayoutSet VertexBufferLayoutSet;
 
 typedef struct DescribedComputePipeline{

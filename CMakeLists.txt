@@ -333,9 +333,9 @@ set(RG_SOURCES
     "src/cgltf_impl.c"
     "src/msf_gif_impl.c"
     "src/rtext.c"
-    "src/rshapes.cpp"
+    "src/rshapes.c"
     
-    "src/models.cpp"
+    "src/models.c"
     "src/windows_stuff.c"
     "include/enum_translation.h"
 )

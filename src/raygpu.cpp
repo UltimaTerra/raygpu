@@ -22,8 +22,7 @@
  * SOFTWARE.
  */
 
-#include "macros_and_constants.h"
-#include "pipeline.h"
+#include <macros_and_constants.h>
 #include <c_fs_utils.h>
 #include <cstddef>
 #include <raygpu.h>
@@ -1773,12 +1772,10 @@ void SetStorageBufferData         (uint32_t index, const void* data, size_t size
     SetShaderStorageBufferData(GetActiveShader(), index, data, size);
 }
 
-
-
 void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
     WGPUBindGroupEntry entry{};
     entry.binding = index;
-    entry.buffer = (WGPUBuffer)buffer->buffer;
+    entry.buffer = buffer->buffer;
     entry.size = buffer->size;
     UpdateBindGroupEntry(bg, index, entry);
 }
@@ -1786,7 +1783,7 @@ void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, Describe
 void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
     WGPUBindGroupEntry entry{};
     entry.binding = index;
-    entry.buffer = (WGPUBuffer)buffer->buffer;
+    entry.buffer = buffer->buffer;
     entry.size = buffer->size;
     UpdateBindGroupEntry(bg, index, entry);
 }
@@ -1794,7 +1791,7 @@ void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, Describe
 extern "C" void SetBindgroupTexture3D(DescribedBindGroup* bg, uint32_t index, Texture3D tex){
     WGPUBindGroupEntry entry{};
     entry.binding = index;
-    entry.textureView = (WGPUTextureView)tex.view;
+    entry.textureView = tex.view;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
@@ -1808,7 +1805,7 @@ extern "C" void SetBindgroupTextureView(DescribedBindGroup* bg, uint32_t index, 
 extern "C" void SetBindgroupTexture(DescribedBindGroup* bg, uint32_t index, Texture tex){
     WGPUBindGroupEntry entry{};
     entry.binding = index;
-    entry.textureView = (WGPUTextureView)tex.view;
+    entry.textureView = tex.view;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
@@ -2459,7 +2456,6 @@ unsigned char *DecompressData(const unsigned char *compData, int compDataSize, i
     // Decompress data from a valid DEFLATE stream
     data = (unsigned char *)calloc((20)*1024*1024, 1);
     int length = sinflate(data, 20*1024*1024, compData, compDataSize);
-
     // WARNING: RL_REALLOC can make (and leave) data copies in memory, be careful with sensitive compressed data!
     // TODO: Use a different approach, create another buffer, copy data manually to it and wipe original buffer memory
 
