@@ -146,8 +146,8 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
 InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
 InOutAttributeInfo getAttributes    (ShaderSources sources);
 
-void PrepareFrameGlobals();
-DescribedBuffer* UpdateVulkanRenderbatch();
+RGAPI void PrepareFrameGlobals();
+RGAPI DescribedBuffer* UpdateVulkanRenderbatch();
 void PushUsedBuffer(void* nativeBuffer);
 typedef struct VertexBufferLayout{
     uint64_t arrayStride;
@@ -722,6 +722,28 @@ extern "C" const char* copyString(const char* str);
 //    std::free(set.layouts);
 //    std::free(set.attributePool);
 //}
+
+static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* attributes, const char* name){
+    if(name == NULL){
+        return LOCATION_NOT_FOUND;
+    }
+    for(uint32_t i = 0;i < MAX_VERTEX_ATTRIBUTES;i++){
+        int equal = 1;
+        for(size_t j = 0;j < MAX_VERTEX_ATTRIBUTE_NAME_LENGTH;j++){
+            if(name[j] == '\0'){
+                break;
+            }
+            else if(attributes->vertexAttributes[i].name[j] != name[j]){
+                equal = 0;
+                break;
+            }
+        }
+        if(equal){
+            return i;
+        }
+    }
+    return LOCATION_NOT_FOUND;
+}
 
 static inline ShaderSources singleStage(const char* code, ShaderSourceType language, WGPUShaderStageEnum stage){
     ShaderSources sources zeroinit;

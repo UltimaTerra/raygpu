@@ -879,7 +879,9 @@ typedef struct ReflectionFragmentOutput{
 }ReflectionFragmentOutput;
 
 typedef struct InOutAttributeInfo{
+    uint32_t vertexAttributeCount;
     ReflectionVertexAttribute vertexAttributes[MAX_VERTEX_ATTRIBUTES];
+    uint32_t attachmentCount;
     ReflectionFragmentOutput attachments[MAX_COLOR_ATTACHMENTS];    
 }InOutAttributeInfo;
 

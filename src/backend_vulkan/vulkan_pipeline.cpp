@@ -463,13 +463,16 @@ extern "C" Shader LoadPipelineEx(const char* shaderSource, const AttributeAndRes
 }
 extern "C" Shader LoadPipeline(const char* shaderSource){
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
-    auto [attribs, attachments] = getAttributesWGSL(sources);
+    InOutAttributeInfo attribs = getAttributesWGSL(sources);
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
     
-    allAttribsInOneBuffer.reserve(attribs.size());
+    allAttribsInOneBuffer.reserve(MAX_VERTEX_ATTRIBUTES);
     uint32_t offset = 0;
-    for(const auto& [name, attr] : attribs){
-        const auto& [format, location] = attr;
+    for(size_t i = 0;i < MAX_VERTEX_ATTRIBUTES;i++){
+        const char* name = attribs.vertexAttributes[i].name;
+        if(name == NULL)continue;
+        const auto& location = attribs.vertexAttributes[i].location;
+        const auto& format = attribs.vertexAttributes[i].format;
         allAttribsInOneBuffer.push_back(AttributeAndResidence{
             .attr = WGPUVertexAttribute{
                 .nextInChain = nullptr,

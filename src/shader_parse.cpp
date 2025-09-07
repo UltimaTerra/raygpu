@@ -263,7 +263,7 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources){
     
     std::string_view source_view = std::string_view((const char*)sources.sources[0].data, (const char*)sources.sources[0].data + sources.sources[0].sizeInBytes);
     InOutAttributeInfo retvalue;
-    std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>>& ret = retvalue.vertexAttributes;
+    ReflectionVertexAttribute* ret = retvalue.vertexAttributes;
     //TODO attachmentss
 #if SUPPORT_WGSL_PARSER == 1
     tint::Source::File f("path", shaderSourceWGSL);

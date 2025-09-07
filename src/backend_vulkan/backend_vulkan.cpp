@@ -947,7 +947,7 @@ extern "C" void RenderPassDrawIndexed (DescribedRenderpass* drp, uint32_t indexC
     wgpuRenderPassEncoderDrawIndexed((WGPURenderPassEncoder)drp->rpEncoder, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
     //wgpuRenderPassEncoderDrawIndexed((WGPURenderPassEncoder)drp->rpEncoder, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
-extern "C" void PrepareFrameGlobals(){
+RGAPI void PrepareFrameGlobals(){
     uint32_t cacheIndex = g_vulkanstate.device->submittedFrames % framesInFlight;
     auto& cache = g_vulkanstate.device->fifCache.frameCaches[cacheIndex];
     if(vbo_buf != 0){
@@ -977,7 +977,7 @@ extern "C" void PrepareFrameGlobals(){
         wgpuBufferAddRef(vbo_buf);
     }
 }
-extern "C" DescribedBuffer* UpdateVulkanRenderbatch(){
+RGAPI DescribedBuffer* UpdateVulkanRenderbatch(){
     uint32_t cacheIndex = g_vulkanstate.device->submittedFrames % framesInFlight;
     auto& cache = g_vulkanstate.device->fifCache.frameCaches[cacheIndex];
     DescribedBuffer* db = callocnewpp(DescribedBuffer); 
