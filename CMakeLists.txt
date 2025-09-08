@@ -379,10 +379,10 @@ if(SUPPORT_VULKAN_BACKEND)
     #target_include_directories(wgvk_standalone PUBLIC "include" "amalgamation/vulkan_headers/include")
     #target_compile_definitions(wgvk_standalone PUBLIC SUPPORT_VULKAN_BACKEND=1)
 
-    list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_textures.cpp")
-    list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_pipeline.cpp")
+    #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_textures.cpp")
+    #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_pipeline.cpp")
     #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_raytracing.cpp")
-    list(APPEND RG_SOURCES "src/backend_vulkan/backend_vulkan.cpp")
+    list(APPEND RG_SOURCES "src/backend_wgpu.cpp")
 
     
 endif()

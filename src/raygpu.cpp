@@ -344,7 +344,7 @@ RGAPI void drawCurrentBatch(){
     size_t vertexCount = vboptr - vboptr_base;
     //std::cout << "vcoun = " << vertexCount << "\n";
     if(vertexCount == 0)return;
-    #if SUPPORT_VULKAN_BACKEND == 1
+    #if SUPPORT_VULKAN_BACKEND == 8
     DescribedBuffer* vbo = UpdateVulkanRenderbatch();
     constexpr bool allocated_via_pool = false;
     #else
@@ -445,7 +445,7 @@ RGAPI void drawCurrentBatch(){
         default:break;
     }
     if(!allocated_via_pool){
-        #if SUPPORT_VULKAN_BACKEND == 1
+        #if SUPPORT_VULKAN_BACKEND == 8
         PushUsedBuffer(vbo->buffer);
         #endif
         UnloadBuffer(vbo);

@@ -76,11 +76,11 @@ static inline uint32_t bitcount64(uint64_t x){
     return std::popcount(x);
     #endif
 }
-#if defined(__cplusplus) && SUPPORT_WGPU_BACKEND == 1
 extern const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTable;
 extern const std::unordered_map<WGPUPresentMode, std::string> presentModeSpellingTable;
 extern const std::unordered_map<WGPUBackendType, std::string> backendTypeSpellingTable;
 extern const std::unordered_map<WGPUFeatureName, std::string> featureSpellingTable;
+#if defined(__cplusplus) && SUPPORT_WGPU_BACKEND == 1
 wgpu::Instance& GetCXXInstance();
 wgpu::Adapter&  GetCXXAdapter ();
 wgpu::Device&   GetCXXDevice  ();
