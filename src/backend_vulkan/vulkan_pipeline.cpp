@@ -95,7 +95,7 @@ extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineSta
     WGPUFragmentState fragmentState zeroinit;
     WGPUBlendState    blendState    zeroinit;
 
-    vertexState.module = (WGPUShaderModule)shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
+    vertexState.module = shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
 
     VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes, mst.vertexAttributeCount);
     vertexState.bufferCount = vlayout_complete.number_of_buffers;
@@ -519,7 +519,7 @@ RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndReside
     ret->state.vertexAttributeCount = attribCount; 
     ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
     ret->shaderModule = mod;
-    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
+    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.attributes.attachmentCount;
 
     std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
     //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);

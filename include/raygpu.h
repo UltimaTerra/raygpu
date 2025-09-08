@@ -890,7 +890,6 @@ typedef struct ShaderReflectionInfo{
     StringToUniformMap* uniforms;
     
     InOutAttributeInfo attributes;
-    uint32_t colorAttachmentCount;
 }ShaderReflectionInfo;
 
 typedef struct StageInModule{

@@ -84,7 +84,7 @@ extern "C" void EndComputepassEx(DescribedComputepass* computePass){
 
 extern "C" DescribedRenderpass LoadRenderpassEx(RenderSettings settings, bool colorClear, WGPUColor colorClearValue, bool depthClear, float depthClearValue){
     DescribedRenderpass ret{};
-
+    
     VkRenderPassCreateInfo rpci{};
     ret.settings = settings;
 
@@ -94,50 +94,6 @@ extern "C" DescribedRenderpass LoadRenderpassEx(RenderSettings settings, bool co
     ret.colorStoreOp = WGPUStoreOp_Store;
     ret.depthLoadOp = depthClear ? WGPULoadOp_Clear : WGPULoadOp_Load;
     ret.depthStoreOp = WGPUStoreOp_Store;
-    VkAttachmentDescription attachments[2] = {};
-
-    VkAttachmentDescription& colorAttachment = attachments[0];
-    colorAttachment = VkAttachmentDescription{};
-    colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;//toVulkanPixelFormat(g_vulkanstate.surface.surfaceConfig.format);
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = toVulkanLoadOperation(ret.colorLoadOp);
-    colorAttachment.storeOp = toVulkanStoreOperation(ret.colorStoreOp);
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = colorClear ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    VkAttachmentDescription& depthAttachment = attachments[1];
-    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = toVulkanLoadOperation(ret.depthLoadOp);
-    depthAttachment.storeOp = toVulkanStoreOperation(ret.depthStoreOp);
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    rpci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rpci.attachmentCount = 2;
-    rpci.pAttachments = attachments;
-    
-    VkAttachmentReference ca{};
-    ca.attachment = 0;
-    ca.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference da{};
-    da.attachment = 1;
-    da.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &ca;
-    subpass.pDepthStencilAttachment = &da;
-
-    rpci.pSubpasses = &subpass;
-    rpci.subpassCount = 1;
-    vkCreateRenderPass(g_vulkanstate.device->device, &rpci, nullptr, (VkRenderPass*)&ret.VkRenderPass);
-
     return ret;
 }
 
@@ -155,6 +111,7 @@ DescribedSampler LoadSamplerEx(TextureWrap amode, TextureFilter fmode, TextureFi
                 rg_unreachable();
         }
     };
+    
     DescribedSampler ret zeroinit;// = callocnew(DescribedSampler);
     WGPUSamplerDescriptor sdesc zeroinit;
     
@@ -757,8 +714,8 @@ void GenTextureMipmaps(Texture2D* tex){
     VkOffset3D initial = VkOffset3D{(int32_t)tex->width, (int32_t)tex->height, 1};
     auto mipExtent = [initial](const uint32_t mipLevel){
         VkOffset3D i = initial;
-        i.x >>= mipLevel;
-        i.y >>= mipLevel;
+        i.x >>= (int)mipLevel;
+        i.y >>= (int)mipLevel;
         i.x = std::max(i.x, 1);
         i.y = std::max(i.y, 1);
         return i;
@@ -789,7 +746,7 @@ void GenTextureMipmaps(Texture2D* tex){
         blitRegion.dstSubresource.layerCount = 1;
         blitRegion.srcSubresource.mipLevel = 0;
         blitRegion.dstSubresource.mipLevel = i + 1;
-        vkCmdBlitImage(enc->buffer, wgpuTex->image, VK_IMAGE_LAYOUT_GENERAL, wgpuTex->image, VK_IMAGE_LAYOUT_GENERAL, 1, &blitRegion, VK_FILTER_LINEAR);
+        enc->device->functions.vkCmdBlitImage(enc->buffer, wgpuTex->image, VK_IMAGE_LAYOUT_GENERAL, wgpuTex->image, VK_IMAGE_LAYOUT_GENERAL, 1, &blitRegion, VK_FILTER_LINEAR);
     }
     
     //ru_trackTexture(&enc->resourceUsage, wgpuTex);
@@ -870,63 +827,6 @@ extern "C" void UnloadBuffer(DescribedBuffer* buf){
 }
 
 
-void createRenderPass() {
-    VkAttachmentDescription attachments[2] = {};
-
-    VkAttachmentDescription& colorAttachment = attachments[0];
-    colorAttachment = VkAttachmentDescription{};
-    //colorAttachment.format = toVulkanPixelFormat(g_vulkanstate.surface.surfaceConfig.format);
-    colorAttachment.format = toVulkanPixelFormat(WGPUTextureFormat_BGRA8Unorm);
-    colorAttachment.samples = VK_SAMPLE_COUNT_4_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    #ifdef FORCE_HEADLESS
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    #else
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    #endif
-    VkAttachmentDescription& depthAttachment = attachments[1];
-    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
-    depthAttachment.samples = VK_SAMPLE_COUNT_4_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 2;
-    renderPassInfo.pAttachments = attachments;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    
-
-    if (vkCreateRenderPass(g_vulkanstate.device->device, &renderPassInfo, nullptr, &g_vulkanstate.renderPass) != VK_SUCCESS) {
-        TRACELOG(LOG_FATAL, "failed to create render pass!");
-    }
-}
 extern "C" void RenderPassSetIndexBuffer(DescribedRenderpass* drp, DescribedBuffer* buffer, WGPUIndexFormat format, uint64_t offset){
     wgpuRenderPassEncoderSetIndexBuffer(drp->rpEncoder, (WGPUBuffer)buffer->buffer, format, 0, WGPU_WHOLE_SIZE);
     //wgpuRenderPassEncoderSetIndexBuffer((WGPURenderPassEncoder)drp->rpEncoder, (WGPUBuffer)buffer->buffer, format, offset, buffer->size);
@@ -1143,8 +1043,6 @@ void InitBackend(){
     wgpuInstanceWaitAny(g_vulkanstate.instance, 1, &info, 1000000000);
     g_vulkanstate.device = device;
     g_vulkanstate.queue = device->queue;
-    
-    createRenderPass();
 }
 
 extern "C" FullSurface CompleteSurface(void* nsurface, int width, int height){
@@ -1393,26 +1291,6 @@ extern "C" void EndRenderpassEx(DescribedRenderpass* rp){
         wgpuRenderPassEncoderRelease((WGPURenderPassEncoder)rp->rpEncoder);
         rp->rpEncoder = nullptr;
     }
-    VkImageMemoryBarrier rpAttachmentBarriers[2] zeroinit;
-    auto rtex = g_renderstate.renderTargetStack.peek();
-    rpAttachmentBarriers[0].image = reinterpret_cast<WGPUTexture>(rtex.texture.id)->image;
-    rpAttachmentBarriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    rpAttachmentBarriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    rpAttachmentBarriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    rpAttachmentBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rpAttachmentBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    rpAttachmentBarriers[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    rpAttachmentBarriers[0].subresourceRange.baseMipLevel = 0;
-    rpAttachmentBarriers[0].subresourceRange.levelCount = 1;
-    rpAttachmentBarriers[0].subresourceRange.baseArrayLayer = 0;
-    rpAttachmentBarriers[0].subresourceRange.layerCount = 1;
-    rpAttachmentBarriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    rpAttachmentBarriers[0].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    rpAttachmentBarriers[0].subresourceRange.layerCount = 1;
-    vkCmdPipelineBarrier(((WGPUCommandEncoder)rp->cmdEncoder)->buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, 0, 0, 0, 1, rpAttachmentBarriers);
-    
-
-
     WGPUCommandBuffer cbuffer = wgpuCommandEncoderFinish(rp->cmdEncoder, NULL);
     
     g_renderstate.activeRenderpass = nullptr;
