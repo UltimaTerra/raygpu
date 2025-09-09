@@ -367,7 +367,9 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
             .type = sample_type,
         };
     }
+    ret.attachmentCount = pouts;
     uint32_t attributeInsertionIndex = 0;
+    memset(ret.vertexAttributes, 0, MAX_VERTEX_ATTRIBUTES * sizeof(ReflectionVertexAttribute));
     for(int32_t i = 0;i < attributeCount;i++){
         int glattrib = program.getAttributeType(i);
         std::string attribname = program.getAttributeName(i);
@@ -383,10 +385,11 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
                 memcpy(insert->name, attribname.c_str(), attribname.size());
                 insert->name[attribname.size()] = '\0';
                 insert->format = format;
+                insert->location = location;
             }
         }
-
     }
+    ret.vertexAttributeCount = attributeInsertionIndex;
     return ret;
 }
 namespace glslang{
@@ -605,7 +608,6 @@ DescribedShaderModule LoadShaderModuleGLSL(ShaderSources sourcesGLSL){
     ShaderSources spirv = glsl_to_spirv(sourcesGLSL);
     DescribedShaderModule ret = LoadShaderModuleSPIRV(spirv);
     ret.reflectionInfo.uniforms = callocnewpp(StringToUniformMap);
-    ret.reflectionInfo.attributes = callocnewpp(StringToAttributeMap);
     ret.reflectionInfo.uniforms->uniforms = getBindingsGLSL(sourcesGLSL);
     
     InOutAttributeInfo attribs = getAttributesGLSL(sourcesGLSL);
@@ -636,20 +638,34 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
         return a.location < b.location;
     });
 
-    std::vector<std::pair<WGPUVertexFormat, unsigned int>> flatAttributes;
-    flatAttributes.reserve(shaderModule.reflectionInfo.attributes->attributes.size());
-    for(const auto& [x, y] : shaderModule.reflectionInfo.attributes->attributes){
-        flatAttributes.push_back(y);
+    ReflectionVertexAttribute flatAttributes[MAX_VERTEX_ATTRIBUTES];
+    const uint32_t acount = shaderModule.reflectionInfo.attributes.vertexAttributeCount;
+    for(size_t i = 0;i < acount;i++){
+        flatAttributes[i] = shaderModule.reflectionInfo.attributes.vertexAttributes[i];
     }
-    std::sort(flatAttributes.begin(), flatAttributes.end(), [](const std::pair<WGPUVertexFormat, unsigned int>& a, const std::pair<WGPUVertexFormat, unsigned int>& b){
-        return a.second < b.second;
+    
+    std::sort(flatAttributes, flatAttributes + acount, [](const ReflectionVertexAttribute& a, const ReflectionVertexAttribute& b){
+        return a.location < b.location;
     });
+    // ----> ADD THIS DEBUGGING CODE <----
+    printf("--- Shader Reflection Info ---\n");
+    printf("Found %u vertex attributes:\n", acount);
+    for (uint32_t i = 0; i < acount; i++) {
+        printf("  Attribute[%u]: name='%s', location=%u, format=%d\n",
+               i,
+               flatAttributes[i].name,
+               flatAttributes[i].location,
+               flatAttributes[i].format);
+    }
+    printf("----------------------------\n");
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
 
-    allAttribsInOneBuffer.reserve(flatAttributes.size());
+    allAttribsInOneBuffer.reserve(acount);
     uint32_t offset = 0;
     
-    for(const auto& [format, location] : flatAttributes){
+    for(uint32_t i = 0;i < acount;i++){
+        WGPUVertexFormat format = flatAttributes[i].format;
+        uint32_t location = flatAttributes[i].location;
         allAttribsInOneBuffer.push_back(AttributeAndResidence{
             .attr = WGPUVertexAttribute{
                 .nextInChain = nullptr,
@@ -663,6 +679,11 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
         );
         offset += attributeSize(format);
     }
+    // ----> ADD THIS DEBUGGING CODE <----
+    printf("--- Pipeline Vertex Stride ---\n");
+    printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
+    printf("----------------------------\n");
+    // ----> END DEBUGGING CODE <----
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
 extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){

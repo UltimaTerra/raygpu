@@ -32,8 +32,8 @@ extern "C" DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sources){
         insert->vulkanModuleMultiEP = insert_;
         spv_reflect::ShaderModule module(csCreateInfo.codeSize, csCreateInfo.pCode);
         uint32_t epCount = module.GetEntryPointCount();
-        for(uint32_t i = 0;i < epCount;i++){
-            SpvReflectShaderStageFlagBits epStage = module.GetEntryPointShaderStage(i);
+        for(uint32_t epIndex = 0;epIndex < epCount;epIndex++){
+            SpvReflectShaderStageFlagBits epStage = module.GetEntryPointShaderStage(epIndex);
             WGPUShaderStageEnum stage = [](SpvReflectShaderStageFlagBits epStage){
                 switch(epStage){
                     case SpvReflectShaderStageFlagBits::SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
@@ -59,9 +59,9 @@ extern "C" DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sources){
             ret.reflectionInfo.ep[stage].stage = stage;
             ret.stages[stage].module = insert;
             std::memset(ret.reflectionInfo.ep[stage].name, 0, sizeof(ret.reflectionInfo.ep[stage].name));
-            uint32_t eplength = std::strlen(module.GetEntryPointName(i));
+            uint32_t eplength = std::strlen(module.GetEntryPointName(epIndex));
             rassert(eplength < 16, "Entry point name must be < 16 chars");
-            std::copy(module.GetEntryPointName(i), module.GetEntryPointName(i) + eplength, ret.reflectionInfo.ep[stage].name);
+            std::copy(module.GetEntryPointName(epIndex), module.GetEntryPointName(epIndex) + eplength, ret.reflectionInfo.ep[stage].name);
             //TRACELOG(LOG_INFO, "%s : %d", module.GetEntryPointName(i), module.GetEntryPointShaderStage(i));
         }
     }
@@ -95,12 +95,14 @@ extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineSta
     WGPUFragmentState fragmentState zeroinit;
     WGPUBlendState    blendState    zeroinit;
 
-    vertexState.module = (WGPUShaderModule)shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
+    vertexState.module = shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
 
     VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes, mst.vertexAttributeCount);
     vertexState.bufferCount = vlayout_complete.number_of_buffers;
 
     std::vector<WGPUVertexBufferLayout> layouts_converted;
+    layouts_converted.reserve(vlayout_complete.number_of_buffers);
+    
     for(uint32_t i = 0;i < vlayout_complete.number_of_buffers;i++){
         layouts_converted.push_back(WGPUVertexBufferLayout{
             .nextInChain    = nullptr,
@@ -113,7 +115,7 @@ extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineSta
     }
     vertexState.buffers = layouts_converted.data();
     vertexState.constantCount = 0;
-    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
     pipelineDesc.vertex = vertexState;
 
 
@@ -463,13 +465,15 @@ extern "C" Shader LoadPipelineEx(const char* shaderSource, const AttributeAndRes
 }
 extern "C" Shader LoadPipeline(const char* shaderSource){
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
-    auto [attribs, attachments] = getAttributesWGSL(sources);
+    InOutAttributeInfo attribs = getAttributesWGSL(sources);
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
     
-    allAttribsInOneBuffer.reserve(attribs.size());
+    allAttribsInOneBuffer.reserve(MAX_VERTEX_ATTRIBUTES);
     uint32_t offset = 0;
-    for(const auto& [name, attr] : attribs){
-        const auto& [format, location] = attr;
+    for(size_t i = 0;i < attribs.vertexAttributeCount;i++){
+        const char* name = attribs.vertexAttributes[i].name;
+        const auto& location = attribs.vertexAttributes[i].location;
+        const auto& format = attribs.vertexAttributes[i].format;
         allAttribsInOneBuffer.push_back(AttributeAndResidence{
             .attr = WGPUVertexAttribute{
                 .nextInChain = nullptr,
@@ -515,7 +519,7 @@ RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndReside
     ret->state.vertexAttributeCount = attribCount; 
     ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
     ret->shaderModule = mod;
-    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
+    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.attributes.attachmentCount;
 
     std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
     //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);

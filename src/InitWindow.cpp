@@ -455,7 +455,7 @@ extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
     rassert(createdWindow.handle != nullptr, "Returned window can't have null handle");
     #endif
     void* wgpu_or_wgpu_surface = CreateSurfaceForWindow(createdWindow);
-    #if SUPPORT_WGPU_BACKEND == 1
+    #if SUPPORT_WGPU_BACKEND == 1 || SUPPORT_VULKAN_BACKEND == 1
     WGPUSurface wSurface = (WGPUSurface)wgpu_or_wgpu_surface;
     g_renderstate.createdSubwindows[createdWindow.handle].surface = CompleteSurface(wSurface, width, height);
     #else

@@ -380,11 +380,11 @@ static inline VkImageType toVulkanTextureDimension(WGPUTextureDimension dim){
         }
     }
 }
-static inline VkFilter toVulkanFilterMode(filterMode fm) {
+static inline VkFilter toVulkanFilterMode(TextureFilter fm) {
     switch (fm) {
-    case filter_nearest:
+    case TEXTURE_FILTER_POINT:
         return VK_FILTER_NEAREST;
-    case filter_linear:
+    case TEXTURE_FILTER_LINEAR:
         return VK_FILTER_LINEAR;
     default:
         return VK_FILTER_NEAREST; // Default fallback
@@ -413,13 +413,13 @@ static inline PixelFormat fromVulkanPixelFormat(VkFormat format) {
 }
 static inline VkPresentModeKHR toVulkanPresentMode(WGPUPresentMode mode){
     switch(mode){
-        case PresentMode_Fifo:
+        case WGPUPresentMode_Fifo:
             return VK_PRESENT_MODE_FIFO_KHR;
-        case PresentMode_FifoRelaxed:
+        case WGPUPresentMode_FifoRelaxed:
             return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
-        case PresentMode_Immediate:
+        case WGPUPresentMode_Immediate:
             return VK_PRESENT_MODE_IMMEDIATE_KHR;
-        case PresentMode_Mailbox:
+        case WGPUPresentMode_Mailbox:
             return VK_PRESENT_MODE_MAILBOX_KHR;
         default:
             rg_trap();
@@ -429,13 +429,13 @@ static inline VkPresentModeKHR toVulkanPresentMode(WGPUPresentMode mode){
 static inline WGPUPresentMode fromVulkanPresentMode(VkPresentModeKHR mode){
     switch(mode){
         case VK_PRESENT_MODE_FIFO_KHR:
-            return PresentMode_Fifo;
+            return WGPUPresentMode_Fifo;
         case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
-            return PresentMode_FifoRelaxed;
+            return WGPUPresentMode_FifoRelaxed;
         case VK_PRESENT_MODE_IMMEDIATE_KHR:
-            return PresentMode_Immediate;
+            return WGPUPresentMode_Immediate;
         case VK_PRESENT_MODE_MAILBOX_KHR:
-            return PresentMode_Mailbox;
+            return WGPUPresentMode_Mailbox;
         default:
             return (WGPUPresentMode)~0;
     }
@@ -470,13 +470,13 @@ static inline VkFormat toVulkanPixelFormat(PixelFormat format) {
     return (VkFormat)0;
 }
 
-static inline VkSamplerAddressMode toVulkanAddressMode(addressMode am) {
+static inline VkSamplerAddressMode toVulkanAddressMode(TextureWrap am) {
     switch (am) {
-    case clampToEdge:
+    case TEXTURE_WRAP_CLAMP:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    case repeat:
+    case TEXTURE_WRAP_REPEAT:
         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    case mirrorRepeat:
+    case TEXTURE_WRAP_MIRROR_REPEAT:
         return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
     default:
         return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; // Default fallback
@@ -657,16 +657,6 @@ static inline VkBlendOp toVulkanBlendOperation(WGPUBlendOperation bo) {
     }
 }
 
-static inline VkFilter toVulkanTFilterMode(TFilterMode tfm) {
-    switch (tfm) {
-    case TFilterMode_Nearest:
-        return VK_FILTER_NEAREST;
-    case TFilterMode_Linear:
-        return VK_FILTER_LINEAR;
-    default:
-        return VK_FILTER_NEAREST; // Default fallback
-    }
-}
 
 static inline VkFrontFace toVulkanFrontFace(FrontFace ff) {
     switch (ff) {

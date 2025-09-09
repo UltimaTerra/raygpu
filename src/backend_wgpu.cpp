@@ -1,11 +1,15 @@
+#include <endian.h>
 #include <raygpu.h>
+#ifdef SUPPORT_VULKAN_BACKEND
+#else
 #include <webgpu/webgpu.h>
 #include <webgpu/webgpu_cpp.h>
+#endif
 #include <wgpustate.inc>
 #include <unordered_set>
 #include <internals.hpp>
 
-#include "enum_translation.h"
+//#include "enum_translation.h"
 
 #ifndef __EMSCRIPTEN__
 #include <spirv_reflect.h>
@@ -13,37 +17,15 @@
 
 
 wgpustate g_wgpustate{};
-struct webgpu_cxx_state{
-    wgpu::Instance instance{};
-    wgpu::Adapter adapter{};
-    wgpu::Device device{};
-    wgpu::Queue queue{};
-    //wgpu::Surface surface{};
-    //full_renderstate* rstate = nullptr;
-    //Texture depthTexture{};
-};
+
 WGPUQueue GetQueue(){
-    return g_wgpustate.queue.Get();
+    return g_wgpustate.queue;
 }
 
 void* GetSurface(){
     return (WGPUSurface)g_renderstate.mainWindow->surface.surface;
 }
-wgpu::Instance& GetCXXInstance(){
-    return g_wgpustate.instance;
-}
-wgpu::Adapter&  GetCXXAdapter (){
-    return g_wgpustate.adapter;
-}
-wgpu::Device&   GetCXXDevice  (){
-    return g_wgpustate.device;
-}
-wgpu::Queue&    GetCXXQueue   (){
-    return g_wgpustate.queue;
-}
-wgpu::Surface&  GetCXXSurface (){
-    return *((wgpu::Surface*)&g_renderstate.mainWindow->surface.surface);
-}
+
 inline WGPUVertexFormat f16format(uint32_t s){
     switch(s){
         case 1:return WGPUVertexFormat_Float16  ;
@@ -569,7 +551,7 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* unifo
 
 
 
-RGAPI FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t height){
+RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     FullSurface ret{};
     ret.surface = (WGPUSurface)nsurface;
     negotiateSurfaceFormatAndPresentMode(nsurface);
@@ -590,16 +572,17 @@ RGAPI FullSurface CompleteSurface(void* nsurface, uint32_t width, uint32_t heigh
     }
     
     
-    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
+    //TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
     WGPUSurfaceConfiguration config = {
         .device = (WGPUDevice)GetDevice(),
         .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
         .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc,
-        .width = width,
-        .height = height,
+        .width = (uint32_t)width,
+        .height = (uint32_t)height,
         .viewFormatCount = 1,
         .viewFormats = &config.format,
         .alphaMode = WGPUCompositeAlphaMode_Opaque,
+        .presentMode = presentMode,
     };
 
     ret.surfaceConfig.presentMode = config.presentMode;
@@ -845,10 +828,15 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         fsurface->renderTarget.texture.view = wgpuTextureCreateView(surfaceTexture.texture, nullptr);
     }
 }
-std::optional<wgpu::Limits> limitsToBeRequested = std::nullopt;
+struct {
+    WGPUBool requested;
+    WGPULimits limits;
+}limitsToBeRequested;
+
 WGPUBackendType requestedBackend = DEFAULT_BACKEND;
 WGPUAdapterType requestedAdapterType = WGPUAdapterType_Unknown;
-void setlimit(wgpu::Limits& limits, LimitType limit, uint64_t value){
+
+void setlimit(WGPULimits& limits, LimitType limit, uint64_t value){
     switch(limit){
         case maxTextureDimension1D: limits.maxTextureDimension1D = value;
         case maxTextureDimension2D: limits.maxTextureDimension2D = value;
@@ -881,14 +869,13 @@ void setlimit(wgpu::Limits& limits, LimitType limit, uint64_t value){
         case maxComputeWorkgroupSizeY: limits.maxComputeWorkgroupSizeY = value;
         case maxComputeWorkgroupSizeZ: limits.maxComputeWorkgroupSizeZ = value;
         case maxComputeWorkgroupsPerDimension: limits.maxComputeWorkgroupsPerDimension = value;
-        case maxImmediateSize: limits.maxImmediateSize = value;
+        //case maxImmediateSize: limits.maxImmediateSize = value;
     }
 }
 extern "C" void RequestLimit(LimitType limit, uint64_t value){
-    if(!limitsToBeRequested.has_value()){
-        limitsToBeRequested = wgpu::Limits();
-    }
-    setlimit(limitsToBeRequested.value(), limit, value);
+    limitsToBeRequested.requested = (WGPUBool)1;
+    
+    setlimit(limitsToBeRequested.limits, limit, value);
 }
 extern "C" void RequestAdapterType(AdapterType type){
     switch(type){
@@ -898,7 +885,9 @@ extern "C" void RequestAdapterType(AdapterType type){
     }
 }
 void DummySubmitOnQueue(){
-
+    #if SUPPORT_VULKAN_BACKEND == 1
+    wgpuDeviceTick(GetDevice());
+    #endif
 }
 extern "C" void RequestBackend(BackendType backend){
     switch(backend){
@@ -914,12 +903,48 @@ extern "C" void RequestBackend(BackendType backend){
         default:abort();
     }
 }
+void requestAdapterCallback(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* _userdata1, void*  _userdata2){
+    wgpustate* st = (wgpustate*)_userdata1;
+    if(status == WGPURequestAdapterStatus_Success){
+        st->adapter = adapter;
+    }
+    else{
+        char tmp[2048] = {};
+        std::memcpy(tmp, message.data, std::min(message.length, (size_t)2047));
+        TRACELOG(LOG_FATAL, "Failed to get an adapter: %s\n", tmp);
+    }
+}
+void requestDeviceCallback(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message, void* _userdata1, void* _userdata2){
+    wgpustate* st = (wgpustate*)_userdata1;
+    if(status == WGPURequestDeviceStatus_Success){
+        st->device = device;
+    }
+    else{
+        char tmp[2048] = {};
+        std::memcpy(tmp, message.data, std::min(message.length, (size_t)2047));
+        TRACELOG(LOG_FATAL, "Failed to create device: %s\n", tmp);
+    }
+}
+
+inline std::string WGPUStringViewToString(WGPUStringView view) {
+    if (view.data == nullptr) {
+        return "";
+    }
+    if (view.length == WGPU_STRLEN) {
+        // Use the constructor that takes a null-terminated C-string.
+        return std::string(view.data);
+    } else {
+        // Use the constructor that takes a pointer and a specific length.
+        return std::string(view.data, view.length);
+    }
+}
+
 void InitBackend(){
     wgpustate* sample = &g_wgpustate;
     // Create the toggles descriptor if not using emscripten.
-    wgpu::ChainedStruct* togglesChain = nullptr;
-    wgpu::SType type;
-#ifndef __EMSCRIPTEN__
+    WGPUChainedStruct* togglesChain = nullptr;
+    WGPUSType type;
+#if !defined(__EMSCRIPTEN__) && !defined(SUPPORT_VULKAN_BACKEND) 
     std::vector<const char*> enableToggleNames{};
     std::vector<const char*> disabledToggleNames{};
 
@@ -933,45 +958,45 @@ void InitBackend(){
 #endif  // __EMSCRIPTEN__
 
     // Setup base adapter options with toggles.
-    wgpu::RequestAdapterOptions adapterOptions = {};
+    WGPURequestAdapterOptions adapterOptions = {};
     adapterOptions.nextInChain = togglesChain;
-    auto backendType = (wgpu::BackendType)requestedBackend;
-    auto adapterType = (wgpu::AdapterType)requestedAdapterType;
+    auto backendType = requestedBackend;
+    auto adapterType = requestedAdapterType;
     adapterOptions.backendType = backendType;
-    if (backendType != wgpu::BackendType::Undefined) {
-        auto bcompat = [](wgpu::BackendType backend) {
+    if (backendType != WGPUBackendType_Undefined) {
+        auto bcompat = [](WGPUBackendType backend) {
             switch (backend) {
-                case wgpu::BackendType::D3D12:
-                case wgpu::BackendType::Metal:
-                case wgpu::BackendType::Vulkan:
-                case wgpu::BackendType::WebGPU:
-                case wgpu::BackendType::Null:
+                case WGPUBackendType_D3D12:
+                case WGPUBackendType_Metal:
+                case WGPUBackendType_Vulkan:
+                case WGPUBackendType_WebGPU:
+                case WGPUBackendType_Null:
                     return false;
-                case wgpu::BackendType::D3D11:
-                case wgpu::BackendType::OpenGL:
-                case wgpu::BackendType::OpenGLES:
+                case WGPUBackendType_D3D11:
+                case WGPUBackendType_OpenGL:
+                case WGPUBackendType_OpenGLES:
                     return true;
-                case wgpu::BackendType::Undefined:
+                case WGPUBackendType_Undefined:
                 default:
                     rg_unreachable();
                     //return false;
             }
         };
-        adapterOptions.featureLevel = bcompat(backendType) ?  wgpu::FeatureLevel::Compatibility : wgpu::FeatureLevel::Core;
+        adapterOptions.featureLevel = bcompat(backendType) ?  WGPUFeatureLevel_Compatibility : WGPUFeatureLevel_Core;
 
     }
 
     switch (adapterType) {
-        case wgpu::AdapterType::CPU:
+        case WGPUAdapterType_CPU:
             adapterOptions.forceFallbackAdapter = true;
             break;
-        case wgpu::AdapterType::DiscreteGPU:
-            adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
+        case WGPUAdapterType_DiscreteGPU:
+            adapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
             break;
-        case wgpu::AdapterType::IntegratedGPU:
-            adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
+        case WGPUAdapterType_IntegratedGPU:
+            adapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
             break;
-        case wgpu::AdapterType::Unknown:
+        default:
             break;
     }
 
@@ -979,18 +1004,30 @@ void InitBackend(){
     //dawnProcSetProcs(&dawn::native::GetProcs());
 
     // Create the instance with the toggles
-    wgpu::InstanceDescriptor instanceDescriptor = {};
+    WGPUInstanceDescriptor instanceDescriptor = {};
     instanceDescriptor.nextInChain = togglesChain;
 
-    const wgpu::InstanceFeatureName timedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
-    wgpu::InstanceFeatureName requiredInstanceFeatues[2] = {
-        wgpu::InstanceFeatureName::TimedWaitAny,
-        wgpu::InstanceFeatureName::ShaderSourceSPIRV
+    const WGPUInstanceFeatureName timedWaitAny = WGPUInstanceFeatureName_TimedWaitAny;
+    WGPUInstanceFeatureName requiredInstanceFeatues[2] = {
+        WGPUInstanceFeatureName_TimedWaitAny,
+        WGPUInstanceFeatureName_ShaderSourceSPIRV
     };
     instanceDescriptor.requiredFeatures = requiredInstanceFeatues;
     instanceDescriptor.requiredFeatureCount = 2;
+    #if SUPPORT_VULKAN_BACKEND == 1 && !defined(NDEBUG)
+    WGPUInstanceLayerSelection lsel = {
+        .chain = {
+            .next = NULL,
+            .sType = WGPUSType_InstanceLayerSelection
+        }
+    };
+    const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};
+    lsel.instanceLayers = layernames;
+    lsel.instanceLayerCount = 1;
+    instanceDescriptor.nextInChain = &lsel.chain;
+    #endif
 
-    sample->instance = wgpu::CreateInstance(&instanceDescriptor);
+    sample->instance = wgpuCreateInstance(&instanceDescriptor);
     #else
     // Create the instance
     TRACELOG(LOG_INFO, "Creating instance");
@@ -1007,47 +1044,42 @@ void InitBackend(){
     //std::cout << sample->instance.HasWGSLLanguageFeature(wgpu::WGSLFeatureName::ReadonlyAndReadwriteStorageTextures);
     //exit(0);
     // Synchronously create the adapter
-    sample->instance.WaitAny(
-        sample->instance.RequestAdapter(
-            &adapterOptions, wgpu::CallbackMode::WaitAnyOnly,
-            [sample](wgpu::RequestAdapterStatus status, wgpu::Adapter adapter, wgpu::StringView message) {
-                if (status != wgpu::RequestAdapterStatus::Success) {
-                    char tmp[2048] = {};
-                    std::memcpy(tmp, message.data, std::min(message.length, (size_t)2047));
-                    TRACELOG(LOG_FATAL, "Failed to get an adapter: %s\n", tmp);
-                    return;
-                }
-                sample->adapter = std::move(adapter);
-            }),
-        UINT64_MAX);
+
+    WGPURequestAdapterCallbackInfo requestAdapterCallbackInfo = {
+        .mode = WGPUCallbackMode_WaitAnyOnly,
+        .callback = requestAdapterCallback,
+        .userdata1 = sample,
+    };
+    WGPUFuture future = wgpuInstanceRequestAdapter(sample->instance, &adapterOptions, requestAdapterCallbackInfo);
+    WGPUFutureWaitInfo rafWinfo = {
+        .future = future
+    };
+
+    wgpuInstanceWaitAny(sample->instance, 1, &rafWinfo, UINT32_MAX);
+    
     if (sample->adapter == nullptr) {
         std::cerr << "Adapter is null\n";
         abort();
     }
-    wgpu::AdapterInfo info;
-    sample->adapter.GetInfo(&info);
+    WGPUAdapterInfo info;
+    wgpuAdapterGetInfo(sample->adapter, &info);
     
-    std::vector<char> deviceNameCstr(info.device.length + 1, '\0');
-    std::vector<char> architectureCstr(info.architecture.length + 1, '\0');
-    std::vector<char> deviceDescCstr(info.description.length + 1, '\0');
-    std::vector<char> vendorC2str(info.vendor.length + 1, '\0');
-
-    memcpy(deviceNameCstr.data(), info.device.data, info.device.length);
-    memcpy(deviceDescCstr.data(), info.description.data, info.description.length);
-    memcpy(architectureCstr.data(), info.architecture.data, info.architecture.length);
-    memcpy(vendorC2str.data(), info.vendor.data, info.vendor.length);
+    std::string deviceName = WGPUStringViewToString(info.device);
+    std::string architecture = WGPUStringViewToString(info.architecture);
+    std::string description = WGPUStringViewToString(info.description);
+    //std::string vendor = WGPUStringViewToString(info.vendor);
     
-    const char* adapterTypeString = info.adapterType == wgpu::AdapterType::CPU ? "CPU" : (info.adapterType == wgpu::AdapterType::IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
+    const char* adapterTypeString = info.adapterType == WGPUAdapterType_CPU ? "CPU" : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
     const char* backendString = backendTypeSpellingTable.at((WGPUBackendType)info.backendType).c_str();
 
-    TRACELOG(LOG_INFO, "Using adapter %s %s", vendorC2str.data(), deviceNameCstr.data());
-    TRACELOG(LOG_INFO, "Adapter description: %s", deviceDescCstr.data());
-    TRACELOG(LOG_INFO, "Adapter architecture: %s", architectureCstr.data());
+    //TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
+    TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
+    TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture.c_str());
     TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
     // Create device descriptor with callbacks and toggles
     {
-        wgpu::SupportedFeatures features;
-        sample->adapter.GetFeatures(&features);
+        WGPUSupportedFeatures features;
+        wgpuAdapterGetFeatures(sample->adapter, &features);
         std::string featuresString;
         for(size_t i = 0; i < features.featureCount;i++){
             featuresString += featureSpellingTable.contains((WGPUFeatureName)features.features[i]) ? featureSpellingTable.at((WGPUFeatureName)features.features[i]) : "<unknown feature>";
@@ -1055,8 +1087,8 @@ void InitBackend(){
         }
         TRACELOG(LOG_INFO, "Features supported: %s ", featuresString.c_str());
     }
-    wgpu::Limits adapterLimits;
-    sample->adapter.GetLimits(&adapterLimits);
+    WGPULimits adapterLimits;
+    wgpuAdapterGetLimits(sample->adapter, &adapterLimits);
     
     {
         TraceLog(LOG_INFO, "Platform could support %u bindings per bindgroup",    (unsigned)adapterLimits.maxBindingsPerBindGroup);
@@ -1066,108 +1098,97 @@ void InitBackend(){
         TraceLog(LOG_INFO, "Platform could support %u VBO slots",                 (unsigned)adapterLimits.maxVertexBuffers);
     }
     
-    wgpu::DeviceDescriptor deviceDesc = {};
+    WGPUDeviceDescriptor deviceDesc = {};
     #ifndef __EMSCRIPTEN__ //y tho
-    wgpu::FeatureName fnames[2] = {
-        wgpu::FeatureName::ClipDistances,
-        wgpu::FeatureName::Float32Filterable,
+    WGPUFeatureName fnames[2] = {
+        WGPUFeatureName_ClipDistances,
+        WGPUFeatureName_Float32Filterable,
     };
     deviceDesc.requiredFeatures = fnames;
     deviceDesc.requiredFeatureCount = 2;
     #endif
     deviceDesc.nextInChain = togglesChain;
-    deviceDesc.SetDeviceLostCallback(
-        wgpu::CallbackMode::AllowSpontaneous,
-        [](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView message) {
-            const char* reasonName = "";
+    deviceDesc.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
+    deviceDesc.deviceLostCallbackInfo.callback = [](const WGPUDevice* device, WGPUDeviceLostReason reason, WGPUStringView message, void* userdata1, void* userdata2){
+        const char* reasonName = "";
             switch (reason) {
-                case wgpu::DeviceLostReason::Unknown:
+                case WGPUDeviceLostReason_Unknown:
                     reasonName = "Unknown";
                     break;
-                case wgpu::DeviceLostReason::Destroyed:
+                case WGPUDeviceLostReason_Destroyed:
                     reasonName = "Destroyed";
                     break;
-                case wgpu::DeviceLostReason::FailedCreation:
+                case WGPUDeviceLostReason_FailedCreation:
                     reasonName = "FailedCreation";
                     break;
                 default:
                     rg_unreachable();
             }
-            std::cerr << "Device lost because of " << reasonName << ": " << std::string(message.data, message.length) << std::endl;
-        });
-    deviceDesc.SetUncapturedErrorCallback(
-        [](const wgpu::Device&, wgpu::ErrorType type, wgpu::StringView message) {
-            const char* errorTypeName = "";
-            switch (type) {
-                case wgpu::ErrorType::Validation:
-                    errorTypeName = "Validation";
-                    break;
-                case wgpu::ErrorType::OutOfMemory:
-                    errorTypeName = "Out of memory";
-                    break;
-                case wgpu::ErrorType::Unknown:
-                    errorTypeName = "Unknown";
-                    break;
-                case wgpu::ErrorType::NoError:
-                    errorTypeName = "No Error";
-                    break;
-                case wgpu::ErrorType::Internal:
-                    errorTypeName = "Internal";
-                    break;
-                default:
-                    rg_unreachable();
-            }
-            TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, std::string(message.data, message.length).c_str());
-            rg_trap();
-        });
+            std::string messages(message.data, message.length);
+            TRACELOG(LOG_FATAL, "Device lost because of %s: ", reasonName, messages.c_str());
+    };
+
+    deviceDesc.uncapturedErrorCallbackInfo.callback = [](const WGPUDevice* device, WGPUErrorType type, WGPUStringView message, void* _userdata1, void* _userdata2) {
+        const char* errorTypeName = "";
+        switch (type) {
+            case WGPUErrorType_Validation:
+                errorTypeName = "Validation";
+                break;
+            case WGPUErrorType_OutOfMemory:
+                errorTypeName = "Out of memory";
+                break;
+            case WGPUErrorType_Unknown:
+                errorTypeName = "Unknown";
+                break;
+            case WGPUErrorType_NoError:
+                errorTypeName = "No Error";
+                break;
+            case WGPUErrorType_Internal:
+                errorTypeName = "Internal";
+                break;
+            default:
+                rg_unreachable();
+        }
+        TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, std::string(message.data, message.length).c_str());
+        rg_trap();
+    };
 
     
-    if(!limitsToBeRequested.has_value()){
-        limitsToBeRequested = wgpu::Limits();
+    if(!limitsToBeRequested.requested){
+        limitsToBeRequested.requested = true;
     }
-    
-    
-    // Synchronously create the device
-    wgpu::Limits reqLimits;
+    WGPULimits reqLimits;
+    limitsToBeRequested.limits.maxStorageBuffersPerShaderStage = adapterLimits.maxStorageBuffersPerShaderStage;
+    limitsToBeRequested.limits.maxStorageTexturesPerShaderStage = adapterLimits.maxStorageTexturesPerShaderStage;
+    if(limitsToBeRequested.requested){
 
-
-
-    if(limitsToBeRequested.has_value()){
-        limitsToBeRequested->maxStorageBuffersPerShaderStage = adapterLimits.maxStorageBuffersPerShaderStage;
-        limitsToBeRequested->maxStorageTexturesPerShaderStage = adapterLimits.maxStorageTexturesPerShaderStage;
-
-        reqLimits = limitsToBeRequested.value();
+        reqLimits = limitsToBeRequested.limits;
         deviceDesc.requiredLimits = &reqLimits;
     }
     else{
         deviceDesc.requiredLimits = nullptr;
     }
-    sample->instance.WaitAny(
-        sample->adapter.RequestDevice(
-            &deviceDesc, wgpu::CallbackMode::WaitAnyOnly,
-            [sample](wgpu::RequestDeviceStatus status, wgpu::Device device, wgpu::StringView message) {
-                if (status != wgpu::RequestDeviceStatus::Success) {
-                    std::cerr << "Failed to get an device: " << std::string(message.data, message.length);
-                    return;
-                }
-                sample->device = std::move(device);
-                sample->queue = sample->device.GetQueue();
-            }),
+    WGPURequestDeviceCallbackInfo rdCallback = {
+        .mode = WGPUCallbackMode_WaitAnyOnly,
+        .callback = requestDeviceCallback,
+        .userdata1 = sample
+    };
+    WGPUFuture rdFuture = wgpuAdapterRequestDevice(sample->adapter, &deviceDesc, rdCallback);
+    WGPUFutureWaitInfo rdFutureWaitInfo = {
+        .future = rdFuture
+    };
+    wgpuInstanceWaitAny(sample->instance, 1, &rdFutureWaitInfo, UINT32_MAX);
 
-        UINT64_MAX);
-    if (sample->device == nullptr) {
-        TRACELOG(LOG_FATAL, "Device is null");
-    }
-    wgpu::Limits slimits;
-
-    sample->device.GetLimits(&slimits);
+    
+    WGPULimits slimits;
+    wgpuDeviceGetLimits(sample->device, &slimits);
     
     TraceLog(LOG_INFO, "Device supports %u bindings per bindgroup", (unsigned)slimits.maxBindingsPerBindGroup);
     TraceLog(LOG_INFO, "Device supports %u bindgroups", (unsigned)slimits.maxBindGroups);
     TraceLog(LOG_INFO, "Device supports buffers up to %llu megabytes", (unsigned long long)slimits.maxBufferSize / (1000000ull));
     TraceLog(LOG_INFO, "Device supports textures up to %u x %u", (unsigned)slimits.maxTextureDimension2D, (unsigned)slimits.maxTextureDimension2D);
     TraceLog(LOG_INFO, "Device supports %u VBO slots", (unsigned)slimits.maxVertexBuffers);
-
+    sample->queue = wgpuDeviceGetQueue(sample->device);
 }
 
 
@@ -1264,13 +1285,13 @@ extern "C" DescribedBuffer* GenBufferEx(const void* data, size_t size, WGPUBuffe
     return ret;
 }
 void* GetInstance(){
-    return g_wgpustate.instance.Get();
+    return g_wgpustate.instance;
 }
 WGPUDevice GetDevice(){
-    return g_wgpustate.device.Get();
+    return g_wgpustate.device;
 }
 WGPUAdapter GetAdapter(){
-    return g_wgpustate.adapter.Get();
+    return g_wgpustate.adapter;
 }
 extern "C" void ComputePassSetBindGroup(DescribedComputepass* drp, uint32_t group, DescribedBindGroup* bindgroup){
     wgpuComputePassEncoderSetBindGroup((WGPUComputePassEncoder)drp->cpEncoder, group, (WGPUBindGroup)UpdateAndGetNativeBindGroup(bindgroup), 0, nullptr);
@@ -1280,32 +1301,37 @@ extern "C" void ComputePassSetBindGroup(DescribedComputepass* drp, uint32_t grou
 //    return g_renderstate.matrixStack[g_renderstate.stackPosition].second;
 //}
 extern "C" Texture2DArray LoadTextureArray(uint32_t width, uint32_t height, uint32_t layerCount, PixelFormat format){
-    Texture2DArray ret zeroinit;
-    ret.sampleCount = 1;
-    WGPUTextureDescriptor tDesc zeroinit;
-    tDesc.format = toWGPUTextureFormat(format);
-    tDesc.size = WGPUExtent3D{width, height, layerCount};
-    tDesc.dimension = WGPUTextureDimension_2D;
-    tDesc.sampleCount = 1;
-    tDesc.mipLevelCount = 1;
-    tDesc.usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
-    tDesc.viewFormatCount = 1;
-    tDesc.viewFormats = &tDesc.format;
-    ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &tDesc);
-    WGPUTextureViewDescriptor vDesc zeroinit;
-    vDesc.aspect = WGPUTextureAspect_All;
-    vDesc.arrayLayerCount = layerCount;
-    vDesc.baseArrayLayer = 0;
-    vDesc.mipLevelCount = 1;
-    vDesc.baseMipLevel = 0;
-    vDesc.dimension = WGPUTextureViewDimension_2DArray;
-    vDesc.format = tDesc.format;
-    vDesc.usage = tDesc.usage;
-    ret.view = wgpuTextureCreateView((WGPUTexture)ret.id, &vDesc);
-    ret.width = width;
-    ret.height = height;
-    ret.layerCount = layerCount;
-    ret.format = format;
+    const WGPUTextureDescriptor tDesc = {
+        .usage = WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst,
+        .dimension = WGPUTextureDimension_2D,
+        .size = WGPUExtent3D{width, height, layerCount},
+        .format = toWGPUPixelFormat(format),
+        .mipLevelCount = 1,
+        .sampleCount = 1,
+        .viewFormatCount = 1,
+        .viewFormats = &tDesc.format,
+    };
+    const WGPUTextureViewDescriptor vDesc = {
+        .format = tDesc.format,
+        .dimension = WGPUTextureViewDimension_2DArray,
+        .baseMipLevel = 0,
+        .mipLevelCount = 1,
+        .baseArrayLayer = 0,
+        .arrayLayerCount = layerCount,
+        .aspect = WGPUTextureAspect_All,
+        .usage = tDesc.usage,
+    };
+
+    WGPUTexture id = wgpuDeviceCreateTexture(GetDevice(), &tDesc);
+    WGPUTextureView view = wgpuTextureCreateView(id, &vDesc);
+    
+    Texture2DArray ret {
+        .id = id,
+        .view = view,
+        .layerCount = layerCount,
+        .format = format,
+        .sampleCount = 1
+    };
     return ret;
 }
 extern "C" Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat format, WGPUTextureUsage usage, uint32_t sampleCount, uint32_t mipmaps){
@@ -1438,10 +1464,10 @@ Texture LoadTextureFromImage(Image img){
         WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
         WGPUTextureDimension_2D,
         WGPUExtent3D{img.width, img.height, 1},
-        img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUTextureFormat(img.format),
+        img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format),
         1,1,1,nullptr
     };
-    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUTextureFormat(img.format);
+    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format);
     desc.viewFormats = (WGPUTextureFormat*)&resulting_tf;
     ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &desc);
     WGPUTextureViewDescriptor vdesc{};
@@ -1472,7 +1498,7 @@ Texture LoadTextureFromImage(Image img){
     TRACELOG(LOG_INFO, "Successfully loaded %u x %u texture from image", (unsigned)img.width, (unsigned)img.height);
     return ret;
 }
-extern "C" void ResizeSurface(FullSurface* fsurface, uint32_t newWidth, uint32_t newHeight){
+extern "C" void ResizeSurface(FullSurface* fsurface, int newWidth, int newHeight){
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     fsurface->renderTarget.colorMultisample.width = newWidth;
@@ -1606,7 +1632,7 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
     renderPass->rpEncoder = wgpuCommandEncoderBeginRenderPass((WGPUCommandEncoder)renderPass->cmdEncoder, &renderPassDesc);
     g_renderstate.activeRenderpass = renderPass;
 }
-wgpu::Buffer readtex zeroinit;
+WGPUBuffer readtex = NULL;
 volatile bool waitflag = false;
 Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     WGPUTextureFormat wFormat = wgpuTextureGetFormat(tex);
@@ -1627,7 +1653,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     b.size = RoundUpToNextMultipleOf256(formatSize * width) * height;
     b.usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst;
     
-    readtex = wgpu::Buffer(wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &b));
+    readtex = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &b);
 
     WGPUCommandEncoderDescriptor commandEncoderDesc{};
     commandEncoderDesc.label = STRVIEW("Command Encoder");
@@ -1638,7 +1664,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     tbsource.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
     tbsource.aspect = WGPUTextureAspect_All; // only relevant for depth/Stencil textures
     WGPUTexelCopyBufferInfo tbdest{};
-    tbdest.buffer = readtex.Get();
+    tbdest.buffer = readtex;
     tbdest.layout.offset = 0;
     tbdest.layout.bytesPerRow = RoundUpToNextMultipleOf256(formatSize * width);
     tbdest.layout.rowsPerImage = height;
@@ -1654,31 +1680,39 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
     wgpuCommandBufferRelease(command);
     ret.format = ret.format;
     waitflag = true;
-    auto onBuffer2Mapped = [&ret](wgpu::MapAsyncStatus status, const char* userdata){
+    auto onBuffer2Mapped = [](WGPUMapAsyncStatus status, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2){
         //std::cout << "Backcalled: " << (int)status << std::endl;
         waitflag = false;
-        if(status != wgpu::MapAsyncStatus::Success){
+        if(status != WGPUMapAsyncStatus_Success){
             TRACELOG(LOG_ERROR, "onBuffer2Mapped called back with error!");
         }
-        assert(status == wgpu::MapAsyncStatus::Success);
+        assert(status == WGPUMapAsyncStatus_Success);
 
-        uint64_t bufferSize = readtex.GetSize();
-        const void* map = readtex.GetConstMappedRange(0, bufferSize);
-        //fbLoad.data = std::realloc(fbLoad.data , bufferSize);
-        ret.data = std::malloc(bufferSize);
-        std::memcpy(ret.data, map, bufferSize);
-        readtex.Unmap();
-        wgpuBufferRelease(readtex.MoveToCHandle());
+        uint64_t bufferSize = wgpuBufferGetSize(readtex);
+        const void* map = wgpuBufferGetConstMappedRange(readtex, 0, bufferSize);
+        Image* udImage = (Image*)userdata1;
+        udImage->data = std::malloc(bufferSize);
+        std::memcpy(udImage->data, map, bufferSize);
+        wgpuBufferUnmap(readtex);
+        wgpuBufferRelease(readtex);
     };
 
-    
-    
-    #ifndef __EMSCRIPTEN__
-    GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
-    #else
-    GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
-    
-    #endif
+    WGPUBufferMapCallbackInfo mapCallbackInfo = {
+        .mode = WGPUCallbackMode_WaitAnyOnly,
+        .callback = onBuffer2Mapped,
+        .userdata1 = &ret
+    };
+    WGPUFuture future = wgpuBufferMapAsync(readtex, WGPUCallbackMode_WaitAnyOnly, 0, b.size, mapCallbackInfo);
+    WGPUFutureWaitInfo fwinfo = {
+        .future = future
+    };
+    wgpuInstanceWaitAny((WGPUInstance)GetInstance(), 1, &fwinfo, UINT32_MAX);
+
+    //#ifndef __EMSCRIPTEN__
+    //GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
+    //#else
+    //GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
+    //#endif
     return ret;
 }
 extern "C" void BufferData(DescribedBuffer* buffer, const void* data, size_t size){
@@ -1844,12 +1878,12 @@ DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv){
     #ifndef __EMSCRIPTEN__
     for(uint32_t i = 0;i < sourcesSpirv.sourceCount;i++){
         WGPUShaderModuleDescriptor shaderDesc zeroinit;
-        WGPUShaderModuleSPIRVDescriptor shaderCodeDesc zeroinit;
+        WGPUShaderSourceSPIRV shaderCodeDesc zeroinit;
         shaderCodeDesc.chain.next = nullptr;
         shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceSPIRV;
 
         shaderCodeDesc.code = (const uint32_t*)sourcesSpirv.sources[i].data;
-        shaderCodeDesc.codeSize = sourcesSpirv.sources[i].sizeInBytes / sizeof(uint32_t);
+        shaderCodeDesc.codeSize = sourcesSpirv.sources[i].sizeInBytes;
 
         shaderDesc.nextInChain = &shaderCodeDesc.chain;
         WGPUShaderModule sh = wgpuDeviceCreateShaderModule((WGPUDevice)GetDevice(), &shaderDesc);
@@ -2022,7 +2056,7 @@ extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndR
     ret->state.vertexAttributeCount = attribCount; 
     ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
     ret->shaderModule = mod;
-    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.colorAttachmentCount;
+    ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.attributes.attachmentCount;
 
     std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
     //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
@@ -2265,62 +2299,62 @@ const std::unordered_map<WGPUFeatureName, std::string> featureSpellingTable = []
     ret[WGPUFeatureName_DualSourceBlending] = "WGPUFeatureName_DualSourceBlending";
     ret[WGPUFeatureName_Subgroups] = "WGPUFeatureName_Subgroups";
     ret[WGPUFeatureName_CoreFeaturesAndLimits] = "WGPUFeatureName_CoreFeaturesAndLimits";
-    ret[WGPUFeatureName_DawnInternalUsages] = "WGPUFeatureName_DawnInternalUsages";
-    ret[WGPUFeatureName_DawnMultiPlanarFormats] = "WGPUFeatureName_DawnMultiPlanarFormats";
-    ret[WGPUFeatureName_DawnNative] = "WGPUFeatureName_DawnNative";
-    ret[WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses] = "WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses";
-    ret[WGPUFeatureName_ImplicitDeviceSynchronization] = "WGPUFeatureName_ImplicitDeviceSynchronization";
-    ret[WGPUFeatureName_TransientAttachments] = "WGPUFeatureName_TransientAttachments";
-    ret[WGPUFeatureName_MSAARenderToSingleSampled] = "WGPUFeatureName_MSAARenderToSingleSampled";
-    ret[WGPUFeatureName_D3D11MultithreadProtected] = "WGPUFeatureName_D3D11MultithreadProtected";
-    ret[WGPUFeatureName_ANGLETextureSharing] = "WGPUFeatureName_ANGLETextureSharing";
-    ret[WGPUFeatureName_PixelLocalStorageCoherent] = "WGPUFeatureName_PixelLocalStorageCoherent";
-    ret[WGPUFeatureName_PixelLocalStorageNonCoherent] = "WGPUFeatureName_PixelLocalStorageNonCoherent";
-    ret[WGPUFeatureName_Unorm16TextureFormats] = "WGPUFeatureName_Unorm16TextureFormats";
-    ret[WGPUFeatureName_Snorm16TextureFormats] = "WGPUFeatureName_Snorm16TextureFormats";
-    ret[WGPUFeatureName_MultiPlanarFormatExtendedUsages] = "WGPUFeatureName_MultiPlanarFormatExtendedUsages";
-    ret[WGPUFeatureName_MultiPlanarFormatP010] = "WGPUFeatureName_MultiPlanarFormatP010";
-    ret[WGPUFeatureName_HostMappedPointer] = "WGPUFeatureName_HostMappedPointer";
-    ret[WGPUFeatureName_MultiPlanarRenderTargets] = "WGPUFeatureName_MultiPlanarRenderTargets";
-    ret[WGPUFeatureName_MultiPlanarFormatNv12a] = "WGPUFeatureName_MultiPlanarFormatNv12a";
-    ret[WGPUFeatureName_FramebufferFetch] = "WGPUFeatureName_FramebufferFetch";
-    ret[WGPUFeatureName_BufferMapExtendedUsages] = "WGPUFeatureName_BufferMapExtendedUsages";
-    ret[WGPUFeatureName_AdapterPropertiesMemoryHeaps] = "WGPUFeatureName_AdapterPropertiesMemoryHeaps";
-    ret[WGPUFeatureName_AdapterPropertiesD3D] = "WGPUFeatureName_AdapterPropertiesD3D";
-    ret[WGPUFeatureName_AdapterPropertiesVk] = "WGPUFeatureName_AdapterPropertiesVk";
-    ret[WGPUFeatureName_R8UnormStorage] = "WGPUFeatureName_R8UnormStorage";
-    ret[WGPUFeatureName_DawnFormatCapabilities] = "WGPUFeatureName_DawnFormatCapabilities";
-    ret[WGPUFeatureName_DawnDrmFormatCapabilities] = "WGPUFeatureName_DawnDrmFormatCapabilities";
-    ret[WGPUFeatureName_Norm16TextureFormats] = "WGPUFeatureName_Norm16TextureFormats";
-    ret[WGPUFeatureName_MultiPlanarFormatNv16] = "WGPUFeatureName_MultiPlanarFormatNv16";
-    ret[WGPUFeatureName_MultiPlanarFormatNv24] = "WGPUFeatureName_MultiPlanarFormatNv24";
-    ret[WGPUFeatureName_MultiPlanarFormatP210] = "WGPUFeatureName_MultiPlanarFormatP210";
-    ret[WGPUFeatureName_MultiPlanarFormatP410] = "WGPUFeatureName_MultiPlanarFormatP410";
-    ret[WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation] = "WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation";
-    ret[WGPUFeatureName_SharedTextureMemoryAHardwareBuffer] = "WGPUFeatureName_SharedTextureMemoryAHardwareBuffer";
-    ret[WGPUFeatureName_SharedTextureMemoryDmaBuf] = "WGPUFeatureName_SharedTextureMemoryDmaBuf";
-    ret[WGPUFeatureName_SharedTextureMemoryOpaqueFD] = "WGPUFeatureName_SharedTextureMemoryOpaqueFD";
-    ret[WGPUFeatureName_SharedTextureMemoryZirconHandle] = "WGPUFeatureName_SharedTextureMemoryZirconHandle";
-    ret[WGPUFeatureName_SharedTextureMemoryDXGISharedHandle] = "WGPUFeatureName_SharedTextureMemoryDXGISharedHandle";
-    ret[WGPUFeatureName_SharedTextureMemoryD3D11Texture2D] = "WGPUFeatureName_SharedTextureMemoryD3D11Texture2D";
-    ret[WGPUFeatureName_SharedTextureMemoryIOSurface] = "WGPUFeatureName_SharedTextureMemoryIOSurface";
-    ret[WGPUFeatureName_SharedTextureMemoryEGLImage] = "WGPUFeatureName_SharedTextureMemoryEGLImage";
-    ret[WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD] = "WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD";
-    ret[WGPUFeatureName_SharedFenceSyncFD] = "WGPUFeatureName_SharedFenceSyncFD";
-    ret[WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle] = "WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle";
-    ret[WGPUFeatureName_SharedFenceDXGISharedHandle] = "WGPUFeatureName_SharedFenceDXGISharedHandle";
-    ret[WGPUFeatureName_SharedFenceMTLSharedEvent] = "WGPUFeatureName_SharedFenceMTLSharedEvent";
-    ret[WGPUFeatureName_SharedBufferMemoryD3D12Resource] = "WGPUFeatureName_SharedBufferMemoryD3D12Resource";
-    ret[WGPUFeatureName_StaticSamplers] = "WGPUFeatureName_StaticSamplers";
-    ret[WGPUFeatureName_YCbCrVulkanSamplers] = "WGPUFeatureName_YCbCrVulkanSamplers";
-    ret[WGPUFeatureName_ShaderModuleCompilationOptions] = "WGPUFeatureName_ShaderModuleCompilationOptions";
-    ret[WGPUFeatureName_DawnLoadResolveTexture] = "WGPUFeatureName_DawnLoadResolveTexture";
-    ret[WGPUFeatureName_DawnPartialLoadResolveTexture] = "WGPUFeatureName_DawnPartialLoadResolveTexture";
-    ret[WGPUFeatureName_MultiDrawIndirect] = "WGPUFeatureName_MultiDrawIndirect";
-    ret[WGPUFeatureName_DawnTexelCopyBufferRowAlignment] = "WGPUFeatureName_DawnTexelCopyBufferRowAlignment";
-    ret[WGPUFeatureName_FlexibleTextureViews] = "WGPUFeatureName_FlexibleTextureViews";
-    ret[WGPUFeatureName_ChromiumExperimentalSubgroupMatrix] = "WGPUFeatureName_ChromiumExperimentalSubgroupMatrix";
-    ret[WGPUFeatureName_SharedFenceEGLSync] = "WGPUFeatureName_SharedFenceEGLSync";
+    //ret[WGPUFeatureName_DawnInternalUsages] = "WGPUFeatureName_DawnInternalUsages";
+    //ret[WGPUFeatureName_DawnMultiPlanarFormats] = "WGPUFeatureName_DawnMultiPlanarFormats";
+    //ret[WGPUFeatureName_DawnNative] = "WGPUFeatureName_DawnNative";
+    //ret[WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses] = "WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses";
+    //ret[WGPUFeatureName_ImplicitDeviceSynchronization] = "WGPUFeatureName_ImplicitDeviceSynchronization";
+    //ret[WGPUFeatureName_TransientAttachments] = "WGPUFeatureName_TransientAttachments";
+    //ret[WGPUFeatureName_MSAARenderToSingleSampled] = "WGPUFeatureName_MSAARenderToSingleSampled";
+    //ret[WGPUFeatureName_D3D11MultithreadProtected] = "WGPUFeatureName_D3D11MultithreadProtected";
+    //ret[WGPUFeatureName_ANGLETextureSharing] = "WGPUFeatureName_ANGLETextureSharing";
+    //ret[WGPUFeatureName_PixelLocalStorageCoherent] = "WGPUFeatureName_PixelLocalStorageCoherent";
+    //ret[WGPUFeatureName_PixelLocalStorageNonCoherent] = "WGPUFeatureName_PixelLocalStorageNonCoherent";
+    //ret[WGPUFeatureName_Unorm16TextureFormats] = "WGPUFeatureName_Unorm16TextureFormats";
+    //ret[WGPUFeatureName_Snorm16TextureFormats] = "WGPUFeatureName_Snorm16TextureFormats";
+    //ret[WGPUFeatureName_MultiPlanarFormatExtendedUsages] = "WGPUFeatureName_MultiPlanarFormatExtendedUsages";
+    //ret[WGPUFeatureName_MultiPlanarFormatP010] = "WGPUFeatureName_MultiPlanarFormatP010";
+    //ret[WGPUFeatureName_HostMappedPointer] = "WGPUFeatureName_HostMappedPointer";
+    //ret[WGPUFeatureName_MultiPlanarRenderTargets] = "WGPUFeatureName_MultiPlanarRenderTargets";
+    //ret[WGPUFeatureName_MultiPlanarFormatNv12a] = "WGPUFeatureName_MultiPlanarFormatNv12a";
+    //ret[WGPUFeatureName_FramebufferFetch] = "WGPUFeatureName_FramebufferFetch";
+    //ret[WGPUFeatureName_BufferMapExtendedUsages] = "WGPUFeatureName_BufferMapExtendedUsages";
+    //ret[WGPUFeatureName_AdapterPropertiesMemoryHeaps] = "WGPUFeatureName_AdapterPropertiesMemoryHeaps";
+    //ret[WGPUFeatureName_AdapterPropertiesD3D] = "WGPUFeatureName_AdapterPropertiesD3D";
+    //ret[WGPUFeatureName_AdapterPropertiesVk] = "WGPUFeatureName_AdapterPropertiesVk";
+    //ret[WGPUFeatureName_R8UnormStorage] = "WGPUFeatureName_R8UnormStorage";
+    //ret[WGPUFeatureName_DawnFormatCapabilities] = "WGPUFeatureName_DawnFormatCapabilities";
+    //ret[WGPUFeatureName_DawnDrmFormatCapabilities] = "WGPUFeatureName_DawnDrmFormatCapabilities";
+    //ret[WGPUFeatureName_Norm16TextureFormats] = "WGPUFeatureName_Norm16TextureFormats";
+    //ret[WGPUFeatureName_MultiPlanarFormatNv16] = "WGPUFeatureName_MultiPlanarFormatNv16";
+    //ret[WGPUFeatureName_MultiPlanarFormatNv24] = "WGPUFeatureName_MultiPlanarFormatNv24";
+    //ret[WGPUFeatureName_MultiPlanarFormatP210] = "WGPUFeatureName_MultiPlanarFormatP210";
+    //ret[WGPUFeatureName_MultiPlanarFormatP410] = "WGPUFeatureName_MultiPlanarFormatP410";
+    //ret[WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation] = "WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation";
+    //ret[WGPUFeatureName_SharedTextureMemoryAHardwareBuffer] = "WGPUFeatureName_SharedTextureMemoryAHardwareBuffer";
+    //ret[WGPUFeatureName_SharedTextureMemoryDmaBuf] = "WGPUFeatureName_SharedTextureMemoryDmaBuf";
+    //ret[WGPUFeatureName_SharedTextureMemoryOpaqueFD] = "WGPUFeatureName_SharedTextureMemoryOpaqueFD";
+    //ret[WGPUFeatureName_SharedTextureMemoryZirconHandle] = "WGPUFeatureName_SharedTextureMemoryZirconHandle";
+    //ret[WGPUFeatureName_SharedTextureMemoryDXGISharedHandle] = "WGPUFeatureName_SharedTextureMemoryDXGISharedHandle";
+    //ret[WGPUFeatureName_SharedTextureMemoryD3D11Texture2D] = "WGPUFeatureName_SharedTextureMemoryD3D11Texture2D";
+    //ret[WGPUFeatureName_SharedTextureMemoryIOSurface] = "WGPUFeatureName_SharedTextureMemoryIOSurface";
+    //ret[WGPUFeatureName_SharedTextureMemoryEGLImage] = "WGPUFeatureName_SharedTextureMemoryEGLImage";
+    //ret[WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD] = "WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD";
+    //ret[WGPUFeatureName_SharedFenceSyncFD] = "WGPUFeatureName_SharedFenceSyncFD";
+    //ret[WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle] = "WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle";
+    //ret[WGPUFeatureName_SharedFenceDXGISharedHandle] = "WGPUFeatureName_SharedFenceDXGISharedHandle";
+    //ret[WGPUFeatureName_SharedFenceMTLSharedEvent] = "WGPUFeatureName_SharedFenceMTLSharedEvent";
+    //ret[WGPUFeatureName_SharedBufferMemoryD3D12Resource] = "WGPUFeatureName_SharedBufferMemoryD3D12Resource";
+    //ret[WGPUFeatureName_StaticSamplers] = "WGPUFeatureName_StaticSamplers";
+    //ret[WGPUFeatureName_YCbCrVulkanSamplers] = "WGPUFeatureName_YCbCrVulkanSamplers";
+    //ret[WGPUFeatureName_ShaderModuleCompilationOptions] = "WGPUFeatureName_ShaderModuleCompilationOptions";
+    //ret[WGPUFeatureName_DawnLoadResolveTexture] = "WGPUFeatureName_DawnLoadResolveTexture";
+    //ret[WGPUFeatureName_DawnPartialLoadResolveTexture] = "WGPUFeatureName_DawnPartialLoadResolveTexture";
+    //ret[WGPUFeatureName_MultiDrawIndirect] = "WGPUFeatureName_MultiDrawIndirect";
+    //ret[WGPUFeatureName_DawnTexelCopyBufferRowAlignment] = "WGPUFeatureName_DawnTexelCopyBufferRowAlignment";
+    //ret[WGPUFeatureName_FlexibleTextureViews] = "WGPUFeatureName_FlexibleTextureViews";
+    //ret[WGPUFeatureName_ChromiumExperimentalSubgroupMatrix] = "WGPUFeatureName_ChromiumExperimentalSubgroupMatrix";
+    //ret[WGPUFeatureName_SharedFenceEGLSync] = "WGPUFeatureName_SharedFenceEGLSync";
     #endif
     return ret;
 }();
@@ -2344,7 +2378,7 @@ const std::unordered_map<WGPUPresentMode, std::string> presentModeSpellingTable 
     map[WGPUPresentMode_FifoRelaxed] = "WGPUPresentMode_FifoRelaxed";
     map[WGPUPresentMode_Immediate] = "WGPUPresentMode_Immediate";
     map[WGPUPresentMode_Mailbox] = "WGPUPresentMode_Mailbox";
-    map[WGPUPresentMode_Force32] = "WGPUPresentMode_Force32";
+    //map[WGPUPresentMode_Force32] = "WGPUPresentMode_Force32";
     return map;
 }();
 const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTable = [](){
@@ -2445,7 +2479,7 @@ const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTa
     map[WGPUTextureFormat_ASTC12x10UnormSrgb] = "WGPUTextureFormat_ASTC12x10UnormSrgb";
     map[WGPUTextureFormat_ASTC12x12Unorm] = "WGPUTextureFormat_ASTC12x12Unorm";
     map[WGPUTextureFormat_ASTC12x12UnormSrgb] = "WGPUTextureFormat_ASTC12x12UnormSrgb";
-    #ifndef __EMSCRIPTEN__ //why??
+    #if !defined(__EMSCRIPTEN__) && !defined(SUPPORT_VULKAN_BACKEND)  //why??
     map[WGPUTextureFormat_R16Unorm] = "WGPUTextureFormat_R16Unorm";
     map[WGPUTextureFormat_RG16Unorm] = "WGPUTextureFormat_RG16Unorm";
     map[WGPUTextureFormat_RGBA16Unorm] = "WGPUTextureFormat_RGBA16Unorm";

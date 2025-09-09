@@ -344,7 +344,7 @@ RGAPI void drawCurrentBatch(){
     size_t vertexCount = vboptr - vboptr_base;
     //std::cout << "vcoun = " << vertexCount << "\n";
     if(vertexCount == 0)return;
-    #if SUPPORT_VULKAN_BACKEND == 1
+    #if SUPPORT_VULKAN_BACKEND == 8
     DescribedBuffer* vbo = UpdateVulkanRenderbatch();
     constexpr bool allocated_via_pool = false;
     #else
@@ -445,7 +445,7 @@ RGAPI void drawCurrentBatch(){
         default:break;
     }
     if(!allocated_via_pool){
-        #if SUPPORT_VULKAN_BACKEND == 1
+        #if SUPPORT_VULKAN_BACKEND == 8
         PushUsedBuffer(vbo->buffer);
         #endif
         UnloadBuffer(vbo);
@@ -1572,7 +1572,7 @@ RGAPI uint32_t GetUniformLocation(Shader shader, const char* uniformName){
 }
 RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
     //Returns LOCATION_NOT_FOUND if not found
-    return GetShaderImpl(shader)->shaderModule.reflectionInfo.attributes->GetLocation(attributeName);
+    return getReflectionAttributeLocation(&GetShaderImpl(shader)->shaderModule.reflectionInfo.attributes, attributeName);
 }
 //RGAPI uint32_t GetUniformLocationCompute(const DescribedComputePipeline* pl, const char* uniformName){
 //    //Returns LOCATION_NOT_FOUND if not found
@@ -1584,7 +1584,7 @@ extern "C" uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* un
 }
 extern "C" uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName){
     ShaderImpl* impl = GetShaderImplByID(shaderID);
-    return impl->shaderModule.reflectionInfo.attributes->GetLocation(attributeName);
+    return getReflectionAttributeLocation(&impl->shaderModule.reflectionInfo.attributes, attributeName);
     //return GetAttributeLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), attributeName);
 }
 // Load shader from code strings and bind default locations

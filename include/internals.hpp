@@ -76,11 +76,11 @@ static inline uint32_t bitcount64(uint64_t x){
     return std::popcount(x);
     #endif
 }
-#if defined(__cplusplus) && SUPPORT_WGPU_BACKEND == 1
 extern const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTable;
 extern const std::unordered_map<WGPUPresentMode, std::string> presentModeSpellingTable;
 extern const std::unordered_map<WGPUBackendType, std::string> backendTypeSpellingTable;
 extern const std::unordered_map<WGPUFeatureName, std::string> featureSpellingTable;
+#if defined(__cplusplus) && SUPPORT_WGPU_BACKEND == 1
 wgpu::Instance& GetCXXInstance();
 wgpu::Adapter&  GetCXXAdapter ();
 wgpu::Device&   GetCXXDevice  ();
@@ -146,8 +146,8 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
 InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
 InOutAttributeInfo getAttributes    (ShaderSources sources);
 
-void PrepareFrameGlobals();
-DescribedBuffer* UpdateVulkanRenderbatch();
+RGAPI void PrepareFrameGlobals();
+RGAPI DescribedBuffer* UpdateVulkanRenderbatch();
 void PushUsedBuffer(void* nativeBuffer);
 typedef struct VertexBufferLayout{
     uint64_t arrayStride;
@@ -722,6 +722,31 @@ extern "C" const char* copyString(const char* str);
 //    std::free(set.layouts);
 //    std::free(set.attributePool);
 //}
+
+static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* attributes, const char* name){
+    if(name == NULL){
+        return LOCATION_NOT_FOUND;
+    }
+    for(uint32_t i = 0;i < attributes->vertexAttributeCount;i++){
+        int equal = 1;
+        for(size_t j = 0;j < MAX_VERTEX_ATTRIBUTE_NAME_LENGTH;j++){
+            if(name[j] == '\0'){
+                if(attributes->vertexAttributes[i].name[j] != '\0'){
+                    equal = 0;
+                }
+                break;
+            }
+            else if(attributes->vertexAttributes[i].name[j] != name[j]){
+                equal = 0;
+                break;
+            }
+        }
+        if(equal){
+            return attributes->vertexAttributes[i].location;
+        }
+    }
+    return LOCATION_NOT_FOUND;
+}
 
 static inline ShaderSources singleStage(const char* code, ShaderSourceType language, WGPUShaderStageEnum stage){
     ShaderSources sources zeroinit;
