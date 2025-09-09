@@ -1,3 +1,4 @@
+#include <endian.h>
 #include <raygpu.h>
 #ifdef SUPPORT_VULKAN_BACKEND
 #else
@@ -884,7 +885,9 @@ extern "C" void RequestAdapterType(AdapterType type){
     }
 }
 void DummySubmitOnQueue(){
-
+    #if SUPPORT_VULKAN_BACKEND == 1
+    wgpuDeviceTick(GetDevice());
+    #endif
 }
 extern "C" void RequestBackend(BackendType backend){
     switch(backend){
@@ -1011,6 +1014,18 @@ void InitBackend(){
     };
     instanceDescriptor.requiredFeatures = requiredInstanceFeatues;
     instanceDescriptor.requiredFeatureCount = 2;
+    #if SUPPORT_VULKAN_BACKEND == 1 && !defined(NDEBUG)
+    WGPUInstanceLayerSelection lsel = {
+        .chain = {
+            .next = NULL,
+            .sType = WGPUSType_InstanceLayerSelection
+        }
+    };
+    const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};
+    lsel.instanceLayers = layernames;
+    lsel.instanceLayerCount = 1;
+    instanceDescriptor.nextInChain = &lsel.chain;
+    #endif
 
     sample->instance = wgpuCreateInstance(&instanceDescriptor);
     #else
@@ -1052,12 +1067,12 @@ void InitBackend(){
     std::string deviceName = WGPUStringViewToString(info.device);
     std::string architecture = WGPUStringViewToString(info.architecture);
     std::string description = WGPUStringViewToString(info.description);
-    std::string vendor = WGPUStringViewToString(info.vendor);
+    //std::string vendor = WGPUStringViewToString(info.vendor);
     
     const char* adapterTypeString = info.adapterType == WGPUAdapterType_CPU ? "CPU" : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
     const char* backendString = backendTypeSpellingTable.at((WGPUBackendType)info.backendType).c_str();
 
-    TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
+    //TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
     TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
     TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture.c_str());
     TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
