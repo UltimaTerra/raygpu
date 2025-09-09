@@ -76,7 +76,7 @@ SetupWindowAndGetSurfaceDescriptor(GLFWwindow* window) {
     return {desc, [](wgpu::ChainedStruct* desc) {
                 delete reinterpret_cast<wgpu::SurfaceSourceWindowsHWND*>(desc);
             }};
-#elif defined(DAWN_ENABLE_BACKEND_METAL)
+#elif defined(DAWN_ENABLE_BACKEND_METAL) || defined(__APPLE__)
     return SetupWindowAndGetSurfaceDescriptorCocoa(window);
 #elif defined(RAYGPU_USE_WAYLAND) || defined(RAYGPU_USE_X11)
 #if defined(GLFW_PLATFORM_WAYLAND) && defined(RAYGPU_USE_WAYLAND)

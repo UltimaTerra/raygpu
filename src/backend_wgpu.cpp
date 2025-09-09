@@ -946,13 +946,13 @@ void InitBackend(){
     std::vector<const char*> enableToggleNames{};
     std::vector<const char*> disabledToggleNames{};
 
-    wgpu::DawnTogglesDescriptor toggles = {};
+    WGPUDawnTogglesDescriptor toggles = {};
     toggles.enabledToggles = enableToggleNames.data();
     toggles.enabledToggleCount = enableToggleNames.size();
     toggles.disabledToggles = disabledToggleNames.data();
     toggles.disabledToggleCount = disabledToggleNames.size();
 
-    togglesChain = &toggles;
+    togglesChain = &toggles.chain;
 #endif  // __EMSCRIPTEN__
 
     // Setup base adapter options with toggles.
@@ -1003,7 +1003,7 @@ void InitBackend(){
 
     // Create the instance with the toggles
     WGPUInstanceDescriptor instanceDescriptor = {};
-    instanceDescriptor.nextInChain = togglesChain;
+    //instanceDescriptor.nextInChain = togglesChain;
 
     const WGPUInstanceFeatureName timedWaitAny = WGPUInstanceFeatureName_TimedWaitAny;
     WGPUInstanceFeatureName requiredInstanceFeatues[2] = {
@@ -1059,7 +1059,7 @@ void InitBackend(){
         std::cerr << "Adapter is null\n";
         abort();
     }
-    WGPUAdapterInfo info;
+    WGPUAdapterInfo info = {0};
     wgpuAdapterGetInfo(sample->adapter, &info);
     
     std::string deviceName = WGPUStringViewToString(info.device);
@@ -1068,7 +1068,7 @@ void InitBackend(){
     //std::string vendor = WGPUStringViewToString(info.vendor);
     
     const char* adapterTypeString = info.adapterType == WGPUAdapterType_CPU ? "CPU" : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
-    const char* backendString = backendTypeSpellingTable.at((WGPUBackendType)info.backendType).c_str();
+    const char* backendString = backendTypeSpellingTable.at(info.backendType).c_str();
 
     //TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
     TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
@@ -1076,7 +1076,7 @@ void InitBackend(){
     TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
     // Create device descriptor with callbacks and toggles
     {
-        WGPUSupportedFeatures features;
+        WGPUSupportedFeatures features = {};
         wgpuAdapterGetFeatures(sample->adapter, &features);
         std::string featuresString;
         for(size_t i = 0; i < features.featureCount;i++){
@@ -1085,7 +1085,7 @@ void InitBackend(){
         }
         TRACELOG(LOG_INFO, "Features supported: %s ", featuresString.c_str());
     }
-    WGPULimits adapterLimits;
+    WGPULimits adapterLimits = {0};
     wgpuAdapterGetLimits(sample->adapter, &adapterLimits);
     
     {
@@ -1096,7 +1096,7 @@ void InitBackend(){
         TraceLog(LOG_INFO, "Platform could support %u VBO slots",                 (unsigned)adapterLimits.maxVertexBuffers);
     }
     
-    WGPUDeviceDescriptor deviceDesc = {};
+    WGPUDeviceDescriptor deviceDesc = {0};
     #ifndef __EMSCRIPTEN__ //y tho
     WGPUFeatureName fnames[2] = {
         WGPUFeatureName_ClipDistances,
@@ -1105,7 +1105,7 @@ void InitBackend(){
     deviceDesc.requiredFeatures = fnames;
     deviceDesc.requiredFeatureCount = 2;
     #endif
-    deviceDesc.nextInChain = togglesChain;
+    //deviceDesc.nextInChain = togglesChain;
     deviceDesc.deviceLostCallbackInfo.mode = WGPUCallbackMode_AllowSpontaneous;
     deviceDesc.deviceLostCallbackInfo.callback = [](const WGPUDevice* device, WGPUDeviceLostReason reason, WGPUStringView message, void* userdata1, void* userdata2){
         const char* reasonName = "";
@@ -1122,8 +1122,14 @@ void InitBackend(){
                 default:
                     rg_unreachable();
             }
-            std::string messages(message.data, message.length);
-            TRACELOG(LOG_FATAL, "Device lost because of %s: ", reasonName, messages.c_str());
+            std::string messages;
+            if(message.length == WGPU_STRLEN){
+                messages = message.data;
+            }
+            else{
+                messages = std::string(message.data, message.data + message.length);
+            }
+            TRACELOG(LOG_FATAL, "Device lost because of %s: %s", reasonName, messages.c_str());
     };
 
     deviceDesc.uncapturedErrorCallbackInfo.callback = [](const WGPUDevice* device, WGPUErrorType type, WGPUStringView message, void* _userdata1, void* _userdata2) {
@@ -1155,17 +1161,16 @@ void InitBackend(){
     if(!limitsToBeRequested.requested){
         limitsToBeRequested.requested = true;
     }
-    WGPULimits reqLimits;
+    WGPULimits reqLimits = {0};
     limitsToBeRequested.limits.maxStorageBuffersPerShaderStage = adapterLimits.maxStorageBuffersPerShaderStage;
     limitsToBeRequested.limits.maxStorageTexturesPerShaderStage = adapterLimits.maxStorageTexturesPerShaderStage;
-    if(limitsToBeRequested.requested){
-
-        reqLimits = limitsToBeRequested.limits;
-        deviceDesc.requiredLimits = &reqLimits;
-    }
-    else{
+    //if(limitsToBeRequested.requested){
+    //    reqLimits = limitsToBeRequested.limits;
+    //    deviceDesc.requiredLimits = &reqLimits;
+    //}
+    //else{
         deviceDesc.requiredLimits = nullptr;
-    }
+    //}
     WGPURequestDeviceCallbackInfo rdCallback = {
         .mode = WGPUCallbackMode_WaitAnyOnly,
         .callback = requestDeviceCallback,
@@ -1178,7 +1183,7 @@ void InitBackend(){
     wgpuInstanceWaitAny(sample->instance, 1, &rdFutureWaitInfo, UINT32_MAX);
 
     
-    WGPULimits slimits;
+    WGPULimits slimits = {0};
     wgpuDeviceGetLimits(sample->device, &slimits);
     
     TraceLog(LOG_INFO, "Device supports %u bindings per bindgroup", (unsigned)slimits.maxBindingsPerBindGroup);
