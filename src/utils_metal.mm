@@ -25,9 +25,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#if !defined(DAWN_ENABLE_BACKEND_METAL)
-#error "utils_metal.mm requires the Metal backend to be enabled."
-#endif  // !defined(DAWN_ENABLE_BACKEND_METAL)
+//#if !defined(DAWN_ENABLE_BACKEND_METAL)
+//#error "utils_metal.mm requires the Metal backend to be enabled."
+//#endif  // !defined(DAWN_ENABLE_BACKEND_METAL)
 
 #include "webgpu/webgpu_glfw.h"
 

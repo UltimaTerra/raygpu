@@ -1,4 +1,3 @@
-#include <endian.h>
 #include <raygpu.h>
 #ifdef SUPPORT_VULKAN_BACKEND
 #else
@@ -8,7 +7,6 @@
 #include <wgpustate.inc>
 #include <unordered_set>
 #include <internals.hpp>
-
 //#include "enum_translation.h"
 
 #ifndef __EMSCRIPTEN__

@@ -4,6 +4,8 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
+#include <iostream>
+
 #ifndef WEBGPU_BACKEND_DAWN
 #define WEBGPU_BACKEND_DAWN 1
 #endif
@@ -26,7 +28,9 @@
 
 WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     //#if defined(SDL_VIDEO_DRIVER_X11)
+    std::cout << "sdl wgpu surfes" << std::endl;
     std::string drv = SDL_GetCurrentVideoDriver();
+    std::cout << drv << std::endl;
 #ifdef __EMSCRIPTEN__
 
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc = {0};
