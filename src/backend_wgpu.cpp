@@ -1,8 +1,8 @@
 #include <raygpu.h>
 #ifdef SUPPORT_VULKAN_BACKEND
+#include <wgvk.h>
 #else
 #include <webgpu/webgpu.h>
-#include <webgpu/webgpu_cpp.h>
 #endif
 #include <wgpustate.inc>
 #include <unordered_set>
@@ -586,7 +586,7 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     ret.surfaceConfig.presentMode = config.presentMode;
     ret.surfaceConfig.device = config.device;
     ret.surfaceConfig.width = config.width;
-    ret.surfaceConfig.height = config.width;
+    ret.surfaceConfig.height = config.height;
     ret.surfaceConfig.format = config.format;
     
     ret.renderTarget = LoadRenderTexture(width, height);
@@ -1029,12 +1029,12 @@ void InitBackend(){
     #else
     // Create the instance
     TRACELOG(LOG_INFO, "Creating instance");
-    wgpu::InstanceDescriptor instanceDescriptor = {};
-    const wgpu::InstanceFeatureName timedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
+    WGPUInstanceDescriptor instanceDescriptor = {};
+    const WGPUInstanceFeatureName timedWaitAny = WGPUInstanceFeatureName_TimedWaitAny;
     instanceDescriptor.requiredFeatures = &timedWaitAny;
     instanceDescriptor.requiredFeatureCount = 1;
     
-    sample->instance = wgpu::CreateInstance(&instanceDescriptor);
+    sample->instance = wgpuCreateInstance(&instanceDescriptor);
     #endif  // __EMSCRIPTEN__
 
     //wgpu::WGSLFeatureName wgslfeatures[8];
@@ -1635,103 +1635,110 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
     renderPass->rpEncoder = wgpuCommandEncoderBeginRenderPass((WGPUCommandEncoder)renderPass->cmdEncoder, &renderPassDesc);
     g_renderstate.activeRenderpass = renderPass;
 }
-WGPUBuffer readtex = NULL;
-volatile bool waitflag = false;
-Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel){
+
+// WGPUBuffer readtex = NULL;
+// volatile bool waitflag = false;
+
+Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel) {
     WGPUTextureFormat wFormat = wgpuTextureGetFormat(tex);
     size_t formatSize = GetPixelSizeInBytes(fromWGPUPixelFormat(wFormat));
     uint32_t width = wgpuTextureGetWidth(tex);
     uint32_t height = wgpuTextureGetHeight(tex);
     Image ret {
-        nullptr, 
-        wgpuTextureGetWidth(tex), 
-        wgpuTextureGetHeight(tex), 
+        nullptr,
+        (uint32_t)wgpuTextureGetWidth(tex),
+        (uint32_t)wgpuTextureGetHeight(tex),
         1,
-        fromWGPUPixelFormat(wFormat), 
-        RoundUpToNextMultipleOf256(formatSize * width), 
+        fromWGPUPixelFormat(wFormat),
+        RoundUpToNextMultipleOf256(formatSize * width),
     };
     WGPUBufferDescriptor b{};
     b.mappedAtCreation = false;
-    
     b.size = RoundUpToNextMultipleOf256(formatSize * width) * height;
     b.usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst;
-    
-    readtex = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &b);
+
+    // Create a LOCAL buffer.
+    WGPUBuffer localReadTex = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &b);
 
     WGPUCommandEncoderDescriptor commandEncoderDesc{};
-    commandEncoderDesc.label = STRVIEW("Command Encoder");
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), &commandEncoderDesc);
+    commandEncoderDesc.label = STRVIEW("Command Encoder for Texture Readback");
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), nullptr);
+
     WGPUTexelCopyTextureInfo tbsource{};
     tbsource.texture = tex;
     tbsource.mipLevel = miplevel;
-    tbsource.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
-    tbsource.aspect = WGPUTextureAspect_All; // only relevant for depth/Stencil textures
+    tbsource.origin = { 0, 0, 0 };
+    tbsource.aspect = WGPUTextureAspect_All;
+
     WGPUTexelCopyBufferInfo tbdest{};
-    tbdest.buffer = readtex;
+    tbdest.buffer = localReadTex;
     tbdest.layout.offset = 0;
     tbdest.layout.bytesPerRow = RoundUpToNextMultipleOf256(formatSize * width);
     tbdest.layout.rowsPerImage = height;
 
-    WGPUExtent3D copysize{width / (1 << miplevel), height / (1 << miplevel), 1};
+    WGPUExtent3D copysize{width / (1u << miplevel), height / (1u << miplevel), 1};
+    wgpuCommandEncoderClearBuffer(encoder, localReadTex, 0, b.size);
     wgpuCommandEncoderCopyTextureToBuffer(encoder, &tbsource, &tbdest, &copysize);
-    
-    WGPUCommandBufferDescriptor cmdBufferDescriptor{};
-    cmdBufferDescriptor.label = STRVIEW("Command buffer");
-    WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
-    wgpuCommandEncoderRelease(encoder);
-    wgpuQueueSubmit((WGPUQueue)GetQueue(), 1, &command);
-    wgpuCommandBufferRelease(command);
-    ret.format = ret.format;
-    waitflag = true;
-    auto onBuffer2Mapped = [](WGPUMapAsyncStatus status, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2){
-        //std::cout << "Backcalled: " << (int)status << std::endl;
-        waitflag = false;
-        if(status != WGPUMapAsyncStatus_Success){
-            TRACELOG(LOG_ERROR, "onBuffer2Mapped called back with error!");
-        }
-        assert(status == WGPUMapAsyncStatus_Success);
 
-        uint64_t bufferSize = wgpuBufferGetSize(readtex);
-        const void* map = wgpuBufferGetConstMappedRange(readtex, 0, bufferSize);
+    WGPUCommandBufferDescriptor cmdBufferDescriptor{};
+    cmdBufferDescriptor.label = STRVIEW("Command buffer for Texture Readback");
+    WGPUCommandBuffer command = wgpuCommandEncoderFinish(encoder, NULL);
+    wgpuQueueSubmit(GetQueue(), 1, &command);
+    wgpuCommandEncoderRelease(encoder);
+    wgpuCommandBufferRelease(command);
+
+    auto onBuffer2Mapped = [](WGPUMapAsyncStatus status, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2){
+        if (status != WGPUMapAsyncStatus_Success) {
+            TRACELOG(LOG_ERROR, "onBuffer2Mapped failed with status: %d", status);
+            return;
+        }
+        
         Image* udImage = (Image*)userdata1;
-        udImage->data = std::malloc(bufferSize);
-        std::memcpy(udImage->data, map, bufferSize);
-        wgpuBufferUnmap(readtex);
-        wgpuBufferRelease(readtex);
+        WGPUBuffer bufferToMap = (WGPUBuffer)userdata2;
+
+        uint64_t bufferSize = wgpuBufferGetSize(bufferToMap);
+        const void* map = wgpuBufferGetConstMappedRange(bufferToMap, 0, bufferSize);
+        
+        udImage->data = std::calloc(bufferSize / 4, 4);
+        if (udImage->data) {
+            std::memcpy(udImage->data, map, bufferSize);
+        }
+
+        wgpuBufferUnmap(bufferToMap);
+        wgpuBufferRelease(bufferToMap);
     };
 
     WGPUBufferMapCallbackInfo mapCallbackInfo = {
         .mode = WGPUCallbackMode_WaitAnyOnly,
         .callback = onBuffer2Mapped,
-        .userdata1 = &ret
+        .userdata1 = &ret,
+        .userdata2 = localReadTex,
     };
-    WGPUFuture future = wgpuBufferMapAsync(readtex, WGPUCallbackMode_WaitAnyOnly, 0, b.size, mapCallbackInfo);
+    
+    WGPUFuture future = wgpuBufferMapAsync(localReadTex, WGPUMapMode_Read, 0, b.size, mapCallbackInfo);
     WGPUFutureWaitInfo fwinfo = {
         .future = future
     };
-    wgpuInstanceWaitAny((WGPUInstance)GetInstance(), 1, &fwinfo, UINT32_MAX);
+    
+    wgpuInstanceWaitAny((WGPUInstance)GetInstance(), 1, &fwinfo, UINT64_MAX);
 
-    //#ifndef __EMSCRIPTEN__
-    //GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
-    //#else
-    //GetCXXInstance().WaitAny(readtex.MapAsync(wgpu::MapMode::Read, 0, RoundUpToNextMultipleOf256(formatSize * width) * height, wgpu::CallbackMode::WaitAnyOnly, onBuffer2Mapped), 1000000000);
-    //#endif
     return ret;
 }
+
 extern "C" void BufferData(DescribedBuffer* buffer, const void* data, size_t size){
     if(buffer->size >= size){
-        wgpuQueueWriteBuffer((WGPUQueue)GetQueue(), (WGPUBuffer)buffer->buffer, 0, data, size);
+        wgpuQueueWriteBuffer(GetQueue(), buffer->buffer, 0, data, size);
     }
     else{
         if(buffer->buffer)
-            wgpuBufferRelease((WGPUBuffer)buffer->buffer);
+            wgpuBufferRelease(buffer->buffer);
         WGPUBufferDescriptor nbdesc{};
         nbdesc.size = size;
         nbdesc.usage = buffer->usage;
 
-        buffer->buffer = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &nbdesc);
+        buffer->buffer = wgpuDeviceCreateBuffer(GetDevice(), &nbdesc);
         buffer->size = size;
-        wgpuQueueWriteBuffer((WGPUQueue)GetQueue(), (WGPUBuffer)buffer->buffer, 0, data, size);
+        wgpuQueueWriteBuffer(GetQueue(), buffer->buffer, 0, data, size);
     }
 }
 extern "C" void ResetSyncState(){}
@@ -1764,6 +1771,7 @@ extern "C" void EndRenderpassEx(DescribedRenderpass* renderPass){
     wgpuRenderPassEncoderRelease((WGPURenderPassEncoder)re);
     wgpuCommandEncoderRelease((WGPUCommandEncoder)renderPass->cmdEncoder);
     wgpuCommandBufferRelease(command);
+    
 }
 extern "C" void EndRenderpassPro(DescribedRenderpass* rp, bool renderTexture){
     EndRenderpassEx(rp);

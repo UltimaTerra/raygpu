@@ -8,6 +8,7 @@ int main(void){
     InitWindow(1280, 1280, "This title has no effect");
     Texture tex = LoadTextureFromImage(GenImageChecker(WHITE, BLACK, 100, 100, 10));
     SetTargetFPS(0);
+    
     while(!WindowShouldClose()){
         BeginDrawing();
         ClearBackground((Color) {20,50,50,255});
@@ -20,6 +21,7 @@ int main(void){
         
         DrawFPS(0, 0);
         EndDrawing();
+
         if(GetFrameCount() % 128 == 0)
         {
             TakeScreenshot(TextFormat("frame%llu.png", GetFrameCount()));

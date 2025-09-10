@@ -27,8 +27,14 @@ void mainloop(void){
         DisableDepthTest();
     }
     //drawCurrentBatch();
-    
+    EndRenderpass();
+    if(GetFrameCount() % 128 == 0)
+    {
+        TakeScreenshot(TextFormat("frame%llu.png", GetFrameCount()));
+        printf("FPS: %d\n", GetFPS());
+    }
     EndDrawing();
+    
     if((GetFrameCount() & 0x7ff) == 0){
         printf("FPS: %u\n", GetFPS());
     }

@@ -1392,7 +1392,7 @@ RGAPI Image LoadImageFromTexture(Texture tex){
     //#endif
 }
 RGAPI void TakeScreenshot(const char* filename){
-    Image img = LoadImageFromTextureEx((WGPUTexture)g_renderstate.mainWindowRenderTarget.texture.id, 0);
+    Image img = LoadImageFromTextureEx(g_renderstate.mainWindowRenderTarget.texture.id, 0);
     SaveImage(img, filename);
     UnloadImage(img);
 }
@@ -1512,13 +1512,14 @@ extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
     src.sizeInBytes = std::strlen(shaderSource);
     std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
 
-    auto [attribs, attachmentState] = getAttributes(sources);
+    InOutAttributeInfo attribs = getAttributes(sources);
     
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
-    allAttribsInOneBuffer.reserve(attribs.size());
+    allAttribsInOneBuffer.reserve(attribs.vertexAttributeCount);
     uint32_t offset = 0;
-    for(const auto& [name, attr] : attribs){
-        const auto& [format, location] = attr;
+    for(uint32_t attribIndex = 0;attribIndex < attribs.vertexAttributeCount;attribIndex++){
+        const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
+        const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer.push_back(AttributeAndResidence{
             .attr = WGPUVertexAttribute{
                 .nextInChain = nullptr,
@@ -2102,15 +2103,15 @@ void SaveImage(Image _img, const char* filepath){
     //    stride = img.width * sizeof(Color);
     //}
     if(fp.ends_with(".png")){
-        stbi_write_png(filepath, img.width, img.height, 4, img.data, img.rowStrideInBytes);
+        stbi_write_png(filepath, (int)img.width, (int)img.height, 4, img.data, (int)img.rowStrideInBytes);
     }
     else if(fp.ends_with(".jpg")){
-        stbi_write_jpg(filepath, img.width, img.height, 4, img.data, 100);
+        stbi_write_jpg(filepath, (int)img.width, (int)img.height, 4, img.data, 100);
     }
     else if(fp.ends_with(".bmp")){
         //if(row)
         //std::cerr << "Careful with bmp!" << filepath << "\n";
-        stbi_write_bmp(filepath, img.width, img.height, 4, img.data);
+        stbi_write_bmp(filepath, (int)img.width, (int)img.height, 4, img.data);
     }
     else{
         TRACELOG(LOG_ERROR, "Unrecognized image format in filename %s", filepath);
