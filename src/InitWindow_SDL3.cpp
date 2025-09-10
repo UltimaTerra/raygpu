@@ -74,6 +74,15 @@ RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
 
 RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     Initialize_SDL3();
+    //if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    //    TRACELOG(LOG_ERROR, "SDL_Init failed: %s\n", SDL_GetError());
+    //    return SubWindow{};
+    //}
+    int numDrivers = SDL_GetNumVideoDrivers();
+    for (int i = 0; i < numDrivers; i++) {
+         TRACELOG(LOG_INFO, "Video driver %d: %s\n", i, SDL_GetVideoDriver(i));
+    }
+    printf("Current video driver: %s\n", SDL_GetCurrentVideoDriver());
     TRACELOG(LOG_INFO, "INITED SDL3!");
     SubWindow ret zeroinit;
     ret.type = windowType_sdl3;
@@ -83,7 +92,7 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     //windowFlags |= SDL_WINDOW_VULKAN;
     //#endif
     #ifdef __APPLE__
-    windowFlags |= SDL_WINDOW_METAL;
+    // windowFlags |= SDL_WINDOW_METAL;
     #endif
     SDL_Window *window = SDL_CreateWindow(title, width, height, windowFlags);
     rassert(window != NULL, "SDL_CreateWindow returned NULL");

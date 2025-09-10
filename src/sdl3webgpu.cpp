@@ -5,7 +5,9 @@
 #include <webgpu/webgpu.h>
 #include <string>
 #include <iostream>
-
+#ifdef __APPLE__
+#define SDL_VIDEO_DRIVER_COCOA
+#endif
 #ifndef WEBGPU_BACKEND_DAWN
 #define WEBGPU_BACKEND_DAWN 1
 #endif
@@ -28,7 +30,7 @@
 
 WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     //#if defined(SDL_VIDEO_DRIVER_X11)
-    std::cout << "sdl wgpu surfes" << std::endl;
+    std::cout << "sdl wgpu surfes for window " << window << std::endl;
     std::string drv = SDL_GetCurrentVideoDriver();
     std::cout << drv << std::endl;
 #ifdef __EMSCRIPTEN__
@@ -64,7 +66,7 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         .nextInChain = &fromHwnd.chain
     };
     return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
-#else
+#elif !defined(__APPLE__)
     #if RAYGPU_USE_X11 == 1
     if (drv == "x11") {
         Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
@@ -96,7 +98,27 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
-#endif
+    #elif defined(SDL_VIDEO_DRIVER_COCOA)
+    {
+        id metal_layer = NULL;
+        NSWindow *ns_window = (__bridge NSWindow *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+        if (!ns_window) return NULL;
+        [ns_window.contentView setWantsLayer : YES];
+        metal_layer = [CAMetalLayer layer];
+        [ns_window.contentView setLayer : metal_layer];
+
+        WGPUSurfaceSourceMetalLayer fromMetalLayer;
+        fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
+        fromMetalLayer.chain.next = NULL;
+        fromMetalLayer.layer = metal_layer;
+
+        WGPUSurfaceDescriptor surfaceDescriptor;
+        surfaceDescriptor.nextInChain = &fromMetalLayer.chain;
+        surfaceDescriptor.label = (WGPUStringView){ NULL, WGPU_STRLEN };
+
+        return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
+    }
+    #endif
     
     //#endif
     return nullptr;
