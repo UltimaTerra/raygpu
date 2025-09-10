@@ -82,7 +82,11 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     //#if SUPPORT_VULKAN_BACKEND == 1 && !defined(__EMSCRIPTEN__)
     //windowFlags |= SDL_WINDOW_VULKAN;
     //#endif
+    #ifdef __APPLE__
+    windowFlags |= SDL_WINDOW_METAL;
+    #endif
     SDL_Window *window = SDL_CreateWindow(title, width, height, windowFlags);
+    rassert(window != NULL, "SDL_CreateWindow returned NULL");
     SDL_SetWindowResizable(window, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
     if(g_renderstate.windowFlags & FLAG_FULLSCREEN_MODE)
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
