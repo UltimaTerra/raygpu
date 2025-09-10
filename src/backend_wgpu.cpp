@@ -538,7 +538,7 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* unifo
 
     ret.entries = (WGPUBindGroupLayoutEntry*)std::calloc(uniformCount, sizeof(WGPUBindGroupLayoutEntry));
     if(uniformCount > 0){
-        std::memcpy(ret.entries, uniforms, uniformCount * sizeof(WGPUBindGroupLayoutEntry));
+        std::memcpy(ret.entries, blayouts, uniformCount * sizeof(WGPUBindGroupLayoutEntry));
     }
     ret.layout = wgpuDeviceCreateBindGroupLayout((WGPUDevice)GetDevice(), &bglayoutdesc);
 
@@ -1880,15 +1880,18 @@ DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv){
     DescribedShaderModule ret zeroinit;
     #ifndef __EMSCRIPTEN__
     for(uint32_t i = 0;i < sourcesSpirv.sourceCount;i++){
-        WGPUShaderModuleDescriptor shaderDesc zeroinit;
-        WGPUShaderSourceSPIRV shaderCodeDesc zeroinit;
-        shaderCodeDesc.chain.next = nullptr;
-        shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceSPIRV;
-
-        shaderCodeDesc.code = (const uint32_t*)sourcesSpirv.sources[i].data;
-        shaderCodeDesc.codeSize = sourcesSpirv.sources[i].sizeInBytes;
-
-        shaderDesc.nextInChain = &shaderCodeDesc.chain;
+        
+        rassert(sourcesSpirv.sources[i].sizeInBytes / sizeof(uint32_t) < UINT32_MAX, "SPIRV too long: %llu bytes", (unsigned long long)sourcesSpirv.sources[i].sizeInBytes);
+        WGPUShaderSourceSPIRV shaderCodeDesc = {
+            .chain= {.sType = WGPUSType_ShaderSourceSPIRV},
+            .codeSize = (uint32_t)(sourcesSpirv.sources[i].sizeInBytes / sizeof(uint32_t)),
+            .code = (const uint32_t*)sourcesSpirv.sources[i].data,
+        };
+        rassert(*shaderCodeDesc.code == 0x07230203, "Invalid SPIRV magic");
+        WGPUShaderModuleDescriptor shaderDesc = {
+            .nextInChain = &shaderCodeDesc.chain
+        };
+        
         WGPUShaderModule sh = wgpuDeviceCreateShaderModule((WGPUDevice)GetDevice(), &shaderDesc);
         
 
@@ -1969,7 +1972,7 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     }
     vertexState.buffers = layouts_converted.data();
     vertexState.constantCount = 0;
-    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
     pipelineDesc.vertex = vertexState;
 
 

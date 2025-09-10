@@ -191,50 +191,33 @@ std::vector<uint32_t> glsl_to_spirv_single(const char* cs, EShLanguage stage){
     shader.setEnvTarget(glslang::EShTargetSpv, defaultSpirvVersion);
     shader.setStrings(&cs, 1);
 
-    auto stageToString = [](EShLanguage stage){
-        switch(stage){
-            case EShLangVertex: return "EShLangVertex";
-            case EShLangTessControl: return "EShLangTessControl";
-            case EShLangTessEvaluation: return "EShLangTessEvaluation";
-            case EShLangGeometry: return "EShLangGeometry";
-            case EShLangFragment: return "EShLangFragment";
-            case EShLangCompute: return "EShLangCompute";
-            case EShLangRayGen: return "EShLangRayGen";
-            case EShLangIntersect: return "EShLangIntersect";
-            case EShLangAnyHit: return "EShLangAnyHit";
-            case EShLangClosestHit: return "EShLangClosestHit";
-            case EShLangMiss: return "EShLangMiss";
-            case EShLangCallable: return "EShLangCallable";
-            case EShLangTask: return "EShLangTask";
-            case EShLangMesh: return "EShLangMesh";
-            default: return "??unknown ShaderStage??";
-        }
-    };
-    TBuiltInResource Resources zeroinit;
-    Resources.maxComputeWorkGroupSizeX = 1024;
-    Resources.maxComputeWorkGroupSizeY = 1024;
-    Resources.maxComputeWorkGroupSizeZ = 1024;
-    Resources.maxCombinedTextureImageUnits = 8;
-
-    Resources.limits.generalUniformIndexing = true;
-    Resources.limits.generalVariableIndexing = true;
-    Resources.maxDrawBuffers = MAX_COLOR_ATTACHMENTS;
-
+    TBuiltInResource Resources = DefaultTBuiltInResource_RG;
+    constexpr int kGLSLVersion = 460;
     EShMessages messages = (EShMessages)(EShMsgDefault | EShMsgSpvRules | EShMsgVulkanRules);
 
-    if(!shader.parse(&Resources, glslang::EShTargetVulkan_1_4, ECoreProfile, false, false, messages)){
-        TRACELOG(LOG_ERROR, "%s GLSL Parsing Failed: %s", stageToString(stage), shader.getInfoLog());
+    if(!shader.parse(&Resources, kGLSLVersion, ECoreProfile, false, false, messages)){
+        TRACELOG(LOG_ERROR, "GLSL parsing failed: %s", shader.getInfoLog());
+        return {};
     }
+
     glslang::TProgram program;
     program.addShader(&shader);
     if(!program.link(messages)){
-        TRACELOG(LOG_ERROR, "Error linkin shader: %s", program.getInfoLog());
+        TRACELOG(LOG_ERROR, "Program link failed: %s", program.getInfoLog());
+        return {};
     }
+
     glslang::TIntermediate* intermediate = program.getIntermediate(stage);
+    if(!intermediate){
+        TRACELOG(LOG_ERROR, "Null intermediate");
+        return {};
+    }
+
     std::vector<uint32_t> output;
     glslang::GlslangToSpv(*intermediate, output);
     return output;
 }
+
 std::vector<uint32_t> glsl_to_spirv(const char *cs){
     if (!glslang_initialized){
         glslang::InitializeProcess();
@@ -638,7 +621,7 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
         return a.location < b.location;
     });
 
-    ReflectionVertexAttribute flatAttributes[MAX_VERTEX_ATTRIBUTES];
+    ReflectionVertexAttribute flatAttributes[MAX_VERTEX_ATTRIBUTES] = {0};
     const uint32_t acount = shaderModule.reflectionInfo.attributes.vertexAttributeCount;
     for(size_t i = 0;i < acount;i++){
         flatAttributes[i] = shaderModule.reflectionInfo.attributes.vertexAttributes[i];
@@ -647,17 +630,18 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     std::sort(flatAttributes, flatAttributes + acount, [](const ReflectionVertexAttribute& a, const ReflectionVertexAttribute& b){
         return a.location < b.location;
     });
-    // ----> ADD THIS DEBUGGING CODE <----
-    printf("--- Shader Reflection Info ---\n");
-    printf("Found %u vertex attributes:\n", acount);
+
+    TRACELOG(LOG_TRACE, "--- Shader Reflection Info ---\n");
+    TRACELOG(LOG_TRACE, "Found %u vertex attributes:\n", acount);
     for (uint32_t i = 0; i < acount; i++) {
-        printf("  Attribute[%u]: name='%s', location=%u, format=%d\n",
+        TRACELOG(LOG_TRACE, "  Attribute[%u]: name='%s', location=%u, format=%d\n",
                i,
                flatAttributes[i].name,
                flatAttributes[i].location,
                flatAttributes[i].format);
     }
-    printf("----------------------------\n");
+    TRACELOG(LOG_TRACE, "----------------------------\n");
+
     std::vector<AttributeAndResidence> allAttribsInOneBuffer;
 
     allAttribsInOneBuffer.reserve(acount);
