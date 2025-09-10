@@ -1249,19 +1249,18 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
         TRACELOG(LOG_INFO, "Supported surface formats: %s", formatsString.c_str());
     }
 
-    WGPUTextureFormat selectedFormat = WGPUTextureFormat_Undefined;
+    WGPUTextureFormat selectedFormat = capabilities.formats[1];//WGPUTextureFormat_Undefined;
     int format_index = 0;
-    for(format_index = 0;format_index < capabilities.formatCount;format_index++){
-        if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
-            selectedFormat = (capabilities.formats[format_index]);
-            break;
-        }
-        if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm ||
-           capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm){
-            selectedFormat = (capabilities.formats[format_index]);
-            break;
-        }
-    }
+    //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
+    //    if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
+    //        selectedFormat = (capabilities.formats[format_index]);
+    //        break;
+    //    }
+    //    if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/){
+    //        selectedFormat = (capabilities.formats[format_index]);
+    //        break;
+    //    }
+    //}
     g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if(format_index == capabilities.formatCount){
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off"); 
@@ -1877,11 +1876,11 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
 //
 //}
 
-//DescribedPipeline* LoadShaderForVAOEx(const char* shaderSource, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
-//    DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-//    PreparePipeline(pl, vao);
-//    return pl;
-//}
+Shader LoadShaderForVAOEx(const char* shaderSource, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+    Shader pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
+    //PreparePipeline(pl, vao);
+    return pl;
+}
 
 
 DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv){
