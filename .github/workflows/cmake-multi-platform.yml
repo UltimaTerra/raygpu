@@ -151,6 +151,7 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DSUPPORT_SDL3=ON
         -S ${{ steps.msys2_strings.outputs.source-dir }}
 
     - name: Configure CMake (Regular)
@@ -160,6 +161,7 @@ jobs:
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        -DSUPPORT_SDL3=ON
         -S ${{ github.workspace }}
 
     - name: Build (MSYS2)
