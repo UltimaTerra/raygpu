@@ -374,9 +374,6 @@ RGAPI void drawCurrentBatch(){
             BindShaderVertexArray(activeShader, renderBatchVAO);
             BindShader(activeShader, RL_LINES);
             DrawArrays(RL_LINES, vertexCount);
-            //wgpuRenderPassEncoderSetBindGroup(g_renderstate.renderpass.rpEncoder, 0, GetWGPUBindGroup(&GetActivePipeline()->bindGroup), 0, 0);
-            //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, wgpuBufferGetSize(vbo.buffer));
-            //wgpuRenderPassEncoderDraw(g_renderstate.renderpass.rpEncoder, vertexCount, 1, 0, 0);
             
             activeShaderImpl->bindGroup.needsUpdate = true;
         }break;
@@ -388,21 +385,9 @@ RGAPI void drawCurrentBatch(){
         }
         
         case RL_TRIANGLES:{
-            //SetTexture(1, g_renderstate.whitePixel);
             BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
             BindShader(GetActiveShader(), RL_TRIANGLES);
             DrawArrays(RL_TRIANGLES, vertexCount);
-            //abort();
-            //vboptr = vboptr_base;
-            //BindPipeline(g_renderstate.activePipeline, WGPUPrimitiveTopology_TriangleList);
-            //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, wgpuBufferGetSize(vbo.buffer));
-            //wgpuRenderPassEncoderDraw(g_renderstate.renderpass.rpEncoder, vertexCount, 1, 0, 0);
-            //if(!allocated_via_pool){
-            //    wgpuBufferRelease(vbo.buffer);
-            //}
-            //else{
-            //    g_renderstate.smallBufferRecyclingBin.push_back(vbo);
-            //}
         } break;
         case RL_QUADS:{
             const size_t quadCount = vertexCount / 4;
@@ -417,29 +402,11 @@ RGAPI void drawCurrentBatch(){
                     indices[i * 6 + 5] = (i * 4 + 3);
                 }
                 BufferData(g_renderstate.quadindicesCache, indices.data(), 6 * quadCount * sizeof(uint32_t));
-                //if(g_renderstate.quadindicesCache->buffer){
-                //    wgpuBufferRelease(g_renderstate.quadindicesCache->buffer);
-                //}
-                //g_renderstate.quadindicesCache = GenBufferEx(indices.data(), 6 * quadCount * sizeof(uint32_t), WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);
             }
             const DescribedBuffer* ibuf = g_renderstate.quadindicesCache;
-            //BindPipeline(g_renderstate.activePipeline, WGPUPrimitiveTopology_TriangleList);
-            //g_renderstate.activePipeline
             BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
             DrawArraysIndexed(RL_TRIANGLES, *ibuf, quadCount * 6);
 
-            //wgpuQueueWriteBuffer(GetQueue(), vbo.buffer, 0, vboptr_base, vertexCount * sizeof(vertex));
-            
-            //wgpuRenderPassEncoderSetVertexBuffer(g_renderstate.renderpass.rpEncoder, 0, vbo.buffer, 0, vertexCount * sizeof(vertex));
-            //wgpuRenderPassEncoderSetIndexBuffer (g_renderstate.renderpass.rpEncoder, ibuf.buffer, WGPUIndexFormat_Uint32, 0, quadCount * 6 * sizeof(uint32_t));
-            //wgpuRenderPassEncoderDrawIndexed    (g_renderstate.renderpass.rpEncoder, quadCount * 6, 1, 0, 0, 0);
-            
-            //if(!allocated_via_pool){
-            //    wgpuBufferRelease(vbo.buffer);
-            //}
-            //else{
-            //    g_renderstate.smallBufferRecyclingBin.push_back(vbo);
-            //}
             
         } break;
         default:break;
@@ -793,29 +760,6 @@ RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int, int){
 }
 RenderTexture headless_rtex;
 RGAPI void BeginDrawing(){
-
-    //++g_renderstate.renderTargetStackPosition;
-    
-    //if(g_renderstate.windowFlags & FLAG_HEADLESS){
-    //    if(headless_rtex.texture.id){
-    //        UnloadTexture(headless_rtex.texture);
-    //    }
-    //    if(headless_rtex.colorMultisample.id){
-    //        UnloadTexture(headless_rtex.colorMultisample);
-    //    }
-    //    if(headless_rtex.depth.id){
-    //        UnloadTexture(headless_rtex.depth);
-    //    }
-    //    
-    //    
-    //    if(headless_rtex.texture.id == nullptr)
-    //        headless_rtex = LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
-    //    g_renderstate.mainWindowRenderTarget = headless_rtex;
-    //    
-    //    //setTargetTextures(g_renderstate.rstate, headless_rtex.texture.view, headless_rtex.colorMultisample.view, headless_rtex.depth.view);
-    //    g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition] = headless_rtex;
-    //}
-    //else
     {
         
         //if(g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition].texture.id)
@@ -850,13 +794,6 @@ RGAPI void BeginDrawing(){
             StartGIFRecording();
         }
     }
-    #if SUPPORT_VULKAN_BACKEND == 1
-    PrepareFrameGlobals();
-    #endif
-    //EndRenderPass(&g_renderstate.clearPass);
-    //BeginRenderPass(&g_renderstate.renderpass);
-    //UseNoTexture();
-    //updateBindGroup(g_renderstate.rstate);
 }
 RGAPI int GetRenderWidth  (cwoid){
     return g_renderstate.renderExtentX;
@@ -1886,30 +1823,13 @@ extern "C" DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bgla
     return ret;
 }
 
-
-
-
-
-
 inline bool operator==(const RenderSettings& a, const RenderSettings& b){
     return a.depthTest == b.depthTest &&
            a.faceCull == b.faceCull &&
            a.depthCompare == b.depthCompare &&
            a.frontFace == b.frontFace;
 }
-/*extern "C" void UpdateRenderpass(DescribedRenderpass* rp, RenderSettings newSettings){
-    if(rp->settings == newSettings){
-        return;
-    }
-    if(!rp->settings.depthTest && newSettings.depthTest){
-        rp->dsa = defaultDSA(newSettings.optionalDepthTexture);
-        rp->renderPassDesc.depthStencilAttachment = rp->dsa;
-    }
-    if(rp->settings.depthTest && !newSettings.depthTest){
-        free(rp->dsa);
-        rp->renderPassDesc.depthStencilAttachment = nullptr;
-    }
-}*/
+
 void UnloadRenderpass(DescribedRenderpass rp){
     //if(rp.rca)free(rp.rca); //Should not happen
     //rp.rca = nullptr;
@@ -1928,36 +1848,6 @@ WGPUTexture GetActiveColorTarget(){
     return g_renderstate.renderTargetStack.peek().texture.id;
 }
 
-/*void setTargetTextures(full_renderstate* state, WGPUTextureView c, WGPUTextureView cms, WGPUTextureView d){
-    DescribedRenderpass* restart = nullptr;
-    if(g_renderstate.activeRenderpass){
-        restart = g_renderstate.activeRenderpass;
-        EndRenderpassEx(g_renderstate.activeRenderpass);
-    }
-    state->color = c;
-    state->depth = d;
-    //LoadTexture
-    
-    WGPUTextureDescriptor desc{};
-    const bool multisample = g_renderstate.windowFlags & FLAG_MSAA_4X_HINT;
-    //if(colorMultisample.id == nullptr && multisample){
-    //    colorMultisample = LoadTexturePro(GetScreenWidth(), GetScreenHeight(), g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4);
-    //}
-    state->renderpass.rca->resolveTarget = multisample ? c : nullptr;
-    state->renderpass.rca->view = multisample ? cms : c;
-    if(state->renderpass.settings.depthTest){
-        state->renderpass.dsa->view = d;
-    }
-
-    //TODO: Not hardcode every renderpass here
-    state->clearPass.rca->view = multisample ? cms : c;
-    if(state->clearPass.settings.depthTest){
-        state->clearPass.dsa->view = d;
-    }
-    //updateRenderPassDesc(state);
-    if(restart)
-        BeginRenderpassEx(restart);
-}*/
 extern "C" char* LoadFileText(const char *fileName) {
     std::ifstream file(fileName, std::ios::ate);
     if (!file.is_open()) {
@@ -2230,9 +2120,6 @@ void EndTextureMode(){
 extern "C" void BeginWindowMode(SubWindow sw){
     auto& swref = g_renderstate.createdSubwindows.at(sw.handle);
     g_renderstate.activeSubWindow = sw;
-    #if SUPPORT_VULKAN_BACKEND == 1
-    PrepareFrameGlobals();
-    #endif
     GetNewTexture(&swref.surface);
     BeginTextureMode(swref.surface.renderTarget);
 }
@@ -2256,10 +2143,7 @@ extern "C" void EndWindowMode(){
             BeginRenderpass();
         }
     }
-    
-    //EndRenderpass();
-    //EndTextureMode();
-    //g_renderstate.currentDefaultRenderTarget = g_renderstate.mainWindowRenderTarget;
+
     PresentSurface(&g_renderstate.activeSubWindow.surface);
     auto& ipstate = g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()];
     std::copy(ipstate.keydown.begin(), ipstate.keydown.end(), ipstate.keydownPrevious.begin());
@@ -2271,37 +2155,6 @@ extern "C" void EndWindowMode(){
     g_renderstate.activeSubWindow = SubWindow zeroinit;
     
     return;
-
-    //Bad implementation:
-    /*drawCurrentBatch();
-    g_renderstate.renderExtentX = GetScreenWidth();
-    g_renderstate.renderExtentY = GetScreenHeight();
-    auto state = g_renderstate.rstate;
-    auto& c = g_renderstate.currentScreenTextureView;
-    auto& cms = colorMultisample.view; 
-    auto d = depthTexture.view;
-    state->color = c;
-    state->depth = d;
-    //LoadTexture
-    
-    WGPUTextureDescriptor desc{};
-    const bool multisample = g_renderstate.windowFlags & FLAG_MSAA_4X_HINT;
-    //if(colorMultisample.id == nullptr && multisample){
-    //    colorMultisample = LoadTexturePro(GetScreenWidth(), GetScreenHeight(), g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4);
-    //}
-    state->renderpass.rca->resolveTarget = multisample ? c : nullptr;
-    state->renderpass.rca->view = multisample ? cms : c;
-    if(state->renderpass.settings.depthTest){
-        state->renderpass.dsa->view = d;
-    }
-
-    //TODO: Not hardcode every renderpass here
-    state->clearPass.rca->view = multisample ? cms : c;
-    if(state->clearPass.settings.depthTest){
-        state->clearPass.dsa->view = d;
-    }
-    wgpuSurfacePresent(g_renderstate.activeSubWindow.surface);*/
-    
 }
 
 

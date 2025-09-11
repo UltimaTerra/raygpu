@@ -614,6 +614,7 @@ extern "C" void UpdateBindGroupEntry(DescribedBindGroup* bg, size_t location, WG
 }
 
 void UpdateBindGroup(DescribedBindGroup* bg){
+    abort();
     const auto* layout = bg->layout;
     const auto* layoutlayout = layout->layout;
     rassert(layout != nullptr, "DescribedBindGroupLayout is nullptr");

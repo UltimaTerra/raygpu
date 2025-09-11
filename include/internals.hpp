@@ -146,7 +146,6 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
 InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
 InOutAttributeInfo getAttributes    (ShaderSources sources);
 
-RGAPI void PrepareFrameGlobals();
 RGAPI DescribedBuffer* UpdateVulkanRenderbatch();
 void PushUsedBuffer(void* nativeBuffer);
 typedef struct VertexBufferLayout{

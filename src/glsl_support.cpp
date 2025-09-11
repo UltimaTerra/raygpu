@@ -663,11 +663,9 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
         );
         offset += attributeSize(format);
     }
-    // ----> ADD THIS DEBUGGING CODE <----
-    printf("--- Pipeline Vertex Stride ---\n");
-    printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
-    printf("----------------------------\n");
-    // ----> END DEBUGGING CODE <----
+    // printf("--- Pipeline Vertex Stride ---\n");
+    // printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
+    // printf("----------------------------\n");
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
 extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){

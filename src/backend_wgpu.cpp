@@ -553,10 +553,9 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     FullSurface ret{};
     ret.surface = (WGPUSurface)nsurface;
     negotiateSurfaceFormatAndPresentMode(nsurface);
-    WGPUSurfaceCapabilities capa{};
-    WGPUAdapter adapter = (WGPUAdapter)GetAdapter();
+    WGPUSurfaceCapabilities capa = {0};
 
-    wgpuSurfaceGetCapabilities(ret.surface, adapter, &capa);
+    wgpuSurfaceGetCapabilities(ret.surface, GetAdapter(), &capa);
 
     WGPUPresentMode presentMode = WGPUPresentMode_Undefined;
     WGPUPresentMode thm = g_renderstate.throttled_PresentMode;
@@ -569,7 +568,7 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
         presentMode = um;
     }
     width *= 1;
-    height *= 1;
+    height *= 1; 
     TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
     WGPUSurfaceConfiguration config = {
         .device = (WGPUDevice)GetDevice(),
@@ -720,8 +719,8 @@ extern "C" void UpdateBindGroup(DescribedBindGroup* bg){
         }
         desc.entries = aswgpu.data();
         desc.entryCount = aswgpu.size();
-        desc.layout = (WGPUBindGroupLayout)bg->layout->layout;
-        bg->bindGroup = wgpuDeviceCreateBindGroup((WGPUDevice)GetDevice(), &desc);
+        desc.layout = bg->layout->layout;
+        bg->bindGroup = wgpuDeviceCreateBindGroup(GetDevice(), &desc);
         bg->needsUpdate = false;
     }
 }
@@ -1249,7 +1248,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
         TRACELOG(LOG_INFO, "Supported surface formats: %s", formatsString.c_str());
     }
 
-    WGPUTextureFormat selectedFormat = capabilities.formats[1];//WGPUTextureFormat_Undefined;
+    WGPUTextureFormat selectedFormat = capabilities.formats[0];
     int format_index = 0;
     //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
     //    if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
@@ -1501,8 +1500,8 @@ Texture LoadTextureFromImage(Image img){
     return ret;
 }
 extern "C" void ResizeSurface(FullSurface* fsurface, int newWidth, int newHeight){
-    newWidth *= 2;
-    newHeight *= 2;
+    newWidth *= 1;
+    newHeight *= 1;
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     fsurface->renderTarget.colorMultisample.width = newWidth;
@@ -1512,17 +1511,18 @@ extern "C" void ResizeSurface(FullSurface* fsurface, int newWidth, int newHeight
     fsurface->renderTarget.depth.width = newWidth;
     fsurface->renderTarget.depth.height = newHeight;
     WGPUTextureFormat format = fsurface->surfaceConfig.format;
-    WGPUSurfaceConfiguration wsconfig{};
-    wsconfig.device = (WGPUDevice)fsurface->surfaceConfig.device;
-    wsconfig.width = newWidth;
-    wsconfig.height = newHeight;
-    wsconfig.format = format;
-    wsconfig.viewFormatCount = 1;
-    wsconfig.viewFormats = &format;
-    wsconfig.alphaMode = WGPUCompositeAlphaMode_Opaque;
-    wsconfig.presentMode = (WGPUPresentMode)fsurface->surfaceConfig.presentMode;
-    wsconfig.usage = WGPUTextureUsage_CopySrc | WGPUTextureUsage_RenderAttachment;
-    wgpuSurfaceConfigure((WGPUSurface)fsurface->surface, &wsconfig);
+    const WGPUSurfaceConfiguration wsconfig = {
+        .device = fsurface->surfaceConfig.device,
+        .format = format,
+        .usage = WGPUTextureUsage_CopySrc | WGPUTextureUsage_RenderAttachment,
+        .width = (uint32_t)newWidth,
+        .height = (uint32_t)newHeight,
+        .viewFormatCount = 1,
+        .viewFormats = &format,
+        .alphaMode = WGPUCompositeAlphaMode_Opaque,
+        .presentMode = (WGPUPresentMode)fsurface->surfaceConfig.presentMode,
+    };
+    wgpuSurfaceConfigure(fsurface->surface, &wsconfig);
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     //UnloadTexture(fsurface->frameBuffer.texture);
@@ -1539,41 +1539,6 @@ extern "C" void ResizeSurface(FullSurface* fsurface, int newWidth, int newHeight
                            (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
                            1
     );
-}
-
-extern "C" void PrepareFrameGlobals(){
-    //vboptr_base = (vertex*)RL_CALLOC(uint64_t(RENDERBATCH_SIZE), sizeof(vertex));
-    //vboptr = vboptr_base;
-    /*uint32_t cacheIndex = g_wgpustate.device->submittedFrames % framesInFlight;
-    auto& cache = g_wgpustate.device->frameCaches[cacheIndex];
-    if(vbo_buf != 0){
-        wgvkBufferUnmap(vbo_buf);
-    }
-    if(cache.unusedBatchBuffers.empty()){
-        WGVKBufferDescriptor bdesc{
-            .usage = BufferUsage_CopyDst | BufferUsage_MapWrite | BufferUsage_Vertex,
-            .size = (RENDERBATCH_SIZE * sizeof(vertex))
-        };
-
-        vbo_buf = wgvkDeviceCreateBuffer(g_wgpustate.device,  &bdesc);
-        
-        cache.usedBatchBuffers.push_back(vbo_buf);
-        wgvkBufferAddRef(vbo_buf);
-
-        wgvkBufferMap(vbo_buf, MapMode_Write, 0, bdesc.size, (void**)&vboptr_base);
-        vboptr = vboptr_base;
-        
-    }
-    else{
-        vbo_buf = cache.unusedBatchBuffers.back();
-        cache.unusedBatchBuffers.pop_back();
-        cache.usedBatchBuffers.push_back(vbo_buf);
-        VmaAllocationInfo allocationInfo zeroinit;
-        vmaGetAllocationInfo(g_wgpustate.device->allocator, vbo_buf->allocation, &allocationInfo);
-        wgvkBufferMap(vbo_buf, MapMode_Write, 0, allocationInfo.size, (void**)&vboptr_base);
-        vboptr = vboptr_base;
-        wgvkBufferAddRef(vbo_buf);
-    }*/
 }
 
 extern "C" DescribedRenderpass LoadRenderpassEx(RenderSettings settings, bool colorClear, WGPUColor colorClearValue, bool depthClear, float depthClearValue){
@@ -2494,7 +2459,7 @@ const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTa
     map[WGPUTextureFormat_ASTC12x10UnormSrgb] = "WGPUTextureFormat_ASTC12x10UnormSrgb";
     map[WGPUTextureFormat_ASTC12x12Unorm] = "WGPUTextureFormat_ASTC12x12Unorm";
     map[WGPUTextureFormat_ASTC12x12UnormSrgb] = "WGPUTextureFormat_ASTC12x12UnormSrgb";
-    #if !defined(__EMSCRIPTEN__) && !defined(SUPPORT_VULKAN_BACKEND)  //why??
+    #if !defined(__EMSCRIPTEN__)  //why??
     map[WGPUTextureFormat_R16Unorm] = "WGPUTextureFormat_R16Unorm";
     map[WGPUTextureFormat_RG16Unorm] = "WGPUTextureFormat_RG16Unorm";
     map[WGPUTextureFormat_RGBA16Unorm] = "WGPUTextureFormat_RGBA16Unorm";

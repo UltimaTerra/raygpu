@@ -1,10 +1,14 @@
+#define Font rlFont
+#include <raygpu.h>
+#undef Font
+
 #include "sdl3webgpu.h"
 #include "SDL3/SDL_properties.h"
 #include "SDL3/SDL_video.h"
 
 #include <webgpu/webgpu.h>
 #include <string>
-#include <raygpu.h>
+
 #include <iostream>
 #ifdef __APPLE__
 #define SDL_VIDEO_DRIVER_COCOA
@@ -69,7 +73,7 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
 #elif !defined(__APPLE__)
     #if RAYGPU_USE_X11 == 1
-    if (drv == "x11") {
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0) {
         Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
         Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
         if (xdisplay && xwindow) {
@@ -96,6 +100,14 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
             fromWl.surface = surface;
             WGPUSurfaceDescriptor surfaceDescriptor{};
             surfaceDescriptor.nextInChain = &fromWl.chain;
+            WGPUSurfaceColorManagement cmanagement = {
+                .chain = {
+                    .sType = WGPUSType_SurfaceColorManagement
+                },
+                .colorSpace = WGPUPredefinedColorSpace_SRGB,
+                .toneMappingMode = WGPUToneMappingMode_Extended,
+            };
+            fromWl.chain.next = &cmanagement.chain;
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
