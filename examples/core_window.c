@@ -35,6 +35,7 @@ void mainloop(void){
 }
 int main(void){
     //RequestAdapterType(SOFTWARE_RENDERER);
+    //SetConfigFlags(FLAG_VSYNC_LOWLATENCY_HINT);
     InitWindow(800, 600, title);
 
     #ifndef __EMSCRIPTEN__

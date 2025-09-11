@@ -4,6 +4,7 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
+#include <raygpu.h>
 #include <iostream>
 #ifdef __APPLE__
 #define SDL_VIDEO_DRIVER_COCOA
@@ -30,9 +31,9 @@
 
 WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     //#if defined(SDL_VIDEO_DRIVER_X11)
-    std::cout << "sdl wgpu surfes for window " << window << std::endl;
-    std::string drv = SDL_GetCurrentVideoDriver();
-    std::cout << drv << std::endl;
+    //std::cout << "sdl wgpu surfes for window " << window << std::endl;
+    //std::string drv = SDL_GetCurrentVideoDriver();
+    //std::cout << drv << std::endl;
 #ifdef __EMSCRIPTEN__
 
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc = {0};
@@ -106,11 +107,21 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         [ns_window.contentView setWantsLayer : YES];
         metal_layer = [CAMetalLayer layer];
         [ns_window.contentView setLayer : metal_layer];
+        CGSize viewSize = ns_window.contentView.bounds.size;
+        CGSize drawableSize;
+        
+        CGFloat scale = ns_window.backingScaleFactor;
+        drawableSize.width = viewSize.width * scale;
+        drawableSize.height = viewSize.height * scale;
+        CAMetalLayer* ml = (CAMetalLayer*)metal_layer;
+        ml.drawableSize = drawableSize;
 
+        TRACELOG(LOG_INFO, "Scale factor: %f", ns_window.backingScaleFactor);
+        TRACELOG(LOG_INFO, "Drawable_size: %d, %d", drawableSize.width, drawableSize.height);
         WGPUSurfaceSourceMetalLayer fromMetalLayer;
         fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
         fromMetalLayer.chain.next = NULL;
-        fromMetalLayer.layer = metal_layer;
+        fromMetalLayer.layer = ml;
 
         WGPUSurfaceDescriptor surfaceDescriptor;
         surfaceDescriptor.nextInChain = &fromMetalLayer.chain;

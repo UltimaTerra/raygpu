@@ -78,12 +78,12 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     //    TRACELOG(LOG_ERROR, "SDL_Init failed: %s\n", SDL_GetError());
     //    return SubWindow{};
     //}
-    TRACELOG(LOG_INFO, "SDL Successfully inited. Some info:\n");
+    TRACELOG(LOG_INFO, "SDL Successfully inited. Some info:");
     int numDrivers = SDL_GetNumVideoDrivers();
     for (int i = 0; i < numDrivers; i++) {
-        TRACELOG(LOG_INFO, "  Video driver %d: %s\n", i, SDL_GetVideoDriver(i));
+        TRACELOG(LOG_INFO, "  Video driver %d: %s", i, SDL_GetVideoDriver(i));
     }
-    TRACELOG(LOG_INFO, "  Current video driver: %s\n", SDL_GetCurrentVideoDriver());
+    TRACELOG(LOG_INFO, "  Current video driver: %s", SDL_GetCurrentVideoDriver());
     SubWindow ret zeroinit;
     ret.type = windowType_sdl3;
     //SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, "1");
@@ -94,7 +94,11 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     #ifdef __APPLE__
     // windowFlags |= SDL_WINDOW_METAL;
     #endif
+    windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window *window = SDL_CreateWindow(title, width, height, windowFlags);
+    //int w, h;
+    //SDL_GetRenderOutputSize(SDL_GetRenderer(window), &w, &h);
+    //std::cout << "SDL Rendersize: " << w << " x " << h << std::endl;
     rassert(window != NULL, "SDL_CreateWindow returned NULL");
     SDL_SetWindowResizable(window, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
     if(g_renderstate.windowFlags & FLAG_FULLSCREEN_MODE)

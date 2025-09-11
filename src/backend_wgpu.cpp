@@ -568,9 +568,9 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     } else {
         presentMode = um;
     }
-    
-    
-    //TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
+    width *= 1;
+    height *= 1;
+    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
     WGPUSurfaceConfiguration config = {
         .device = (WGPUDevice)GetDevice(),
         .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
@@ -809,10 +809,10 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
 
         // TODO: some better surface recovery handling, doesn't seem to be an issue for now however
-        // if(surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){
-        //     wgpuSurfaceConfigure((WGPUSurface)fsurface->surface, &fsurface->surfaceConfig);
-        //     wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
-        // }
+        if(surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){
+            wgpuSurfaceConfigure((WGPUSurface)fsurface->surface, &fsurface->surfaceConfig);
+            wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
+        }
         // rassert(surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal, "WGPUSurface did not return optimal, instead: %d", surfaceTexture.status);
         if(fsurface->renderTarget.texture.id){
             wgpuTextureRelease(fsurface->renderTarget.texture.id);
@@ -1269,7 +1269,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     
     TRACELOG(LOG_INFO, "Selected surface format %s", textureFormatSpellingTable.at(toWGPUPixelFormat(g_renderstate.frameBufferFormat)).c_str());
     
-    //TRACELOG(LOG_INFO, "Selected present mode %s", presentModeSpellingTable.at((WGPUPresentMode)g_wgpustate.presentMode).c_str());
+    //TRACELOG(LOG_INFO, "Selected present mode %s", presentModeSpellingTable.at((WGPUPresentMode)g_renderstate.throttled_PresentMode).c_str());
 }
 
 extern "C" DescribedBuffer* GenBufferEx(const void* data, size_t size, WGPUBufferUsage usage){
@@ -1501,6 +1501,8 @@ Texture LoadTextureFromImage(Image img){
     return ret;
 }
 extern "C" void ResizeSurface(FullSurface* fsurface, int newWidth, int newHeight){
+    newWidth *= 2;
+    newHeight *= 2;
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     fsurface->renderTarget.colorMultisample.width = newWidth;

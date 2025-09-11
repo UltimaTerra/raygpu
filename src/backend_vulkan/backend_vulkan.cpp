@@ -1065,7 +1065,7 @@ extern "C" FullSurface CompleteSurface(void* nsurface, int width, int height){
     } else {
         config.presentMode = um;
     }
-    //TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(config.presentMode).c_str());
+    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(config.presentMode).c_str());
     //config.alphaMode = WGPUCompositeAlphaMode_Opaque;
     config.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
     //config.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
