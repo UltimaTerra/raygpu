@@ -16,16 +16,6 @@ jobs:
     strategy:
       fail-fast: false
 
-      # Set up a matrix to run the following configurations:
-      # 1. <Windows, Release, latest MSVC compiler toolchain on the default runner image, default generator>
-      # 2. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
-      # 3. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
-      # 4. <Windows, Release, MSYS2 MINGW64 GCC compiler>
-      # 5. <Windows, Release, MSYS2 MINGW64 Clang compiler>
-      # 6. <Windows, Release, MSYS2 UCRT64 GCC compiler>
-      # 7. <Windows, Release, MSYS2 UCRT64 Clang compiler>
-      # 8. <Windows, Release, MSYS2 CLANG64 Clang compiler>
-      #
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         build_type: [Release]
@@ -138,7 +128,6 @@ jobs:
           mesa:p
 
     - name: Set reusable strings
-      # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
       shell: bash
       run: |
@@ -185,28 +174,36 @@ jobs:
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: ctest --build-config ${{ matrix.build_type }} --verbose
 
-    - name: Upload artifact (MSYS2)
-      if: matrix.msys2_env && startsWith(github.ref, 'refs/tags/v')
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-${{ matrix.os }}-${{ matrix.msys2_env }}-${{ matrix.c_compiler }}
-        path: ${{ steps.msys2_strings.outputs.build-output-dir }}
+    - name: Archive build (MSYS2)
+      if: ${{ matrix.msys2_env && startsWith(github.ref, 'refs/tags/v') }}
+      shell: msys2 {0}
+      run: |
+        zip -r build-${{ matrix.os }}-${{ matrix.msys2_env }}-${{ matrix.c_compiler }}.zip ${{ steps.msys2_strings.outputs.build-output-dir }}
 
-    - name: Upload release assets (MSYS2)
+    - name: Archive build (Regular Windows)
+      if: ${{ !matrix.msys2_env && matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') }}
+      run: |
+        powershell Compress-Archive -Path ${{ steps.strings.outputs.build-output-dir }}\* -DestinationPath build-${{ matrix.os }}-${{ matrix.c_compiler }}.zip
+
+    - name: Archive build (Regular non-Windows)
+      if: ${{ !matrix.msys2_env && matrix.os != 'windows-latest' && startsWith(github.ref, 'refs/tags/v') }}
+      run: |
+        tar -czf build-${{ matrix.os }}-${{ matrix.c_compiler }}.tar.gz -C ${{ steps.strings.outputs.build-output-dir }} .
+
+    - name: Upload release asset (MSYS2)
       if: ${{ matrix.msys2_env && startsWith(github.ref, 'refs/tags/v') }}
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.msys2_strings.outputs.build-output-dir }}/**/*
+        files: build-${{ matrix.os }}-${{ matrix.msys2_env }}-${{ matrix.c_compiler }}.zip
 
-    - name: Upload artifact (Regular)
-      if: ${{ !matrix.msys2_env && startsWith(github.ref, 'refs/tags/v') }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-${{ matrix.os }}-${{ matrix.c_compiler }}
-        path: ${{ steps.strings.outputs.build-output-dir }}
-    
-    - name: Upload release assets (Regular)
-      if: ${{ !matrix.msys2_env && startsWith(github.ref, 'refs/tags/v') }}
+    - name: Upload release asset (Regular Windows)
+      if: ${{ !matrix.msys2_env && matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') }}
       uses: softprops/action-gh-release@v2
       with:
-        files: ${{ steps.strings.outputs.build-output-dir }}/**/*
+        files: build-${{ matrix.os }}-${{ matrix.c_compiler }}.zip
+
+    - name: Upload release asset (Regular non-Windows)
+      if: ${{ !matrix.msys2_env && matrix.os != 'windows-latest' && startsWith(github.ref, 'refs/tags/v') }}
+      uses: softprops/action-gh-release@v2
+      with:
+        files: build-${{ matrix.os }}-${{ matrix.c_compiler }}.tar.gz
