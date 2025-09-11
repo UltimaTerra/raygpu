@@ -659,8 +659,8 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
             },
             .bufferSlot = 0,
             .stepMode = WGPUVertexStepMode_Vertex,
-            .enabled = true}
-        );
+            .enabled = true
+        });
         offset += attributeSize(format);
     }
     // printf("--- Pipeline Vertex Stride ---\n");
@@ -668,9 +668,11 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     // printf("----------------------------\n");
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
+
 extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){
     return LoadShaderGLSL(vs, fs);
 }
+
 #ifdef GLSL_TO_WGSL
 extern "C" DescribedPipeline* LoadPipelineGLSL(const char* vs, const char* fs){
     auto [spirvV, spirvF] = glsl_to_spirv(vs, fs);
