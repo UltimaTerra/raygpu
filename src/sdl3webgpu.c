@@ -4,23 +4,21 @@
 #undef Font
 
 #include "sdl3webgpu.h"
-#include "SDL3/SDL_properties.h"
-#include "SDL3/SDL_video.h"
+#include <SDL3/SDL_properties.h>
+#include <SDL3/SDL_video.h>
 
 #include <webgpu/webgpu.h>
-#include <string>
 
-#include <iostream>
 #ifdef __APPLE__
-#define SDL_VIDEO_DRIVER_COCOA
+    #define SDL_VIDEO_DRIVER_COCOA
 #endif
 #ifndef WEBGPU_BACKEND_DAWN
-#define WEBGPU_BACKEND_DAWN 1
+    #define WEBGPU_BACKEND_DAWN 1
 #endif
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 //#include <SDL3/SDL_properties.h>
-#if RAYGPU_USE_X11 == 1
+    #if RAYGPU_USE_X11 == 1
 #include <X11/Xlib.h>
 #endif
 #if defined(SDL_VIDEO_DRIVER_COCOA)
@@ -35,10 +33,7 @@
 #endif
 
 WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
-    //#if defined(SDL_VIDEO_DRIVER_X11)
-    //std::cout << "sdl wgpu surfes for window " << window << std::endl;
-    //std::string drv = SDL_GetCurrentVideoDriver();
-    //std::cout << drv << std::endl;
+
 #ifdef __EMSCRIPTEN__
 
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc = {0};
@@ -78,29 +73,27 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
         Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
         if (xdisplay && xwindow) {
-            WGPUSurfaceSourceXlibWindow fromXlibWindow{};
-            fromXlibWindow.chain.sType = WGPUSType_SurfaceSourceXlibWindow;
-            fromXlibWindow.chain.next = NULL;
-            fromXlibWindow.display = xdisplay;
-            fromXlibWindow.window = xwindow;
-            WGPUSurfaceDescriptor surfaceDescriptor{};
-            surfaceDescriptor.nextInChain = &fromXlibWindow.chain;
+            WGPUSurfaceSourceXlibWindow fromXlibWindow = {
+                .chain.sType = WGPUSType_SurfaceSourceXlibWindow,
+                .chain.next = NULL,
+                .display = xdisplay,
+                .window = xwindow,
+            };
+
+            const WGPUSurfaceDescriptor surfaceDescriptor = {
+                .nextInChain = &fromXlibWindow.chain
+            };
+
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
     else 
     #endif
     if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
-        struct wl_display *display = (struct wl_display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
-        struct wl_surface *surface = (struct wl_surface *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
+        struct wl_display* display = (struct wl_display*)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
+        struct wl_surface* surface = (struct wl_surface*)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
         if (display && surface) {
-            WGPUSurfaceSourceWaylandSurface fromWl{};
-            fromWl.chain.sType = WGPUSType_SurfaceSourceWaylandSurface;
-            fromWl.chain.next = NULL;
-            fromWl.display = display;
-            fromWl.surface = surface;
-            WGPUSurfaceDescriptor surfaceDescriptor{};
-            surfaceDescriptor.nextInChain = &fromWl.chain;
+
             WGPUSurfaceColorManagement cmanagement = {
                 .chain = {
                     .sType = WGPUSType_SurfaceColorManagement
@@ -108,7 +101,18 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
                 .colorSpace = WGPUPredefinedColorSpace_SRGB,
                 .toneMappingMode = WGPUToneMappingMode_Extended,
             };
-            fromWl.chain.next = &cmanagement.chain;
+            WGPUSurfaceSourceWaylandSurface fromWl = {
+                .chain = {
+                    .sType = WGPUSType_SurfaceSourceWaylandSurface,
+                    .next = &cmanagement.chain
+                },
+                .display = display,
+                .surface = surface,
+            };
+            const WGPUSurfaceDescriptor surfaceDescriptor = {
+                .nextInChain = &fromWl.chain
+            };
+
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
@@ -153,5 +157,5 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     #endif
     
     //#endif
-    return nullptr;
+    return NULL;
 }

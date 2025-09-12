@@ -338,11 +338,6 @@ if(SUPPORT_SDL3)
         FetchContent_MakeAvailable(sdl3fetch)
     endif()
 endif()
-#download_file_if_not_exists("https://raw.githubusercontent.com/nothings/stb/master/stb_rect_pack.h" "stb_rect_pack.h")
-#download_file_if_not_exists("https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h" "stb_truetype.h")
-#download_file_if_not_exists("https://raw.githubusercontent.com/nothings/stb/master/stb_image.h" "stb_image.h")
-#download_file_if_not_exists("https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h" "stb_image_write.h")
-#download_file_if_not_exists("https://raw.githubusercontent.com/raysan5/raygui/refs/heads/master/src/raygui.h" "raygui.h")
 
 if(ANDROID)
     include_directories("${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include")
@@ -402,12 +397,7 @@ if(SUPPORT_VULKAN_BACKEND)
     else()
         #cst_bundle_libraries(wgvk_full wgvk_standalone)
     endif()
-    #target_include_directories(wgvk_standalone PUBLIC "include" "amalgamation/vulkan_headers/include")
-    #target_compile_definitions(wgvk_standalone PUBLIC SUPPORT_VULKAN_BACKEND=1)
-
-    #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_textures.cpp")
-    #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_pipeline.cpp")
-    #list(APPEND RG_SOURCES "src/backend_vulkan/vulkan_raytracing.cpp")
+    
     list(APPEND RG_SOURCES "src/backend_wgpu.cpp")
 
     
@@ -425,11 +415,11 @@ if(SUPPORT_SDL2)
 endif()
 if(SUPPORT_SDL3)
     list(APPEND RG_SOURCES "src/InitWindow_SDL3.cpp")
-    list(APPEND RG_SOURCES "src/sdl3webgpu.cpp")
+    list(APPEND RG_SOURCES "src/sdl3webgpu.c")
     if(APPLE)
-    set_source_files_properties("src/sdl3webgpu.cpp"
+    set_source_files_properties("src/sdl3webgpu.c"
         PROPERTIES
-        LANGUAGE OBJCXX
+        LANGUAGE OBJC
     )
     endif()
 endif()
@@ -453,50 +443,54 @@ if (NOT EMSCRIPTEN)
 endif()
 if(DAWN_ENABLE_METAL AND SUPPORT_GLFW)
     list(APPEND RG_SOURCES "src/utils_metal.mm")
+    set(RAYGPU_USE_METAL ON)
 endif()
 
-
+set(raygpu_core_library_name raygpu_core)
 if(RAYGPU_BUILD_SHARED_LIBRARY)
-    add_library(raygpu SHARED ${RG_SOURCES})
-    target_compile_definitions(raygpu PRIVATE RG_EXPORTS=1)
+    add_library(${raygpu_core_library_name} SHARED ${RG_SOURCES})
+    target_compile_definitions(${raygpu_core_library_name} PRIVATE RG_EXPORTS=1)
 else()
-    add_library(raygpu STATIC ${RG_SOURCES})
-    target_compile_definitions(raygpu PUBLIC RG_STATIC=1)
+    add_library(${raygpu_core_library_name} STATIC ${RG_SOURCES})
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC RG_STATIC=1)
 endif()
 if(RAYGPU_USE_X11)
-    target_compile_definitions(raygpu PUBLIC RAYGPU_USE_X11=1)
-    target_link_libraries(raygpu PUBLIC X11::X11)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC RAYGPU_USE_X11=1)
+    target_link_libraries(${raygpu_core_library_name} PUBLIC X11::X11)
 endif()
 if(RAYGPU_USE_WAYLAND)
-    target_compile_definitions(raygpu PUBLIC RAYGPU_USE_WAYLAND=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC RAYGPU_USE_WAYLAND=1)
+endif()
+if(RAYGPU_USE_METAL)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC RAYGPU_USE_METAL=1)
 endif()
 if(SUPPORT_SDL2)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_SDL2=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_SDL2=1)
 endif()
 if(SUPPORT_VULKAN_BACKEND)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_VULKAN_BACKEND=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_VULKAN_BACKEND=1)
 endif()
 if(SUPPORT_WGPU_BACKEND)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_WGPU_BACKEND=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_WGPU_BACKEND=1)
 endif()
 if(SUPPORT_SDL3)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_SDL3=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_SDL3=1)
 endif()
 if(SUPPORT_GLFW)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_GLFW=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_GLFW=1)
 endif()
 if(SUPPORT_RGFW)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_RGFW=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_RGFW=1)
 endif()
 if(SUPPORT_GLSL_PARSER)
-    target_compile_definitions(raygpu PUBLIC SUPPORT_GLSL_PARSER=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_GLSL_PARSER=1)
 endif()
 if(SUPPORT_WGSL_PARSER)    
-    target_compile_definitions(raygpu PUBLIC SUPPORT_WGSL_PARSER=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC SUPPORT_WGSL_PARSER=1)
 endif()
 if(MSVC)
-    target_compile_definitions(raygpu PUBLIC NOMINMAX=1)
-    target_compile_definitions(raygpu PUBLIC _USE_MATH_DEFINES=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC NOMINMAX=1)
+    target_compile_definitions(${raygpu_core_library_name} PUBLIC _USE_MATH_DEFINES=1)
 endif()
 
 if(NOT MSVC AND NOT EMSCRIPTEN)
@@ -529,46 +523,46 @@ foreach(file ${SUPPRESS_WARNINGS_SOURCE_FILES})
         set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "-w")
     endif()
 endforeach()
-#target_include_directories(raygpu PUBLIC include/)
-target_include_directories(raygpu PUBLIC  
+
+target_include_directories(${raygpu_core_library_name} PUBLIC  
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>  
     $<INSTALL_INTERFACE:include/raygpu>
 )
+set(raygpu_linked_deps "")
+
 if(EMSCRIPTEN)
-    target_link_libraries(raygpu PUBLIC
+    list(APPEND raygpu_linked_deps
         emdawnwebgpu_c
         emdawnwebgpu_cpp
     )
     if(SUPPORT_WGSL_PARSER)
-        target_link_libraries(raygpu PUBLIC
-            tint_api
-        )
+        list(APPEND raygpu_linked_deps tint_api)
     endif()
     if(SUPPORT_SDL2)
-        target_link_libraries(raygpu PUBLIC SDL2::SDL2)
+        list(APPEND raygpu_linked_deps SDL2::SDL2)
     endif()
     if(SUPPORT_SDL3)
-        target_link_libraries(raygpu PUBLIC SDL3::SDL3)
+        list(APPEND raygpu_linked_deps SDL3::SDL3)
     endif()
-    #target_include_directories(raygpu PUBLIC "${CMAKE_CURRENT_LIST_DIR}/dawn/include" "${CMAKE_CURRENT_LIST_DIR}/dawn/src")
+    #target_include_directories(${raygpu_core_library_name} PUBLIC "${CMAKE_CURRENT_LIST_DIR}/dawn/include" "${CMAKE_CURRENT_LIST_DIR}/dawn/src")
 else()
     if(SUPPORT_GLSL_PARSER)
-        target_link_libraries(raygpu PUBLIC glslang)
+        list(APPEND raygpu_linked_deps glslang)
     endif()
     if(SUPPORT_VULKAN_BACKEND)
-        target_include_directories(raygpu PUBLIC "amalgamation/vulkan_headers/include")
-        target_link_libraries(raygpu PUBLIC wgvk)
+        target_include_directories(${raygpu_core_library_name} PUBLIC "amalgamation/vulkan_headers/include")
+        list(APPEND raygpu_linked_deps wgvk)
     else()
-        target_link_libraries(raygpu PUBLIC webgpu_dawn)
+        list(APPEND raygpu_linked_deps webgpu_dawn)
     endif()
     if(SUPPORT_WGSL_PARSER)
-        target_link_libraries(raygpu PRIVATE tint_lang_wgsl_reader tint_lang_spirv_writer)
+        list(APPEND raygpu_linked_deps tint_lang_wgsl_reader tint_lang_spirv_writer)
     endif()
     if(SUPPORT_SDL2)
-        target_link_libraries(raygpu PUBLIC SDL2::SDL2)
+        list(APPEND raygpu_linked_deps SDL2::SDL2)
     endif()
     if(SUPPORT_SDL3)
-        target_link_libraries(raygpu PUBLIC SDL3::SDL3)
+        list(APPEND raygpu_linked_deps SDL3::SDL3)
     endif()
     if(SUPPORT_GLFW)
         if(NOT DAWN_IS_IN_USE)
@@ -577,20 +571,22 @@ else()
                 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/amalgamation/glfw-3.4")
             endif()
         endif()
-        target_link_libraries(raygpu PUBLIC glfw)
+        list(APPEND raygpu_linked_deps glfw)
     endif()
     if(SUPPORT_GLSL_PARSER)
-        target_link_libraries(raygpu PRIVATE glslang)
+        list(APPEND raygpu_linked_deps glslang)
     endif()
-    target_link_libraries(raygpu PRIVATE spirv-reflect-static)
+    list(APPEND raygpu_linked_deps spirv-reflect-static)
 endif()
 
+target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
+
 #add_executable(example "src/example.cpp")
-target_compile_features(raygpu PUBLIC cxx_std_20)
+target_compile_features(${raygpu_core_library_name} PUBLIC cxx_std_20)
 if(NOT MSVC)
-    target_compile_options(raygpu PUBLIC "-Wno-gnu-anonymous-struct" "-Wno-nested-anon-types")
+    target_compile_options(${raygpu_core_library_name} PUBLIC "-Wno-gnu-anonymous-struct" "-Wno-nested-anon-types")
     if(NOT ENABLE_RTTI)
-    target_compile_options(raygpu PRIVATE "-fno-rtti")
+    target_compile_options(${raygpu_core_library_name} PRIVATE "-fno-rtti")
     endif()
 endif()
 
@@ -609,7 +605,7 @@ if(WIN32)
     if(NOT MSVC)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
         if(RAYGPU_BUILD_SHARED_LIBRARY)
-            target_link_options(raygpu PRIVATE "-static-libgcc" "-static-libstdc++")
+            target_link_options(${raygpu_core_library_name} PRIVATE "-static-libgcc" "-static-libstdc++")
         endif()
     endif()
 endif()
@@ -623,7 +619,7 @@ if(RAYGPU_BUILD_TESTS)
     target_include_directories(test_cc PUBLIC "include")
 endif()
 
-set(EXPORT_RG_TARGETS raygpu)
+set(EXPORT_RG_TARGETS ${raygpu_core_library_name})
 if(SUPPORT_GLFW)
     list(APPEND EXPORT_RG_TARGETS glfw)
 endif()
@@ -646,24 +642,9 @@ if(RAYGPU_GENERATE_PYTHON_BINDINGS)
     )
     target_link_libraries(pyraygpu PUBLIC raygpu)
 endif()
-#if(SUPPORT_VULKAN_BACKEND)
-#    get_target_property(_inc_dirs wgvk_standalone INTERFACE_INCLUDE_DIRECTORIES)
-#    if(_inc_dirs AND NOT _inc_dirs STREQUAL "NOTFOUND")
-#      target_include_directories(wgvk_full PUBLIC ${_inc_dirs})
-#    endif()
-#    
-#    # 2) copy all INTERFACE_COMPILE_DEFINITIONS
-#    get_target_property(_defs wgvk_standalone INTERFACE_COMPILE_DEFINITIONS)
-#    if(_defs AND NOT _defs STREQUAL "NOTFOUND")
-#      target_compile_definitions(wgvk_full PUBLIC ${_defs})
-#    endif()
-#    
-#    # 3) copy all INTERFACE_COMPILE_OPTIONS
-#    get_target_property(_opts wgvk_standalone INTERFACE_COMPILE_OPTIONS)
-#    if(_opts AND NOT _opts STREQUAL "NOTFOUND")
-#      target_compile_options(wgvk_full PUBLIC ${_opts})
-#    endif()
-#endif()
+
+cst_bundle_libraries(raygpu ${raygpu_core_library_name} ${raygpu_linked_deps})
+
 message(STATUS "")
 message(STATUS "------ CONFIGURATION OVERVIEW -------")
 message(STATUS "")
@@ -682,86 +663,3 @@ endif()
 message(STATUS "")
 message(STATUS "------ CONFIGURATION OVERVIEW -------")
 message(STATUS "")
-
-#if(NOT SUPPORT_VULKAN_BACKEND AND FALSE)
-#install(
-#    TARGETS ${EXPORT_RG_TARGETS}
-#    EXPORT DawnInstall
-#    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-#    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-#    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-#    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-#)
-#install(
-#    EXPORT DawnInstall
-#    FILE raygpuTargets.cmake
-#    NAMESPACE raygpu::
-#    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/raygpu"
-#)
-#install(
-#    DIRECTORY ${CMAKE_SOURCE_DIR}/include/
-#    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/raygpu"
-#    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-#)
-#configure_package_config_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/raygpuConfig.cmake.in"
-#    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
-#    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/raygpu"
-#)
-#install(
-#    EXPORT DawnInstall
-#    FILE raygpuConfig.cmake
-#    NAMESPACE raygpu::
-#    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/raygpu"
-#)
-#endif()
-
-#install(TARGETS raygpu)
-#file(GLOB_RECURSE tint_wgsl_src 
-#    "dawn/src/tint/lang/wgsl/ast/*.cc"
-#    "dawn/src/tint/lang/wgsl/reader/*.cc"
-#    "dawn/src/tint/lang/wgsl/common/*.cc"
-#    "dawn/src/tint/lang/wgsl/inspector/*.cc"
-#    "dawn/src/tint/lang/wgsl/intrinsic/*.cc"
-#    "dawn/src/tint/lang/wgsl/resolver/*.cc"
-#    "dawn/src/tint/lang/wgsl/sem/*.cc"
-#    "dawn/src/tint/lang/wgsl/ir/*.cc"
-#)
-#
-## Convert the file to an absolute path
-#get_filename_component(READER_BENCH_PATH
-#    "${CMAKE_SOURCE_DIR}/dawn/src/tint/lang/wgsl/reader/reader_bench.cc" ABSOLUTE)
-#
-## Remove it from the list
-#list(REMOVE_ITEM tint_wgsl_src "${READER_BENCH_PATH}")
-#add_library(tint_full ${tint_wgsl_src})
-#target_include_directories(tint_full PUBLIC  
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/dawn/include/>  
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/dawn/src>
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/dawn/>
-#    $<INSTALL_INTERFACE:include/raygpu/dawn/include>
-#    $<INSTALL_INTERFACE:include/raygpu/dawn/src>
-#    $<INSTALL_INTERFACE:include/raygpu/dawn/>
-#)
-#include(CMakePackageConfigHelpers)
-#
-
-# Export the targets for use in a CMake package
-
-
-## Generate and install a version file
-#include(CMakePackageConfigHelpers)
-#write_basic_package_version_file(
-#    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
-#    COMPATIBILITY AnyNewerVersion
-#    VERSION 1.0
-#)
-#
-# Configure the config file
-
-#
-## Install the config and version files
-#install(FILES
-#    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
-#    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
-#    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/raygpu"
-#)

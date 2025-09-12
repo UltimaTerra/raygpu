@@ -28,16 +28,16 @@ void mainloop(void){
     }
     rlBegin(RL_QUADS);
     UseNoTexture();
-    rlColor4f(1,1,1,1);
+    rlColor4f (1,1,1,1);
     rlVertex2f(400, 400);
     rlVertex2f(500, 400);
     rlVertex2f(500, 500);
     rlVertex2f(400, 500);
-    rlColor4f(20,20,20,20);
-    rlVertex2f(400, 500);
-    rlVertex2f(500, 500);
-    rlVertex2f(500, 600);
-    rlVertex2f(400, 600);
+    rlColor4f (20,20,20,20);
+    rlVertex2f(400, 510);
+    rlVertex2f(500, 510);
+    rlVertex2f(500, 610);
+    rlVertex2f(400, 610);
     rlEnd();
     drawCurrentBatch();
     
