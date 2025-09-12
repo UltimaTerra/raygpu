@@ -2,17 +2,20 @@
 # Variables
 ###############################################################################
 
+.DEFAULT_GOAL := all
+
 CC ?= clang
 AR ?= ar
 CXX ?= clang++
-
+OPT_OR_DEBUG_FLAGS ?= -O3
 # Compiler/Linker flags
-CFLAGS        = -fPIC -O3 -DSUPPORT_VULKAN_BACKEND=1 -DRG_STATIC=1 -DSUPPORT_GLSL_PARSER=1 -DENABLE_SPIRV
-CXXFLAGS      = -fPIC -std=c++20 -fno-rtti -fno-exceptions -DRG_STATIC=1 -O3 -DSUPPORT_VULKAN_BACKEND=1 -DSUPPORT_GLSL_PARSER=1 -DENABLE_SPIRV
+CFLAGS   = -fPIC $(OPT_OR_DEBUG_FLAGS) -DSUPPORT_VULKAN_BACKEND=1 -DRG_STATIC=1 -DSUPPORT_GLSL_PARSER=1 -DENABLE_SPIRV
+CXXFLAGS = -fPIC -std=c++20 -fno-rtti -fno-exceptions -DRG_STATIC=1 $(OPT_OR_DEBUG_FLAGS) -DSUPPORT_VULKAN_BACKEND=1 -DSUPPORT_GLSL_PARSER=1 -DENABLE_SPIRV
 ifeq ($(SUPPORT_GLFW), 1)
-CFLAGS += -DSUPPORT_GLFW=1
+CFLAGS   += -DSUPPORT_GLFW=1
 CXXFLAGS += -DSUPPORT_GLFW=1
 endif
+
 # Include paths
 INCLUDEFLAGS  = -Iinclude \
                 -Iamalgamation/glfw-3.4/include \
@@ -20,21 +23,47 @@ INCLUDEFLAGS  = -Iinclude \
                 -Iamalgamation/vulkan_headers/include \
                 -Iamalgamation/glslang \
                 -Iamalgamation/SPIRV-Reflect \
-                -I/home/manuel/Documents/raygpu/relbuild/_deps/dawn-src/third_party/vulkan-headers/src/include/
+                -I/home/manuel/Documents/raygpu/relbuild/_deps/dawn-src/third_party/vulkan-headers/src/include/ \
+                -Idl
 
 # Platform detection
-PLATFORM_OS   ?= WINDOWS
+PLATFORM_OS     ?= WINDOWS
 TARGET_PLATFORM ?= PLATFORM_DESKTOP
 
 # Output directories
-OBJ_DIR       = obj
-LIB_DIR       = lib
+OBJ_DIR = obj
+LIB_DIR = lib
 
-# Wayland directory for generated protocol files (only used on Linux)
-WL_OUT_DIR    = wl_include
+# Wayland directory for generated protocol files (Linux)
+WL_OUT_DIR = wl_include
 
 # Library output name
-LIB_OUTPUT    = $(LIB_DIR)/libraygpu.a
+LIB_OUTPUT = $(LIB_DIR)/libraygpu.a
+
+###############################################################################
+# WGVK auto-download (into ./dl if missing)
+###############################################################################
+DL_DIR          = dl
+WGVK_URL_BASE   = https://raw.githubusercontent.com/manuel5975p/WGVK/refs/heads/master
+DL_WGVK_C       = $(DL_DIR)/wgvk.c
+DL_WGVK_H       = $(DL_DIR)/wgvk.h
+DL_WGVK_STRUCTS = $(DL_DIR)/wgvk_structs_impl.h
+DL_WGVK_CONFIG  = $(DL_DIR)/wgvk_config.h
+DL_ALL          = $(DL_WGVK_C) $(DL_WGVK_H) $(DL_WGVK_STRUCTS) $(DL_WGVK_CONFIG)
+
+$(DL_DIR):
+	@mkdir -p $(DL_DIR)
+
+$(DL_WGVK_C): | $(DL_DIR)
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/src/wgvk.c -o $@; fi
+$(DL_WGVK_H): | $(DL_DIR)
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk.h -o $@; fi
+$(DL_WGVK_STRUCTS): | $(DL_DIR)
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk_structs_impl.h -o $@; fi
+$(DL_WGVK_CONFIG): | $(DL_DIR)
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk_config.h -o $@; fi
+
+dl_deps: $(DL_ALL)
 
 ###############################################################################
 # Determine PLATFORM_OS when required
@@ -71,6 +100,27 @@ ifeq ($(TARGET_PLATFORM),$(filter $(TARGET_PLATFORM), PLATFORM_DESKTOP))
     endif
 endif
 
+# Windowing selection macros from detected platform
+ifeq ($(PLATFORM_OS), LINUX)
+CFLAGS   += -DRAYGPU_USE_X11=1 -DRAYGPU_USE_WAYLAND=1
+CXXFLAGS += -DRAYGPU_USE_X11=1 -DRAYGPU_USE_WAYLAND=1
+endif
+ifeq ($(PLATFORM_OS), WINDOWS)
+CFLAGS   += -DRAYGPU_USE_WIN32=1
+CXXFLAGS += -DRAYGPU_USE_WIN32=1
+endif
+ifeq ($(PLATFORM_OS), OSX)
+CFLAGS   += -DRAYGPU_USE_METAL=1
+CXXFLAGS += -DRAYGPU_USE_METAL=1
+endif
+ifeq ($(PLATFORM_OS), BSD)
+CFLAGS   += -DRAYGPU_USE_X11=1
+CXXFLAGS += -DRAYGPU_USE_X11=1
+endif
+
+CFLAGS += -DSUPPORT_GLFW=1
+CXXFLAGS += -DSUPPORT_GLFW=1
+
 ###############################################################################
 # Source Files
 ###############################################################################
@@ -78,11 +128,8 @@ SRC_CPP = src/InitWindow.cpp \
           src/InitWindow_GLFW.cpp \
           src/glsl_support.cpp \
           src/models.cpp \
+          src/backend_wgpu.cpp \
           src/raygpu.cpp \
-          src/backend_vulkan/backend_vulkan.cpp \
-          src/backend_vulkan/vulkan_textures.cpp \
-          src/backend_vulkan/vma_impl.cpp \
-          src/backend_vulkan/vulkan_pipeline.cpp \
           src/rshapes.cpp \
           src/shader_parse.cpp
 
@@ -154,7 +201,7 @@ SRC_GLFW += amalgamation/glfw-3.4/src/glx_context.c \
             amalgamation/glfw-3.4/src/x11_window.c \
             amalgamation/glfw-3.4/src/xkb_unicode.c \
             amalgamation/glfw-3.4/src/posix_module.c
-GLFW_BUILD_FLAGS += -D_GLFW_WAYLAND=1 -D_GLFW_X11=1 -DGLFW_INCLUDE_NONE
+GLFW_BUILD_FLAGS += -D_GLFW_WAYLAND=1 -D_GLFW_X11=1
 endif
 
 ifeq ($(PLATFORM_OS), WINDOWS)
@@ -174,8 +221,7 @@ SRC_C = src/sinfl_impl.c \
         src/cgltf_impl.c \
         src/windows_stuff.c \
         src/rtext.c \
-        src/backend_vulkan/wgvk.c \
-        src/backend_vulkan/volk.c \
+        $(DL_DIR)/wgvk.c \
         src/stb_impl.c \
         amalgamation/SPIRV-Reflect/spirv_reflect.c
 
@@ -186,7 +232,7 @@ WL_PROTOS       = xdg-shell fractional-scale-v1 idle-inhibit-unstable-v1 \
                   pointer-constraints-unstable-v1 relative-pointer-unstable-v1 \
                   viewporter wayland xdg-activation-v1 xdg-decoration-unstable-v1
 
-WL_XML_DIR      = amalgamation/glfw-3.4/deps/wayland
+WL_XML_DIR        = amalgamation/glfw-3.4/deps/wayland
 WL_CLIENT_HEADERS = $(addprefix $(WL_OUT_DIR)/, $(addsuffix -client-protocol.h, $(WL_PROTOS)))
 WL_CLIENT_CODES   = $(addprefix $(WL_OUT_DIR)/, $(addsuffix -client-protocol-code.h, $(WL_PROTOS)))
 WL_ALL            = $(WL_CLIENT_HEADERS) $(WL_CLIENT_CODES)
@@ -200,29 +246,25 @@ endif
 ###############################################################################
 # Object Files
 ###############################################################################
-
-# We will create separate object lists for better organization
 OBJ_CPP  = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(SRC_CPP))
 OBJ_GLSL = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(SRC_GLSL))
-# GLFW object files
 OBJ_GLFW = $(patsubst %.c,   $(OBJ_DIR)/%.o, $(SRC_GLFW))
-# Other C object files
 OBJ_C    = $(patsubst %.c,   $(OBJ_DIR)/%.o, $(SRC_C))
 
-# All objects combined
-OBJS     = $(OBJ_CPP) $(OBJ_GLSL) $(OBJ_C)
+OBJS = $(OBJ_CPP) $(OBJ_GLSL) $(OBJ_C)
 ifeq ($(SUPPORT_GLFW), 1)
 OBJS += $(OBJ_GLFW)
 endif
+
 ###############################################################################
 # Phony Targets
 ###############################################################################
-.PHONY: all clean glfw_objs glsl_objs cpp_objs c_objs wayland-protocols
+.PHONY: all clean glfw_objs glsl_objs cpp_objs c_objs wayland-protocols dl_deps
 
-all: $(LIB_OUTPUT)
+all: dl_deps $(LIB_OUTPUT)
 
 clean:
-	rm -rf $(OBJ_DIR) $(LIB_DIR) $(WL_OUT_DIR)
+	rm -rf $(OBJ_DIR) $(LIB_DIR) $(WL_OUT_DIR) $(DL_DIR)
 
 ###############################################################################
 # Library Build
@@ -232,11 +274,11 @@ $(LIB_OUTPUT): glsl_objs glfw_objs cpp_objs c_objs | $(LIB_DIR)
 	@echo "Archiving objects into $(LIB_OUTPUT)"
 	$(AR) rcs $@ $(OBJS)
 else
-$(LIB_OUTPUT): glsl_objs cpp_objs c_objs | $(LIB_DIR)
+$(LIB_OUTPUT): glsl_objs cpp_objs c_objs glfw_objs | $(LIB_DIR)
 	@echo "Archiving objects into $(LIB_OUTPUT)"
 	$(AR) rcs $@ $(OBJS)
 endif
-# Make sure the library directory exists
+
 $(LIB_DIR):
 	@mkdir -p $(LIB_DIR)
 
@@ -248,50 +290,45 @@ glsl_objs: $(OBJ_GLSL)
 cpp_objs:  $(OBJ_CPP)
 c_objs:    $(OBJ_C)
 
+# Ensure C objs wait for downloaded headers too
+$(OBJ_DIR)/$(DL_DIR)/wgvk.o: $(DL_WGVK_H) $(DL_WGVK_STRUCTS) $(DL_WGVK_CONFIG)
+
 ###############################################################################
 # Compile Rules
 ###############################################################################
-
-# Default C++ compile rule (for both normal .cpp and GLSL .cpp)
-$(OBJ_DIR)/%.o: %.cpp
+# Make compiles wait for downloads so dl files are present
+$(OBJ_DIR)/%.o: %.cpp $(DL_ALL)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(INCLUDEFLAGS) -c $< -o $@
 
-# Default C compile rule (for non-GLFW C files)
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.c $(DL_ALL)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDEFLAGS) -c $< -o $@
 
-# GLFW C compile rule with extra GLFW_BUILD_FLAGS
-# We match the path "amalgamation/glfw-3.4/src" so we can apply the extra flags.
-# This uses a more specific pattern and must come *before* the default rule
-# or be more specialized, so it only applies to GLFW files.
 ifeq ($(SUPPORT_GLFW), 1)
-$(OBJ_DIR)/amalgamation/glfw-3.4/src/%.o: amalgamation/glfw-3.4/src/%.c $(WAYLAND_DEPS)
+$(OBJ_DIR)/amalgamation/glfw-3.4/src/%.o: amalgamation/glfw-3.4/src/%.c $(WAYLAND_DEPS) $(DL_ALL)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDEFLAGS) $(GLFW_BUILD_FLAGS) -I $(WL_OUT_DIR) -c $< -o $@
 endif
+
 ###############################################################################
 # Wayland Protocol Generation (Linux)
 ###############################################################################
 ifeq ($(PLATFORM_OS), LINUX)
-# Ensure that glfw objects depend on the generated Wayland protocol files
 $(OBJ_GLFW): wayland-protocols
 
 wayland-protocols: $(WL_ALL)
 	@echo "Wayland protocols generated."
 
-# Create the wl_include directory
 $(WL_OUT_DIR):
 	@mkdir -p $(WL_OUT_DIR)
 
-# Generate headers
 $(WL_OUT_DIR)/%-client-protocol.h: $(WL_XML_DIR)/%.xml | $(WL_OUT_DIR)
 	@echo "Generating $@ ..."
 	wayland-scanner client-header $< $@
 
-# Generate private-code
 $(WL_OUT_DIR)/%-client-protocol-code.h: $(WL_XML_DIR)/%.xml | $(WL_OUT_DIR)
 	@echo "Generating $@ ..."
 	wayland-scanner private-code $< $@
 endif
+

@@ -282,21 +282,27 @@ void setupRGFWCallbacks(RGFW_window* window){
 }
 
 RGAPI void* CreateSurfaceForWindow_RGFW(void* windowHandle){    
-    #if SUPPORT_VULKAN_BACKEND == 1
-    WGPUSurface retp = callocnew(WGPUSurfaceImpl);
-    RGFW_window_createVKSurface((RGFW_window*)windowHandle, ((WGPUInstance)GetInstance())->instance, &retp->surface);
-    return retp;
-    #else
+    //#if SUPPORT_VULKAN_BACKEND == 1
+    //WGPUSurface retp = callocnew(WGPUSurfaceImpl);
+    //RGFW_window_createVKSurface((RGFW_window*)windowHandle, ((WGPUInstance)GetInstance())->instance, &retp->surface);
+    //return retp;
+    //#else
+    
     WGPUSurface surf = (WGPUSurface)RGFW_GetWGPUSurface(GetInstance(), (RGFW_window*) windowHandle);
+    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = 1.0;
     return surf;
-    #endif
+    //#endif
 }
 
 SubWindow InitWindow_RGFW(int width, int height, const char* title){
-    SubWindow ret{};
-    ret.type = windowType_rgfw;
-    ret.handle = RGFW_createWindow(title, RGFW_rect{0, 0, width, height}, RGFW_windowCenter | RGFW_windowNoInitAPI | RGFW_windowNoInitAPI);
-    
+    SubWindow ret = {
+        .handle = RGFW_createWindow(title, RGFW_rect{0, 0, width, height}, RGFW_windowNoInitAPI | RGFW_windowNoResize),
+        .type = windowType_rgfw,
+        .scaleFactor = 1.0f
+    };
+    g_renderstate.createdSubwindows[ret.handle] = ret;
+    g_renderstate.input_map[(RGFW_window*)ret.handle];
+
     setupRGFWCallbacks((RGFW_window*)ret.handle);
     return ret;
 }
