@@ -38,7 +38,7 @@
 
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include "GLFW/glfw3native.h"
-
+#include <iostream> 
 namespace wgpu::glfw {
 
 std::unique_ptr<wgpu::ChainedStruct, void (*)(wgpu::ChainedStruct*)>
@@ -47,13 +47,17 @@ SetupWindowAndGetSurfaceDescriptorCocoa(GLFWwindow* window) {
         NSWindow* nsWindow = glfwGetCocoaWindow(window);
         NSView* view = [nsWindow contentView];
 
-        // Create a CAMetalLayer that covers the whole window that will be passed to
-        // CreateSurface.
+        // This is good practice but becomes less critical after setting the GLFW hint
         [view setWantsLayer:YES];
         [view setLayer:[CAMetalLayer layer]];
 
-        // Use retina if the window was created with retina support.
-        [[view layer] setContentsScale:[nsWindow backingScaleFactor]];
+        // After the window hint, backingScaleFactor will be 1.0, but setting it
+        // explicitly to 1.0 adds clarity and ensures the desired behavior.
+        CGFloat scale = 1.0f;
+        [[view layer] setContentsScale:scale];
+        
+        // You can verify the scale factor
+        std::cout << "Window backing scale factor: " << [nsWindow backingScaleFactor] << std::endl;
 
         wgpu::SurfaceSourceMetalLayer* desc = new wgpu::SurfaceSourceMetalLayer();
         desc->layer = [view layer];

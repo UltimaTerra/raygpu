@@ -232,7 +232,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     if(!(g_renderstate.windowFlags & FLAG_HEADLESS)){
         #if SUPPORT_GLFW == 1 || SUPPORT_SDL2 == 1 || SUPPORT_SDL3 == 1 || SUPPORT_RGFW == 1
         #ifdef MAIN_WINDOW_GLFW
-        SubWindow createdWindow = InitWindow_GLFW(width, height, title);
+        SubWindow createdWindow = InitWindow_GLFW((int)width, (int)height, title);
         #elif defined(MAIN_WINDOW_SDL3)
         Initialize_SDL3();
         SubWindow createdWindow = InitWindow_SDL3(width, height, title);
@@ -244,7 +244,8 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         #endif
         
         WGPUSurface wSurface = (WGPUSurface)CreateSurfaceForWindow(createdWindow);
-        createdWindow.surface = CompleteSurface(wSurface, width, height);
+        createdWindow = g_renderstate.createdSubwindows.at(createdWindow.handle);
+        createdWindow.surface = CompleteSurface(wSurface, (int)(width * createdWindow.scaleFactor), (int)(height * createdWindow.scaleFactor));
         
         g_renderstate.createdSubwindows[createdWindow.handle] = createdWindow;
 
@@ -351,7 +352,16 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     defaultWGSLSource.sources[0].data = shaderSource;
     defaultWGSLSource.sources[0].sizeInBytes = std::strlen(shaderSource);
     defaultWGSLSource.sources[0].stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
-    g_renderstate.defaultPipeline = LoadPipelineForVAOEx(defaultWGSLSource, renderBatchVAO, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), GetDefaultSettings());
+    //g_renderstate.defaultShader = LoadPipeline(shaderSource);
+    g_renderstate.defaultShader = LoadPipelineEx(
+        shaderSource,
+        renderBatchVAO->attributes,
+        renderBatchVAO->attributes_count,
+        uniforms,
+        sizeof(uniforms) / sizeof(ResourceTypeDescriptor),
+        GetDefaultSettings()
+    );
+
     #else
     #error "Must support either glsl or wgsl"
     #endif
@@ -409,6 +419,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
  */
 extern "C" void* CreateSurfaceForWindow(SubWindow window){
     void* surfacePtr = nullptr;
+    window.scaleFactor = 1; // default
     switch (window.type){
         case windowType_sdl3:
         #if SUPPORT_SDL3 == 1
@@ -559,216 +570,9 @@ extern "C" size_t GetPixelSizeInBytes(PixelFormat format) {
         case PixelFormat::PIXELFORMAT_DEPTH_24_PLUS:
         case PixelFormat::PIXELFORMAT_DEPTH_32_FLOAT:
         return 4;
-        default: 
-        rg_unreachable();
+        case PixelFormat::PixelFormat_Force32:
         return 0;
     }
-    /*
-    switch (format) {
-        case WGPUTextureFormat_Undefined:
-            return 0;
-
-        // 8-bit formats
-        case WGPUTextureFormat_R8Unorm:
-        case WGPUTextureFormat_R8Snorm:
-        case WGPUTextureFormat_R8Uint:
-        case WGPUTextureFormat_R8Sint:
-            return 1;
-
-        // 16-bit formats
-        case WGPUTextureFormat_R16Uint:
-        case WGPUTextureFormat_R16Sint:
-        case WGPUTextureFormat_R16Float:
-        case WGPUTextureFormat_RG8Unorm:
-        case WGPUTextureFormat_RG8Snorm:
-        case WGPUTextureFormat_RG8Uint:
-        case WGPUTextureFormat_RG8Sint:
-            return 2;
-
-        // 24-bit formats
-        
-
-        // 32-bit formats
-        case WGPUTextureFormat_RGB9E5Ufloat: // Packed format, typically stored in 4 bytes
-        case WGPUTextureFormat_R32Float:
-        case WGPUTextureFormat_R32Uint:
-        case WGPUTextureFormat_R32Sint:
-        case WGPUTextureFormat_RG16Uint:
-        case WGPUTextureFormat_RG16Sint:
-        case WGPUTextureFormat_RG16Float:
-        case WGPUTextureFormat_RGBA8Unorm:
-        case WGPUTextureFormat_RGBA8UnormSrgb:
-        case WGPUTextureFormat_RGBA8Snorm:
-        case WGPUTextureFormat_RGBA8Uint:
-        case WGPUTextureFormat_RGBA8Sint:
-        case WGPUTextureFormat_BGRA8Unorm:
-        case WGPUTextureFormat_BGRA8UnormSrgb:
-        case WGPUTextureFormat_RGB10A2Uint:
-        case WGPUTextureFormat_RGB10A2Unorm:
-        case WGPUTextureFormat_RG11B10Ufloat:
-            return 4;
-
-        // 64-bit formats
-        case WGPUTextureFormat_RG32Float:
-        case WGPUTextureFormat_RG32Uint:
-        case WGPUTextureFormat_RG32Sint:
-        case WGPUTextureFormat_RGBA16Uint:
-        case WGPUTextureFormat_RGBA16Sint:
-        case WGPUTextureFormat_RGBA16Float:
-            return 8;
-
-        // 128-bit formats
-        case WGPUTextureFormat_RGBA32Float:
-        case WGPUTextureFormat_RGBA32Uint:
-        case WGPUTextureFormat_RGBA32Sint:
-            return 16;
-
-        // Depth and Stencil formats
-        case WGPUTextureFormat_Stencil8:
-            return 1;
-        case WGPUTextureFormat_Depth16Unorm:
-            return 2;
-        case WGPUTextureFormat_Depth24Plus:
-            return 3; // Typically 24 bits for depth
-        case WGPUTextureFormat_Depth24PlusStencil8:
-            return 4; // 24 bits depth + 8 bits stencil
-        case WGPUTextureFormat_Depth32Float:
-            return 4;
-        case WGPUTextureFormat_Depth32FloatStencil8:
-            return 5; // 32 bits depth + 8 bits stencil
-
-        // Compressed Formats (Sizes are per block)
-        case WGPUTextureFormat_BC1RGBAUnorm:
-        case WGPUTextureFormat_BC1RGBAUnormSrgb:
-            return 8; // 8 bytes per 4x4 block
-
-        case WGPUTextureFormat_BC2RGBAUnorm:
-        case WGPUTextureFormat_BC2RGBAUnormSrgb:
-        case WGPUTextureFormat_BC3RGBAUnorm:
-        case WGPUTextureFormat_BC3RGBAUnormSrgb:
-        case WGPUTextureFormat_BC7RGBAUnorm:
-        case WGPUTextureFormat_BC7RGBAUnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_BC4RUnorm:
-        case WGPUTextureFormat_BC4RSnorm:
-            return 8; // 8 bytes per 4x4 block
-
-        case WGPUTextureFormat_BC5RGUnorm:
-        case WGPUTextureFormat_BC5RGSnorm:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_BC6HRGBUfloat:
-        case WGPUTextureFormat_BC6HRGBFloat:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ETC2RGB8Unorm:
-        case WGPUTextureFormat_ETC2RGB8UnormSrgb:
-        case WGPUTextureFormat_ETC2RGB8A1Unorm:
-        case WGPUTextureFormat_ETC2RGB8A1UnormSrgb:
-        case WGPUTextureFormat_ETC2RGBA8Unorm:
-        case WGPUTextureFormat_ETC2RGBA8UnormSrgb:
-            return 8; // 8 bytes per 4x4 block
-
-        case WGPUTextureFormat_EACR11Unorm:
-        case WGPUTextureFormat_EACR11Snorm:
-        case WGPUTextureFormat_EACRG11Unorm:
-        case WGPUTextureFormat_EACRG11Snorm:
-            return 8; // 8 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC4x4Unorm:
-        case WGPUTextureFormat_ASTC4x4UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC5x4Unorm:
-        case WGPUTextureFormat_ASTC5x4UnormSrgb:
-        case WGPUTextureFormat_ASTC5x5Unorm:
-        case WGPUTextureFormat_ASTC5x5UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC6x5Unorm:
-        case WGPUTextureFormat_ASTC6x5UnormSrgb:
-        case WGPUTextureFormat_ASTC6x6Unorm:
-        case WGPUTextureFormat_ASTC6x6UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC8x5Unorm:
-        case WGPUTextureFormat_ASTC8x5UnormSrgb:
-        case WGPUTextureFormat_ASTC8x6Unorm:
-        case WGPUTextureFormat_ASTC8x6UnormSrgb:
-        case WGPUTextureFormat_ASTC8x8Unorm:
-        case WGPUTextureFormat_ASTC8x8UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC10x5Unorm:
-        case WGPUTextureFormat_ASTC10x5UnormSrgb:
-        case WGPUTextureFormat_ASTC10x6Unorm:
-        case WGPUTextureFormat_ASTC10x6UnormSrgb:
-        case WGPUTextureFormat_ASTC10x8Unorm:
-        case WGPUTextureFormat_ASTC10x8UnormSrgb:
-        case WGPUTextureFormat_ASTC10x10Unorm:
-        case WGPUTextureFormat_ASTC10x10UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-        case WGPUTextureFormat_ASTC12x10Unorm:
-        case WGPUTextureFormat_ASTC12x10UnormSrgb:
-        case WGPUTextureFormat_ASTC12x12Unorm:
-        case WGPUTextureFormat_ASTC12x12UnormSrgb:
-            return 16; // 16 bytes per 4x4 block
-
-#ifndef __EMSCRIPTEN__
-        // Additional Formats not available in Emscripten builds
-
-        case WGPUTextureFormat_R16Unorm:
-            return 2;
-
-        case WGPUTextureFormat_RG16Unorm:
-            return 4;
-
-        case WGPUTextureFormat_RGBA16Unorm:
-            return 8;
-
-        case WGPUTextureFormat_R16Snorm:
-            return 2;
-
-        case WGPUTextureFormat_RG16Snorm:
-            return 4;
-
-        case WGPUTextureFormat_RGBA16Snorm:
-            return 8;
-
-        case WGPUTextureFormat_R8BG8Biplanar420Unorm:
-            return 2; // Typically, planar formats have separate sizes for planes
-
-        case WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm:
-            return 3; // Packed format
-
-        case WGPUTextureFormat_R8BG8A8Triplanar420Unorm:
-            return 3; // Triplanar formats have separate sizes for planes
-
-        case WGPUTextureFormat_R8BG8Biplanar422Unorm:
-            return 2;
-
-        case WGPUTextureFormat_R8BG8Biplanar444Unorm:
-            return 2;
-
-        case WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm:
-            return 3;
-
-        case WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm:
-            return 3;
-
-        case WGPUTextureFormat_External:
-            return 0; // External formats may not have a defined size
-
-        case WGPUTextureFormat_Force32:
-            return 4; // Typically used to force enum size
-#endif
-
-        default:
-            // Unknown format
-            return 0;
-    }*/
 }
 
 

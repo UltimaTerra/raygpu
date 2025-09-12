@@ -1,11 +1,19 @@
+#include "wgvk.h"
+#define Font rlFont
+#include <raygpu.h>
+#undef Font
+
 #include "sdl3webgpu.h"
 #include "SDL3/SDL_properties.h"
 #include "SDL3/SDL_video.h"
 
 #include <webgpu/webgpu.h>
 #include <string>
-#include <iostream>
 
+#include <iostream>
+#ifdef __APPLE__
+#define SDL_VIDEO_DRIVER_COCOA
+#endif
 #ifndef WEBGPU_BACKEND_DAWN
 #define WEBGPU_BACKEND_DAWN 1
 #endif
@@ -28,9 +36,9 @@
 
 WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     //#if defined(SDL_VIDEO_DRIVER_X11)
-    std::cout << "sdl wgpu surfes" << std::endl;
-    std::string drv = SDL_GetCurrentVideoDriver();
-    std::cout << drv << std::endl;
+    //std::cout << "sdl wgpu surfes for window " << window << std::endl;
+    //std::string drv = SDL_GetCurrentVideoDriver();
+    //std::cout << drv << std::endl;
 #ifdef __EMSCRIPTEN__
 
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc = {0};
@@ -64,9 +72,9 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         .nextInChain = &fromHwnd.chain
     };
     return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
-#else
+#elif !defined(__APPLE__)
     #if RAYGPU_USE_X11 == 1
-    if (drv == "x11") {
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "x11") == 0) {
         Display *xdisplay = (Display *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
         Window xwindow = (Window)SDL_GetNumberProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
         if (xdisplay && xwindow) {
@@ -93,10 +101,56 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
             fromWl.surface = surface;
             WGPUSurfaceDescriptor surfaceDescriptor{};
             surfaceDescriptor.nextInChain = &fromWl.chain;
+            WGPUSurfaceColorManagement cmanagement = {
+                .chain = {
+                    .sType = WGPUSType_SurfaceColorManagement
+                },
+                .colorSpace = WGPUPredefinedColorSpace_SRGB,
+                .toneMappingMode = WGPUToneMappingMode_Extended,
+            };
+            fromWl.chain.next = &cmanagement.chain;
             return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
         }
     }
-#endif
+    #elif defined(SDL_VIDEO_DRIVER_COCOA)
+    {
+        id metal_layer = NULL;
+        NSWindow *ns_window = (__bridge NSWindow *)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+        if (!ns_window) return NULL;
+        [ns_window.contentView setWantsLayer : YES];
+        metal_layer = [CAMetalLayer layer];
+        [ns_window.contentView setLayer : metal_layer];
+        CGSize viewSize = ns_window.contentView.bounds.size;
+        CGSize drawableSize;
+        
+        CGFloat scale = ns_window.backingScaleFactor;
+        drawableSize.width = viewSize.width * scale;
+        drawableSize.height = viewSize.height * scale;
+        CAMetalLayer* ml = (CAMetalLayer*)metal_layer;
+        ml.drawableSize = drawableSize;
+
+        // TRACELOG(LOG_INFO, "Scale factor: %f", ns_window.backingScaleFactor);
+        // TRACELOG(LOG_INFO, "Drawable_size: %d, %d", drawableSize.width, drawableSize.height);
+
+        WGPUSurfaceColorManagement cmanagement = {
+                .chain = {
+                    .sType = WGPUSType_SurfaceColorManagement
+                },
+                .colorSpace = WGPUPredefinedColorSpace_DisplayP3,
+                .toneMappingMode = WGPUToneMappingMode_Standard,
+        };
+        WGPUSurfaceSourceMetalLayer fromMetalLayer{};
+        fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
+        fromMetalLayer.chain.next = &cmanagement.chain;
+        fromMetalLayer.layer = ml;
+
+        WGPUSurfaceDescriptor surfaceDescriptor;
+        surfaceDescriptor.nextInChain = &fromMetalLayer.chain;
+        surfaceDescriptor.label = (WGPUStringView){ NULL, WGPU_STRLEN };
+
+        return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
+    }
+    #endif
     
     //#endif
     return nullptr;

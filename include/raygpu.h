@@ -946,6 +946,7 @@ typedef struct SubWindow{
     void* handle;
     FullSurface surface;
     windowType type;
+    double scaleFactor;
 }SubWindow;
 
 typedef struct full_renderstate full_renderstate;
@@ -1138,6 +1139,11 @@ EXTERN_C_BEGIN
     RGAPI const char* GetDirectoryPath(const char* arg);
     RGAPI const char* FindDirectory(const char* directoryName, int maxOutwardSearch);
     RGAPI bool IsFileExtension(const char *fileName, const char *ext);
+    /**
+     * @brief Checks if a given path, relative or absolute, exists
+     * @param path The path to check
+     * @return whether the path corresponds to an existing file
+     */
     RGAPI bool FileExists(const char* path);
     
     RGAPI DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode);

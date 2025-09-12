@@ -87,6 +87,8 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
 #endif
 
 void cpcallback(GLFWwindow* window, double x, double y){
+    x *= 2;
+    y *= 2;
     g_renderstate.input_map[window].mousePos = Vector2{float(x), float(y)};
 }
 
@@ -431,7 +433,11 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
             //abort();
         }
     #endif
-    
+    #ifdef __APPLE__
+        glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+        glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
+    #endif
     window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
     //if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
     //    glfwSetWindowPos((GLFWwindow*)window, 200, 1900);

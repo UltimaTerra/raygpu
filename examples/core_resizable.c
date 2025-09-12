@@ -15,6 +15,7 @@ void mainloop(void){
     if(IsKeyPressed(KEY_U)){
         ToggleFullscreen();
     }
+    DrawFPS(5, 70);
     EndDrawing();
 }
 int main(void){
