@@ -112,8 +112,7 @@ struct renderstate{
     array_stack<RenderTexture, 8> renderTargetStack;
 
     bool wantsToggleFullscreen;
-    
-    
+    bool minimized;
 
     RenderTexture mainWindowRenderTarget;
     //RenderTexture currentDefaultRenderTarget;

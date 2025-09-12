@@ -760,6 +760,16 @@ RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int, int){
 }
 RenderTexture headless_rtex;
 RGAPI void BeginDrawing(){
+
+    while (g_renderstate.minimized){
+        PollEvents();
+        #ifdef __EMSCRIPTEN__
+        emscripten_sleep(100);
+        #else
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        #endif
+    }
+    
     {
         
         //if(g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition].texture.id)
