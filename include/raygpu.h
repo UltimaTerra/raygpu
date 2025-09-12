@@ -110,7 +110,8 @@ struct RGBA32FColor{
 
 typedef struct Image{
     void* data;
-    uint32_t width, height;
+    uint32_t width;
+    uint32_t height;
     int mipmaps;
     PixelFormat format;
     size_t rowStrideInBytes; // Does not have to match with width

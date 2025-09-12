@@ -51,7 +51,7 @@ void mainloop(void){
 int main(void){
     //RequestAdapterType(SOFTWARE_RENDERER);
     //SetConfigFlags(FLAG_VSYNC_LOWLATENCY_HINT);
-    InitWindow(1200, 800, title);
+    InitWindow(1200, 1024, title);
 
     #ifndef __EMSCRIPTEN__
     while(!WindowShouldClose()){

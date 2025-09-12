@@ -53,7 +53,7 @@ extern "C" void CopyBufferToBuffer(DescribedBuffer* source, DescribedBuffer* des
 }
 WGPUBuffer intermediary = 0;
 extern "C" void CopyTextureToTexture(Texture source, Texture dest){
-    size_t rowBytes = RoundUpToNextMultipleOf256(source.width * GetPixelSizeInBytes(source.format));
+    size_t rowBytes = RoundUpToNextMultipleOf256(source.width) * GetPixelSizeInBytes(source.format);
     WGPUBufferDescriptor bdesc zeroinit;
     bdesc.size = rowBytes * source.height;
     bdesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_CopySrc;
@@ -1249,20 +1249,20 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
 
     WGPUTextureFormat selectedFormat = WGPUTextureFormat_Undefined; // capabilities.formats[0];
     int format_index = 0;
-    for(format_index = 0;format_index < capabilities.formatCount;format_index++){
-        if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
-            selectedFormat = (capabilities.formats[format_index]);
-            goto found;
-        }
-    }
-    for(format_index = 0;format_index < capabilities.formatCount;format_index++){
-        if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/){
-            selectedFormat = (capabilities.formats[format_index]);
-            goto found;
-        }
-    }
-    found:
-    g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
+    //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
+    //    if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
+    //        selectedFormat = (capabilities.formats[format_index]);
+    //        goto found;
+    //    }
+    //}
+    //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
+    //    if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/){
+    //        selectedFormat = (capabilities.formats[format_index]);
+    //        goto found;
+    //    }
+    //}
+    //found:
+    g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;//fromWGPUPixelFormat(selectedFormat);
     if(format_index == capabilities.formatCount){
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off"); 
         g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
@@ -1612,19 +1612,22 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel) {
     size_t formatSize = GetPixelSizeInBytes(fromWGPUPixelFormat(wFormat));
     uint32_t width = wgpuTextureGetWidth(tex);
     uint32_t height = wgpuTextureGetHeight(tex);
-    Image ret {
-        nullptr,
-        (uint32_t)wgpuTextureGetWidth(tex),
-        (uint32_t)wgpuTextureGetHeight(tex),
-        1,
-        fromWGPUPixelFormat(wFormat),
-        RoundUpToNextMultipleOf256(formatSize * width),
+    const size_t rowStrideInBytes = RoundUpToNextMultipleOf256(width) * formatSize;
+    
+    Image ret = {
+        .data = nullptr,
+        .width = (uint32_t)wgpuTextureGetWidth(tex),
+        .height = (uint32_t)wgpuTextureGetHeight(tex),
+        .mipmaps = 1,
+        .format = fromWGPUPixelFormat(wFormat),
+        .rowStrideInBytes = rowStrideInBytes,
     };
-    WGPUBufferDescriptor b{};
-    b.mappedAtCreation = false;
-    b.size = RoundUpToNextMultipleOf256(formatSize * width) * height;
-    b.usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst;
 
+    WGPUBufferDescriptor b = {
+        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+        .size = rowStrideInBytes * height,
+        .mappedAtCreation = false,
+    };
     // Create a LOCAL buffer.
     WGPUBuffer localReadTex = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &b);
 
@@ -1632,19 +1635,27 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel) {
     commandEncoderDesc.label = STRVIEW("Command Encoder for Texture Readback");
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), nullptr);
 
-    WGPUTexelCopyTextureInfo tbsource{};
-    tbsource.texture = tex;
-    tbsource.mipLevel = miplevel;
-    tbsource.origin = { 0, 0, 0 };
-    tbsource.aspect = WGPUTextureAspect_All;
+    const WGPUTexelCopyTextureInfo tbsource = {
+        .texture = tex,
+        .mipLevel = miplevel,
+        .origin = { 0, 0, 0 },
+        .aspect = WGPUTextureAspect_All,
+    };
 
-    WGPUTexelCopyBufferInfo tbdest{};
-    tbdest.buffer = localReadTex;
-    tbdest.layout.offset = 0;
-    tbdest.layout.bytesPerRow = RoundUpToNextMultipleOf256(formatSize * width);
-    tbdest.layout.rowsPerImage = height;
+    const WGPUTexelCopyBufferInfo tbdest = {
+        .layout = {
+            .offset = 0,
+            .bytesPerRow = (uint32_t)rowStrideInBytes,
+            .rowsPerImage = height,
+        },
+        .buffer = localReadTex,
+    };
 
-    WGPUExtent3D copysize{width / (1u << miplevel), height / (1u << miplevel), 1};
+    WGPUExtent3D copysize = {
+        width / (1u << miplevel),
+        height / (1u << miplevel),
+        1
+    };
     wgpuCommandEncoderClearBuffer(encoder, localReadTex, 0, b.size);
     wgpuCommandEncoderCopyTextureToBuffer(encoder, &tbsource, &tbdest, &copysize);
 
