@@ -1,3 +1,4 @@
+#include "wgvk.h"
 #define Font rlFont
 #include <raygpu.h>
 #undef Font
@@ -128,11 +129,19 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         CAMetalLayer* ml = (CAMetalLayer*)metal_layer;
         ml.drawableSize = drawableSize;
 
-        TRACELOG(LOG_INFO, "Scale factor: %f", ns_window.backingScaleFactor);
-        TRACELOG(LOG_INFO, "Drawable_size: %d, %d", drawableSize.width, drawableSize.height);
-        WGPUSurfaceSourceMetalLayer fromMetalLayer;
+        // TRACELOG(LOG_INFO, "Scale factor: %f", ns_window.backingScaleFactor);
+        // TRACELOG(LOG_INFO, "Drawable_size: %d, %d", drawableSize.width, drawableSize.height);
+
+        WGPUSurfaceColorManagement cmanagement = {
+                .chain = {
+                    .sType = WGPUSType_SurfaceColorManagement
+                },
+                .colorSpace = WGPUPredefinedColorSpace_DisplayP3,
+                .toneMappingMode = WGPUToneMappingMode_Standard,
+        };
+        WGPUSurfaceSourceMetalLayer fromMetalLayer{};
         fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
-        fromMetalLayer.chain.next = NULL;
+        fromMetalLayer.chain.next = &cmanagement.chain;
         fromMetalLayer.layer = ml;
 
         WGPUSurfaceDescriptor surfaceDescriptor;

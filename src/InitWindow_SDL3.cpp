@@ -1,3 +1,4 @@
+#include "SDL3/SDL_video.h"
 #define VK_NO_PROTOTYPES
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_events.h>
@@ -58,7 +59,18 @@ void Initialize_SDL3(){
 }
 
 RGAPI void* CreateSurfaceForWindow_SDL3(void* windowHandle){
-    return SDL3_GetWGPUSurface((WGPUInstance)GetInstance(), (SDL_Window*)windowHandle);
+    void* surface = SDL3_GetWGPUSurface((WGPUInstance)GetInstance(), (SDL_Window*)windowHandle);
+    int px, py;
+    int rx, ry;
+    
+    SDL_GetWindowSizeInPixels((SDL_Window*)windowHandle, &px, &py);
+    SDL_GetWindowSize((SDL_Window*)windowHandle, &rx, &ry);
+    TRACELOG(LOG_INFO, "Pixel size: %d, %d", px, py);
+    TRACELOG(LOG_INFO, "Render size: %d, %d", rx, ry);
+    double scaleFactor = (double)px / rx;
+    g_renderstate.createdSubwindows.find(windowHandle)->second.scaleFactor = scaleFactor;
+    TRACELOG(LOG_INFO, "%f", g_renderstate.createdSubwindows.find(windowHandle)->second.scaleFactor);
+    return surface;
 }
 
 RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
@@ -84,7 +96,10 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
         TRACELOG(LOG_INFO, "  Video driver %d: %s", i, SDL_GetVideoDriver(i));
     }
     TRACELOG(LOG_INFO, "  Current video driver: %s", SDL_GetCurrentVideoDriver());
-    SubWindow ret zeroinit;
+    SubWindow ret = {
+        .scaleFactor = 1.0
+    };
+    
     ret.type = windowType_sdl3;
     //SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, "1");
     SDL_WindowFlags windowFlags = 0;

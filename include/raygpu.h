@@ -946,6 +946,7 @@ typedef struct SubWindow{
     void* handle;
     FullSurface surface;
     windowType type;
+    double scaleFactor;
 }SubWindow;
 
 typedef struct full_renderstate full_renderstate;

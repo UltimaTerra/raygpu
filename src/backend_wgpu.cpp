@@ -567,8 +567,7 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     } else {
         presentMode = um;
     }
-    width *= 1;
-    height *= 1; 
+    
     TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
     WGPUSurfaceConfiguration config = {
         .device = (WGPUDevice)GetDevice(),
@@ -1020,7 +1019,7 @@ void InitBackend(){
     };
     const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};
     lsel.instanceLayers = layernames;
-    lsel.instanceLayerCount = 1;
+    lsel.instanceLayerCount = 0;
     instanceDescriptor.nextInChain = &lsel.chain;
     #endif
 
@@ -1248,18 +1247,21 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
         TRACELOG(LOG_INFO, "Supported surface formats: %s", formatsString.c_str());
     }
 
-    WGPUTextureFormat selectedFormat = capabilities.formats[0];
+    WGPUTextureFormat selectedFormat = WGPUTextureFormat_Undefined; // capabilities.formats[0];
     int format_index = 0;
-    //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
-    //    if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
-    //        selectedFormat = (capabilities.formats[format_index]);
-    //        break;
-    //    }
-    //    if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/){
-    //        selectedFormat = (capabilities.formats[format_index]);
-    //        break;
-    //    }
-    //}
+    for(format_index = 0;format_index < capabilities.formatCount;format_index++){
+        if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
+            selectedFormat = (capabilities.formats[format_index]);
+            goto found;
+        }
+    }
+    for(format_index = 0;format_index < capabilities.formatCount;format_index++){
+        if(capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/){
+            selectedFormat = (capabilities.formats[format_index]);
+            goto found;
+        }
+    }
+    found:
     g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if(format_index == capabilities.formatCount){
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off"); 

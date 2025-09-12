@@ -26,6 +26,21 @@ void mainloop(void){
     if(IsKeyPressed(KEY_E)){
         DisableDepthTest();
     }
+    rlBegin(RL_QUADS);
+    UseNoTexture();
+    rlColor4f(1,1,1,1);
+    rlVertex2f(400, 400);
+    rlVertex2f(500, 400);
+    rlVertex2f(500, 500);
+    rlVertex2f(400, 500);
+    rlColor4f(20,20,20,20);
+    rlVertex2f(400, 500);
+    rlVertex2f(500, 500);
+    rlVertex2f(500, 600);
+    rlVertex2f(400, 600);
+    rlEnd();
+    drawCurrentBatch();
+    
     EndDrawing();
     
     if((GetFrameCount() & 0x7ff) == 0){
@@ -36,7 +51,7 @@ void mainloop(void){
 int main(void){
     //RequestAdapterType(SOFTWARE_RENDERER);
     //SetConfigFlags(FLAG_VSYNC_LOWLATENCY_HINT);
-    InitWindow(800, 600, title);
+    InitWindow(1200, 800, title);
 
     #ifndef __EMSCRIPTEN__
     while(!WindowShouldClose()){
