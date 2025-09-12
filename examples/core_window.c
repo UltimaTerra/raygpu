@@ -16,7 +16,7 @@ void mainloop(void){
     ClearBackground(DARKGRAY);
     int fontsize = GetScreenWidth() < GetScreenHeight() ? GetScreenWidth() : GetScreenHeight();
     fontsize /= 20;
-    DrawText(text, GetScreenWidth() / 2 - MeasureText(text, fontsize) / 2, 300, fontsize, (Color){190, 190, 190,255});
+    DrawText(text, GetScreenWidth() / 2 - MeasureText(text, fontsize) / 2, 200, fontsize, (Color){190, 190, 190,255});
     
     DrawFPS(5, 5);
     if(IsKeyPressed(KEY_U)){
@@ -29,15 +29,15 @@ void mainloop(void){
     rlBegin(RL_QUADS);
     UseNoTexture();
     rlColor4f (1,1,1,1);
-    rlVertex2f(400, 400);
+    rlVertex2f(400, 300);
+    rlVertex2f(500, 300);
     rlVertex2f(500, 400);
-    rlVertex2f(500, 500);
-    rlVertex2f(400, 500);
+    rlVertex2f(400, 400);
     rlColor4f (20,20,20,20);
-    rlVertex2f(400, 510);
+    rlVertex2f(400, 410);
+    rlVertex2f(500, 410);
     rlVertex2f(500, 510);
-    rlVertex2f(500, 610);
-    rlVertex2f(400, 610);
+    rlVertex2f(400, 510);
     rlEnd();
     drawCurrentBatch();
     
@@ -51,7 +51,7 @@ void mainloop(void){
 int main(void){
     //RequestAdapterType(SOFTWARE_RENDERER);
     //SetConfigFlags(FLAG_VSYNC_LOWLATENCY_HINT);
-    InitWindow(1200, 1024, title);
+    InitWindow(800, 600, title);
 
     #ifndef __EMSCRIPTEN__
     while(!WindowShouldClose()){

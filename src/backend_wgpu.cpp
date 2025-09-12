@@ -1247,7 +1247,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
         TRACELOG(LOG_INFO, "Supported surface formats: %s", formatsString.c_str());
     }
 
-    WGPUTextureFormat selectedFormat = WGPUTextureFormat_Undefined; // capabilities.formats[0];
+    WGPUTextureFormat selectedFormat = WGPUTextureFormat_BGRA8Unorm; // capabilities.formats[0];
     int format_index = 0;
     //for(format_index = 0;format_index < capabilities.formatCount;format_index++){
     //    if(capabilities.formats[format_index] == WGPUTextureFormat_RGBA16Float){
@@ -1262,7 +1262,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     //    }
     //}
     //found:
-    g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;//fromWGPUPixelFormat(selectedFormat);
+    g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if(format_index == capabilities.formatCount){
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off"); 
         g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);

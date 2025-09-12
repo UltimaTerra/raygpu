@@ -384,8 +384,10 @@ void ToggleFullscreen_GLFW(){
 extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle){
     #if SUPPORT_VULKAN_BACKEND == 1
     WGPUSurface retp = callocnew(WGPUSurfaceImpl);
-    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = 1.0;
     glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, nullptr, &retp->surface);
+    float xscale, yscale;
+    glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
+    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = xscale;
     return retp;
     #elif defined(__EMSCRIPTEN__)
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector;
@@ -433,9 +435,9 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
             //abort();
         }
     #endif
+    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+    glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
     #ifdef __APPLE__
-        glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-        glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
         glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
     #endif
     window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
@@ -459,7 +461,7 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     setupGLFWCallbacks((GLFWwindow*)ret.handle);
     return ret;
 }
-extern "C" SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
+SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
     SubWindow ret{};
     #ifndef __EMSCRIPTEN__
     glfwInit();

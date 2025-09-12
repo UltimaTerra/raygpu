@@ -77,9 +77,10 @@ RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
     SubWindow ret zeroinit;
     ret.type = windowType_sdl3;
     ret.handle = SDL_CreateWindow(title, width, height, 0);
-
+    SDL_SetWindowResizable((SDL_Window*)ret.handle, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
+    
     g_renderstate.createdSubwindows[ret.handle] = ret;
-    g_renderstate.input_map[(GLFWwindow*)ret.handle];
+    g_renderstate.input_map[(SDL_Window*)ret.handle];
     return ret;
 }
 
@@ -358,7 +359,8 @@ void MouseButtonCallback(SDL_Window* window, int button, int action){
     }
 }
 void MousePositionCallback(SDL_Window* window, double x, double y){
-    g_renderstate.input_map[window].mousePos = Vector2{float(x), float(y)};
+    float scale = g_renderstate.createdSubwindows.at(window).scaleFactor;
+    g_renderstate.input_map[window].mousePos = Vector2{float(x) * scale, float(y) * scale};
 }
 
 void ScrollCallback(SDL_Window* window, double xoffset, double yoffset){
