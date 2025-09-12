@@ -1,8 +1,6 @@
 # RayGPU
 A fast and simple [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) or [Vulkan](https://www.vulkan.org/) based graphics library for **C and C++**, inspired by and based on [raylib](https://github.com/raysan5/raylib/). Primarily targeting WebGPU for browsers and desktop through [Dawn](https://dawn.googlesource.com/dawn), it also supports a direct and lightweight Vulkan backend.
-```mermaid
 
-```
 - [Getting Started](#getting-started)
 - [Building](#building)
 - [OpenGL compatibility](#opengl-compatibility-and-similarity)
