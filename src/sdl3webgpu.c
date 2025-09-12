@@ -143,12 +143,12 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
                 .colorSpace = WGPUPredefinedColorSpace_DisplayP3,
                 .toneMappingMode = WGPUToneMappingMode_Standard,
         };
-        WGPUSurfaceSourceMetalLayer fromMetalLayer{};
+        WGPUSurfaceSourceMetalLayer fromMetalLayer = {0};
         fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
         fromMetalLayer.chain.next = &cmanagement.chain;
         fromMetalLayer.layer = ml;
 
-        WGPUSurfaceDescriptor surfaceDescriptor;
+        WGPUSurfaceDescriptor surfaceDescriptor = {0};
         surfaceDescriptor.nextInChain = &fromMetalLayer.chain;
         surfaceDescriptor.label = (WGPUStringView){ NULL, WGPU_STRLEN };
 
