@@ -384,7 +384,7 @@ void ToggleFullscreen_GLFW(){
 extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle){
     #if SUPPORT_VULKAN_BACKEND == 1
     WGPUSurface retp = callocnew(WGPUSurfaceImpl);
-    
+    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = 1.0;
     glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, nullptr, &retp->surface);
     return retp;
     #elif defined(__EMSCRIPTEN__)
