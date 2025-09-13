@@ -51,13 +51,11 @@ SetupWindowAndGetSurfaceDescriptorCocoa(GLFWwindow* window) {
         [view setWantsLayer:YES];
         [view setLayer:[CAMetalLayer layer]];
 
-        // After the window hint, backingScaleFactor will be 1.0, but setting it
-        // explicitly to 1.0 adds clarity and ensures the desired behavior.
-        CGFloat scale = 1.0f;
-        [[view layer] setContentsScale:scale];
+        // I don't think that works
+        // CGFloat scale = 1.0f;
+        // [[view layer] setContentsScale:scale];
         
-        // You can verify the scale factor
-        std::cout << "Window backing scale factor: " << [nsWindow backingScaleFactor] << std::endl;
+        // std::cout << "Window backing scale factor: " << [nsWindow backingScaleFactor] << std::endl;
 
         wgpu::SurfaceSourceMetalLayer* desc = new wgpu::SurfaceSourceMetalLayer();
         desc->layer = [view layer];

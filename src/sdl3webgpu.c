@@ -1,4 +1,3 @@
-#include "wgvk.h"
 #define Font rlFont
 #include <raygpu.h>
 #undef Font
@@ -104,7 +103,7 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
             WGPUSurfaceSourceWaylandSurface fromWl = {
                 .chain = {
                     .sType = WGPUSType_SurfaceSourceWaylandSurface,
-                    .next = &cmanagement.chain
+                    .next = NULL//&cmanagement.chain
                 },
                 .display = display,
                 .surface = surface,
@@ -145,7 +144,7 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
         };
         WGPUSurfaceSourceMetalLayer fromMetalLayer = {0};
         fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
-        fromMetalLayer.chain.next = &cmanagement.chain;
+        fromMetalLayer.chain.next = NULL;//&cmanagement.chain;
         fromMetalLayer.layer = ml;
 
         WGPUSurfaceDescriptor surfaceDescriptor = {0};

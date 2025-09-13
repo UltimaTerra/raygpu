@@ -100,7 +100,7 @@ void main() {
 
 
 #endif
-DescribedPipeline *rpl;
+Shader rpl;
 DescribedComputePipeline* firstPassPipeline;
 VertexArray* vao;
 DescribedBuffer* quad;
@@ -110,7 +110,7 @@ DescribedBuffer* positionsnew;
 
 constexpr bool headless = false;
 
-constexpr size_t parts = (1 << 17);
+constexpr size_t parts = (1 << 21);
 void mainloop(void){
     BeginDrawing();
     BeginComputepass();
@@ -119,10 +119,10 @@ void mainloop(void){
     EndComputepass();
     ClearBackground(BLACK);
 
-    BeginPipelineMode(rpl);
+    BeginShaderMode(rpl);
     BindShaderVertexArray(rpl, vao);
     DrawArraysInstanced(RL_TRIANGLE_STRIP, 4, parts);
-    EndPipelineMode();
+    EndShaderMode();
 
     DrawFPS(10, 10);
     EndDrawing();
@@ -188,7 +188,7 @@ int main(){
     #if SUPPORT_GLSL_PARSER == 0
     rpl = LoadPipeline(wgsl);
     #elif SUPPORT_GLSL_PARSER == 1
-    rpl = LoadPipelineGLSL(vertexSource, fragmentSource);
+    rpl = LoadShaderFromMemory(vertexSource, fragmentSource);
     #endif
     #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(mainloop, 0, 0);

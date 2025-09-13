@@ -397,6 +397,9 @@ extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle){
     surfaceDesc.nextInChain = &fromCanvasHTMLSelector.chain;
     return wgpuInstanceCreateSurface((WGPUInstance)GetInstance(), &surfaceDesc);
     #else
+    float xscale, yscale;
+    glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
+    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = xscale;
     wgpu::Surface rs = wgpu::glfw::CreateSurfaceForWindow((WGPUInstance)GetInstance(), (GLFWwindow*)windowHandle);
     WGPUSurface wsurfaceHandle = rs.MoveToCHandle();
     return wsurfaceHandle;
