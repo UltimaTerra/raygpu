@@ -86,8 +86,8 @@ layout(set = 0, binding = 1, std430) buffer velBuffer {
 void main() {
     // Get the global invocation ID (matches WGSL's @builtin(global_invocation_id))
     uvec3 id = gl_GlobalInvocationID;
-
-    uint index = id.x * 64u + id.y;
+    //return;
+    uint index = id.x;// * 64u + id.y;
     vec2 pos = posBufferdata[index];
     vec2 accel = -pos / pow(dot(pos, pos), 1);
     velBufferdata[index] += accel * 0.000001f;
@@ -110,7 +110,7 @@ DescribedBuffer* positionsnew;
 
 constexpr bool headless = false;
 
-constexpr size_t parts = (1 << 21);
+constexpr size_t parts = (1 << 14);
 void mainloop(void){
     BeginDrawing();
     BeginComputepass();
@@ -135,7 +135,7 @@ void mainloop(void){
     }
 }
 int main(){
-    //SetConfigFlags(FLAG_MSAA_4X_HINT);
+    SetConfigFlags(FLAG_VSYNC_HINT);
     //SetConfigFlags(FLAG_STDOUT_TO_FFMPEG);
     //if(headless)
     //    SetConfigFlags(FLAG_HEADLESS);

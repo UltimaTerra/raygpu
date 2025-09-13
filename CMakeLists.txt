@@ -608,7 +608,7 @@ if(WIN32)
     endif()
 endif()
 
-add_subdirectory("examples")
+
 if(RAYGPU_BUILD_TESTS)
     add_executable(hash_map_test "src/test/hash_map_test.c")
     add_executable(test_cc "src/test/test_cc.c")
@@ -624,6 +624,18 @@ endif()
 if(SUPPORT_SDL3)
     list(APPEND EXPORT_RG_TARGETS SDL3::SDL3)
 endif()
+
+cst_bundle_libraries(raygpu ${raygpu_core_library_name} ${raygpu_linked_deps})
+
+if(DEFINED ENV{HOMEBREW_PREFIX})
+    # Construct the RPATH using the environment variable
+    set(HOMEBREW_LIB_RPATH "$ENV{HOMEBREW_PREFIX}/lib")
+    # Add the constructed RPATH to the target
+    target_link_options(${raygpu_core_library_name} PUBLIC "-Wl,-rpath,${HOMEBREW_LIB_RPATH}")
+    message(STATUS "HOMEBREW_PREFIX detected. Adding ${HOMEBREW_LIB_RPATH} to RPATH for ${raygpu_core_library_name}.")
+endif()
+
+add_subdirectory("examples")
 if(RAYGPU_GENERATE_PYTHON_BINDINGS)
     set(PYBIND11_FINDPYTHON ON)
     find_package(pybind11 CONFIG QUIET)
@@ -641,7 +653,7 @@ if(RAYGPU_GENERATE_PYTHON_BINDINGS)
     target_link_libraries(pyraygpu PUBLIC raygpu)
 endif()
 
-cst_bundle_libraries(raygpu ${raygpu_core_library_name} ${raygpu_linked_deps})
+
 
 message(STATUS "")
 message(STATUS "------ CONFIGURATION OVERVIEW -------")

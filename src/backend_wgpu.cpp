@@ -1019,7 +1019,7 @@ void InitBackend(){
     };
     const char* layernames[] = {"VK_LAYER_KHRONOS_validation"};
     lsel.instanceLayers = layernames;
-    lsel.instanceLayerCount = 0;
+    lsel.instanceLayerCount = 1;
     instanceDescriptor.nextInChain = &lsel.chain;
     #endif
 
