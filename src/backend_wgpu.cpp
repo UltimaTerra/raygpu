@@ -834,6 +834,7 @@ WGPUAdapterType requestedAdapterType = WGPUAdapterType_Unknown;
 
 void setlimit(WGPULimits& limits, LimitType limit, uint64_t value){
     switch(limit){
+        case maxImmediateSize: break; // TODO
         case maxTextureDimension1D: limits.maxTextureDimension1D = value;
         case maxTextureDimension2D: limits.maxTextureDimension2D = value;
         case maxTextureDimension3D: limits.maxTextureDimension3D = value;
