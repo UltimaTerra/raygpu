@@ -1,7 +1,7 @@
 /*
- * MIT License
- * 
- * Copyright (c) 2025 @manuel5975p
+* MIT License
+* 
+* Copyright (c) 2025 @manuel5975p
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,9 +33,10 @@
 #include "simple_wgsl/wgsl_parser.h"
 #include "simple_wgsl/wgsl_resolve.c"
 #include "simple_wgsl/wgsl_resolve.h"
+#include "wgvk.h"
 
-#if SUPPORT_WGSL_PARSER == 1// && defined(__EMSCRIPTEN__)
-
+//#if SUPPORT_WGSL_PARSER == 1// && defined(__EMSCRIPTEN__)
+#if SUPPORT_TINT_WGSL_PARSER != 1
 inline bool str_starts_with(const char* s, const char* prefix) {
     if (!s || !prefix) return false;
     const size_t n = std::strlen(prefix);
@@ -51,30 +52,115 @@ inline WGPUShaderStageEnum to_stage_enum(WgslStage st) {
     }
 }
 
-std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL){
-    WgslAstNode* root = wgsl_parse(shaderSourceWGSL);
-    WgslResolver* resolver = wgsl_resolver_build(root);
-    int entrypointCount = 0;
-    const WgslResolverEntrypoint* eps = wgsl_resolver_entrypoints(resolver, &entrypointCount);
-    std::vector<std::pair<WGPUShaderStageEnum, std::string>> ret;
-    for(int i = 0;i < entrypointCount;i++){
-        ret.push_back({to_stage_enum(eps[i].stage), std::string(eps->name)});
-    }
-    wgsl_resolve_free((void*)eps);
-    wgsl_resolver_free(resolver);
-    wgsl_free_ast(root);
-    return ret;
-}
+WGPUVertexFormat fromTypeAndCount(int componentCount, WgslNumericType type){
+    if(type == WGSL_NUM_F32){
+        switch(componentCount){
+            case 1:{
+                            return WGPUVertexFormat_Float32;
+                        }break;
+                        case 2:{
+                            return  WGPUVertexFormat_Float32x2;
+                        }break;
+                        case 3:{
+                            return  WGPUVertexFormat_Float32x3;
+                        }break;
+                        case 4:{
+                            return  WGPUVertexFormat_Float32x4;
+                        }break;
+                        default:{
+                            TRACELOG(LOG_ERROR, "Unknown composition type");
+                            
+                        }break;
+                    }
+                }else if(type == WGSL_NUM_U32){
+                    switch(componentCount){
+                        case 1:{
+                            return  WGPUVertexFormat_Uint32;
+                        }break;
+                        case 2:{
+                            return  WGPUVertexFormat_Uint32x2;
+                        }break;
+                        case 3:{
+                            return  WGPUVertexFormat_Uint32x3;
+                        }break;
+                        case 4:{
+                            return  WGPUVertexFormat_Uint32x4;
+                        }break;
+                        default:{
+                            TRACELOG(LOG_ERROR, "Unknown composition type");
+                        }break;
+                    }
+                }
+                else if(type == WGSL_NUM_I32){
+                    switch(componentCount){
+                        case 1:{
+                            return  WGPUVertexFormat_Sint32;
+                        }break;
+                        case 2:{
+                            return  WGPUVertexFormat_Sint32x2;
+                        }break;
+                        case 3:{
+                            return  WGPUVertexFormat_Sint32x3;
+                        }break;
+                        case 4:{
+                            return  WGPUVertexFormat_Sint32x4;
+                        }break;
+                        default:{
+                            TRACELOG(LOG_ERROR, "Unknown composition type");
+                        }break;
+                    }
+                }else if(type == WGSL_NUM_F16){
+                    switch(componentCount){
+                        case 1:{
+                            return  WGPUVertexFormat_Float16;
+                        }break;
+                        case 2:{
+                            return  WGPUVertexFormat_Float16x2;
+                        }break;
+                        case 3:{
+                            TRACELOG(LOG_ERROR, "That should not be possible: vec3<f16>");
+                        }break;
+                        case 4:{
+                            return WGPUVertexFormat_Float16x4;
+                        }break;
+                        default:{
+                            TRACELOG(LOG_ERROR, "Unknown composition type");
+                        }break;
+                    }
+                }
+                return WGPUVertexFormat_Float32;
+            }
 
-InOutAttributeInfo getAttributesWGSL(ShaderSources sources){
+InOutAttributeInfo getAttributesWGSLcustom(ShaderSources sources){
     InOutAttributeInfo ret{};
     for(uint32_t stage = 0;stage < sources.sourceCount;stage++){
         if(sources.sources[stage].stageMask & WGPUShaderStage_Vertex){
-            WgslAstNode* root = wgsl_parse(sources.sources[stage].data);
+            WgslAstNode* root = wgsl_parse((const char*)sources.sources[stage].data);
             WgslResolver* resolver = wgsl_resolver_build(root);
-            wgsl_resolver_vertex_inputs(resolver, const char *vertex_entry_name, WgslVertexSlot **out_slots)
+            int epCount;
+            const WgslResolverEntrypoint* eps = wgsl_resolver_entrypoints(resolver, &epCount);
+            const char* name = NULL;
+            for(int j = 0;j < epCount;j++){
+                if(eps[j].stage == WGSL_STAGE_VERTEX){
+                    name = eps[j].name;
+                    goto found;
+                }
+            }
+            found:
+            WgslVertexSlot* vertexInputs = NULL;
+            int vertexInputCount = wgsl_resolver_vertex_inputs(resolver, name, &vertexInputs);
+            ret.vertexAttributeCount = vertexInputCount;
+            for(int j = 0;j < vertexInputCount;j++){
+                ret.vertexAttributes[j].location = vertexInputs[j].location;
+                ret.vertexAttributes[j].location = vertexInputs[j].numeric_type;
+            }
+            
+            wgsl_resolve_free((void*)eps);
+            wgsl_resolve_free((void*)vertexInputs);
             wgsl_resolver_free(resolver);
+            
             wgsl_free_ast(root);
+            break;
         }
     }
 }
@@ -172,7 +258,7 @@ inline ParsedTextureMeta parse_texture_typenode(const WgslAstNode* T) {
     return m;
 }
 
-std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
+std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSLcustom(const char* shaderSourceWGSL) {
     std::vector<std::pair<WGPUShaderStageEnum, std::string>> eps;
 
     if (!shaderSourceWGSL) return eps;
@@ -321,26 +407,19 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Simple(S
     wgsl_free_ast(ast);
     return out;
 }
-
-// ---- Public surface ----
-// If Tint is not enabled, export the expected symbols with the Simple implementation.
-#if !defined(SUPPORT_WGSL_PARSER) || SUPPORT_WGSL_PARSER == 0
+#endif
 
 std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL) {
     return getEntryPointsWGSL_Simple(shaderSourceWGSL);
 }
 
-InOutAttributeInfo getAttributesWGSL(ShaderSources sources) {
+InOutAttributeInfo getAttributesWGSL_(ShaderSources sources) {
     return getAttributesWGSL_Simple(sources);
 }
 
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources sources) {
+std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_(ShaderSources sources) {
     return getBindingsWGSL_Simple(sources);
 }
-
-#endif
-#undef SUPPORT_WGSL_PARSER
-#endif
 
 
 #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1
@@ -566,8 +645,8 @@ ShaderSources wgsl_to_spirv(ShaderSources sources){
     return ret;
     #endif
 }
-InOutAttributeInfo getAttributesWGSL_(ShaderSources sources){
-    //TODo
+InOutAttributeInfo getAttributesWGSLtint(ShaderSources sources){
+    //TODO
     const char* shaderSourceWGSL = (const char*)sources.sources[0].data;
     rassert(shaderSourceWGSL != nullptr, "vertexAndFragmentSource must be set for WGSL");
     
@@ -723,7 +802,7 @@ InOutAttributeInfo getAttributesWGSL_(ShaderSources sources){
 #endif
     return retvalue;
 }
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_(ShaderSources sources){
+std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSLtint(ShaderSources sources){
     std::unordered_map<std::string, ResourceTypeDescriptor> ret;
     
 #if SUPPORT_WGSL_PARSER == 1

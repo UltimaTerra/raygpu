@@ -669,7 +669,7 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
 }
 
-extern "C" Shader rlLoadShaderCode(char const* vs, char const* fs){
+RGAPI Shader rlLoadShaderCode(char const* vs, char const* fs){
     return LoadShaderGLSL(vs, fs);
 }
 

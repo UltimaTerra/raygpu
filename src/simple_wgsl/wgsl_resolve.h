@@ -36,6 +36,7 @@ typedef enum {
     WGSL_NUM_F32,
     WGSL_NUM_I32,
     WGSL_NUM_U32,
+    WGSL_NUM_F16,
     WGSL_NUM_BOOL
 } WgslNumericType;
 
