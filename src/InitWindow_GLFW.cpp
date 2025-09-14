@@ -365,8 +365,10 @@ void ToggleFullscreen_GLFW(){
         //We need to enter fullscreen
         int xpos = 0, ypos = 0;
         int xs, ys;
+        #ifndef __EMSCRIPTEN__
         if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
             glfwGetWindowPos(g_renderstate.window, &xpos, &ypos);
+        #endif
         glfwGetWindowSize(g_renderstate.window, &xs, &ys);
         g_renderstate.input_map[g_renderstate.window].windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         int monitorCount = 0;
@@ -438,8 +440,8 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
             //abort();
         }
     #endif
-    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-    glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
+    // glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+    // glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
     #ifdef __APPLE__
         glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
     #endif
@@ -448,8 +450,10 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     //    glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
     
     int wposx = 0, wposy = 0;
+    #ifndef __EMSCRIPTEN__
     if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
         glfwGetWindowPos((GLFWwindow*)window, &wposx, &wposy);
+    #endif
     g_renderstate.input_map[window].windowPosition = CLITERAL(Rectangle){
         (float)wposx,
         (float)wposy,

@@ -22,20 +22,19 @@
  * SOFTWARE.
  */
 
-
-//#include <ctre.hpp>
-
-
 #include <raygpu.h>
 #include <internals.hpp>
-#include <vector>
+#include <string>
 #include <sstream>
 
 #include <string_view>
 
-#if SUPPORT_CUSTOM_WGSL_PARSER == 0
+#include "simple_wgsl/wgsl_parser.c"
 #include "simple_wgsl/wgsl_parser.h"
+#include "simple_wgsl/wgsl_resolve.c"
 #include "simple_wgsl/wgsl_resolve.h"
+
+#if SUPPORT_WGSL_PARSER == 1// && defined(__EMSCRIPTEN__)
 
 inline bool str_starts_with(const char* s, const char* prefix) {
     if (!s || !prefix) return false;
@@ -51,6 +50,35 @@ inline WGPUShaderStageEnum to_stage_enum(WgslStage st) {
         default:                  return WGPUShaderStageEnum_Vertex; // safe default
     }
 }
+
+std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL){
+    WgslAstNode* root = wgsl_parse(shaderSourceWGSL);
+    WgslResolver* resolver = wgsl_resolver_build(root);
+    int entrypointCount = 0;
+    const WgslResolverEntrypoint* eps = wgsl_resolver_entrypoints(resolver, &entrypointCount);
+    std::vector<std::pair<WGPUShaderStageEnum, std::string>> ret;
+    for(int i = 0;i < entrypointCount;i++){
+        ret.push_back({to_stage_enum(eps[i].stage), std::string(eps->name)});
+    }
+    wgsl_resolve_free((void*)eps);
+    wgsl_resolver_free(resolver);
+    wgsl_free_ast(root);
+    return ret;
+}
+
+InOutAttributeInfo getAttributesWGSL(ShaderSources sources){
+    InOutAttributeInfo ret{};
+    for(uint32_t stage = 0;stage < sources.sourceCount;stage++){
+        if(sources.sources[stage].stageMask & WGPUShaderStage_Vertex){
+            WgslAstNode* root = wgsl_parse(sources.sources[stage].data);
+            WgslResolver* resolver = wgsl_resolver_build(root);
+            wgsl_resolver_vertex_inputs(resolver, const char *vertex_entry_name, WgslVertexSlot **out_slots)
+            wgsl_resolver_free(resolver);
+            wgsl_free_ast(root);
+        }
+    }
+}
+
 
 inline WGPUVertexFormat vf_from_numeric(int comps, WgslNumericType nt) {
     // Bool is not valid as a vertex attribute. Map to Uint32* as the least-bad fallback.
@@ -311,7 +339,8 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSo
 }
 
 #endif
-
+#undef SUPPORT_WGSL_PARSER
+#endif
 
 
 #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1
@@ -356,7 +385,7 @@ const std::unordered_map<std::string, std::unordered_map<std::string, WGPUVertex
     map["vec4"]["u32"] = WGPUVertexFormat_Uint32x4;
     return map;
 }();
-#if SUPPORT_WGSL_PARSER == 1
+#if SUPPORT_WGSL_PARSER == 1 || defined(__EMSCRIPTEN__)
 DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     
     DescribedShaderModule ret zeroinit;
@@ -398,6 +427,8 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     ret.reflectionInfo.attributes = getAttributesWGSL(sources);
     return ret;
 }
+#endif
+#if SUPPORT_WGSL_PARSER == 1
 static format_or_sample_type extractFormat(const tint::ast::Identifier* iden){
     if(auto templiden = iden->As<tint::ast::TemplatedIdentifier>()){
         for(size_t i = 0;i < templiden->arguments.Length();i++){
@@ -535,7 +566,7 @@ ShaderSources wgsl_to_spirv(ShaderSources sources){
     return ret;
     #endif
 }
-InOutAttributeInfo getAttributesWGSL(ShaderSources sources){
+InOutAttributeInfo getAttributesWGSL_(ShaderSources sources){
     //TODo
     const char* shaderSourceWGSL = (const char*)sources.sources[0].data;
     rassert(shaderSourceWGSL != nullptr, "vertexAndFragmentSource must be set for WGSL");
@@ -692,7 +723,7 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources){
 #endif
     return retvalue;
 }
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources sources){
+std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_(ShaderSources sources){
     std::unordered_map<std::string, ResourceTypeDescriptor> ret;
     
 #if SUPPORT_WGSL_PARSER == 1

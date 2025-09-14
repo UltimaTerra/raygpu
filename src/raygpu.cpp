@@ -1509,7 +1509,14 @@ extern "C" FullSurface CreateHeadlessSurface(int width, int height, PixelFormat 
     return ret;
 }
 
-extern "C" Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
+Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
+
+#if SUPPORT_GLSL_PARSER == 0 || !defined(SUPPORT_GLSL_PARSER)
+Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode){
+
+}
+#endif
+
 uint32_t rlGetShaderIdDefault(){
     return DefaultShader().id;
 }
