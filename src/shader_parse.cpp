@@ -33,6 +33,287 @@
 
 #include <string_view>
 
+#if SUPPORT_CUSTOM_WGSL_PARSER == 0
+#include "simple_wgsl/wgsl_parser.h"
+#include "simple_wgsl/wgsl_resolve.h"
+
+inline bool str_starts_with(const char* s, const char* prefix) {
+    if (!s || !prefix) return false;
+    const size_t n = std::strlen(prefix);
+    return std::strncmp(s, prefix, n) == 0;
+}
+
+inline WGPUShaderStageEnum to_stage_enum(WgslStage st) {
+    switch (st) {
+        case WGSL_STAGE_VERTEX:   return WGPUShaderStageEnum_Vertex;
+        case WGSL_STAGE_FRAGMENT: return WGPUShaderStageEnum_Fragment;
+        case WGSL_STAGE_COMPUTE:  return WGPUShaderStageEnum_Compute;
+        default:                  return WGPUShaderStageEnum_Vertex; // safe default
+    }
+}
+
+inline WGPUVertexFormat vf_from_numeric(int comps, WgslNumericType nt) {
+    // Bool is not valid as a vertex attribute. Map to Uint32* as the least-bad fallback.
+    switch (nt) {
+        case WGSL_NUM_F32:
+            switch (comps) {
+                case 1: return WGPUVertexFormat_Float32;
+                case 2: return WGPUVertexFormat_Float32x2;
+                case 3: return WGPUVertexFormat_Float32x3;
+                case 4: return WGPUVertexFormat_Float32x4;
+            }
+            break;
+        case WGSL_NUM_I32:
+            switch (comps) {
+                case 1: return WGPUVertexFormat_Sint32;
+                case 2: return WGPUVertexFormat_Sint32x2;
+                case 3: return WGPUVertexFormat_Sint32x3;
+                case 4: return WGPUVertexFormat_Sint32x4;
+            }
+            break;
+        case WGSL_NUM_U32:
+        case WGSL_NUM_BOOL: // fallback
+            switch (comps) {
+                case 1: return WGPUVertexFormat_Uint32;
+                case 2: return WGPUVertexFormat_Uint32x2;
+                case 3: return WGPUVertexFormat_Uint32x3;
+                case 4: return WGPUVertexFormat_Uint32x4;
+            }
+            break;
+        default:
+            break;
+    }
+#ifdef WGPUVertexFormat_Undefined
+    return WGPUVertexFormat_Undefined;
+#else
+    return WGPUVertexFormat_Float32;
+#endif
+}
+
+inline format_or_sample_type parse_format_token(const char* tkn) {
+    if (!tkn) return we_dont_know;
+    if (std::strcmp(tkn, "r32float") == 0)   return format_r32float;
+    if (std::strcmp(tkn, "r32uint") == 0)    return format_r32uint;
+    if (std::strcmp(tkn, "rgba8unorm") == 0) return format_rgba8unorm;
+    if (std::strcmp(tkn, "rgba32float") == 0)return format_rgba32float;
+    if (std::strcmp(tkn, "f32") == 0)        return sample_f32;
+    if (std::strcmp(tkn, "u32") == 0)        return sample_u32;
+    return we_dont_know;
+}
+
+inline access_type parse_access_token(const char* tkn) {
+    if (!tkn) return readwrite; // safest default
+    if (std::strcmp(tkn, "read") == 0)       return readonly;
+    if (std::strcmp(tkn, "write") == 0)      return writeonly;
+    if (std::strcmp(tkn, "read_write") == 0) return readwrite;
+    return readwrite;
+}
+
+struct ParsedTextureMeta {
+    // Interpreted from a TypeNode like: texture_2d<T> or texture_storage_2d<F, access>
+    bool is_storage = false;
+    bool is_array = false;
+    bool is_3d = false;
+    format_or_sample_type fmt_or_sample = we_dont_know;
+    access_type access = readwrite;
+};
+
+inline ParsedTextureMeta parse_texture_typenode(const WgslAstNode* T) {
+    ParsedTextureMeta m{};
+    if (!T || T->type != WGSL_NODE_TYPE) return m;
+    const char* name = T->type_node.name ? T->type_node.name : "";
+
+    m.is_storage = str_starts_with(name, "texture_storage_");
+    m.is_array   = str_starts_with(name, "texture_2d_array") || str_starts_with(name, "texture_storage_2d_array");
+    m.is_3d      = str_starts_with(name, "texture_3d") || str_starts_with(name, "texture_storage_3d");
+
+    // The simple parser places template identifiers into type_args.
+    // For storage textures: <FORMAT, ACCESS> ; for sampled textures: <SAMPLE_T>
+    for (int i = 0; i < T->type_node.type_arg_count; ++i) {
+        const WgslAstNode* a = T->type_node.type_args[i];
+        if (a && a->type == WGSL_NODE_TYPE && a->type_node.name) {
+            format_or_sample_type f = parse_format_token(a->type_node.name);
+            if (f != we_dont_know) {
+                m.fmt_or_sample = f;
+                continue;
+            }
+            // Maybe it's an access token
+            m.access = parse_access_token(a->type_node.name);
+        }
+    }
+    return m;
+}
+
+std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
+    std::vector<std::pair<WGPUShaderStageEnum, std::string>> eps;
+
+    if (!shaderSourceWGSL) return eps;
+
+    WgslAstNode* ast = wgsl_parse(shaderSourceWGSL);
+    if (!ast) return eps;
+
+    WgslResolver* R = wgsl_resolver_build(ast);
+    if (!R) { wgsl_free_ast(ast); return eps; }
+
+    int n = 0;
+    const WgslResolverEntrypoint* arr = wgsl_resolver_entrypoints(R, &n);
+    for (int i = 0; i < n; ++i) {
+        WGPUShaderStageEnum st = to_stage_enum(arr[i].stage);
+        eps.emplace_back(st, arr[i].name ? arr[i].name : "");
+    }
+
+    wgsl_resolve_free((void*)arr);
+    wgsl_resolver_free(R);
+    wgsl_free_ast(ast);
+    return eps;
+}
+
+InOutAttributeInfo getAttributesWGSL_Simple(ShaderSources sources) {
+    InOutAttributeInfo info{}; // zero-init
+    if (sources.sourceCount == 0 || sources.sources[0].data == nullptr) return info;
+
+    const char* src = (const char*)sources.sources[0].data;
+
+    WgslAstNode* ast = wgsl_parse(src);
+    if (!ast) return info;
+
+    WgslResolver* R = wgsl_resolver_build(ast);
+    if (!R) { wgsl_free_ast(ast); return info; }
+
+    // Choose first vertex entrypoint
+    int ep_count = 0;
+    const WgslResolverEntrypoint* eps = wgsl_resolver_entrypoints(R, &ep_count);
+
+    const char* vertex_name = nullptr;
+    for (int i = 0; i < ep_count; ++i) {
+        if (eps[i].stage == WGSL_STAGE_VERTEX) { vertex_name = eps[i].name; break; }
+    }
+
+    if (vertex_name) {
+        WgslVertexSlot* slots = nullptr;
+        int slot_count = wgsl_resolver_vertex_inputs(R, vertex_name, &slots);
+        // Clamp to struct capacity if needed
+        info.vertexAttributeCount = (uint32_t)slot_count;
+        for (int i = 0; i < slot_count; ++i) {
+            ReflectionVertexAttribute* out = &info.vertexAttributes[i];
+            out->location = (uint32_t)slots[i].location;
+            out->format = vf_from_numeric(slots[i].component_count, slots[i].numeric_type);
+            // Name is optional here; leave empty.
+            out->name[0] = '\0';
+        }
+        wgsl_resolve_free(slots);
+    }
+
+    // Fragment outputs not provided by the simple resolver. Leave attachmentCount = 0.
+    wgsl_resolve_free((void*)eps);
+    wgsl_resolver_free(R);
+    wgsl_free_ast(ast);
+    return info;
+}
+
+std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Simple(ShaderSources sources) {
+    std::unordered_map<std::string, ResourceTypeDescriptor> out;
+
+    if (sources.sourceCount == 0 || sources.sources[0].data == nullptr) return out;
+    const char* src = (const char*)sources.sources[0].data;
+
+    WgslAstNode* ast = wgsl_parse(src);
+    if (!ast) return out;
+
+    WgslResolver* R = wgsl_resolver_build(ast);
+    if (!R) { wgsl_free_ast(ast); return out; }
+
+    int n = 0;
+    const WgslSymbolInfo* syms = wgsl_resolver_binding_vars(R, &n);
+    for (int i = 0; i < n; ++i) {
+        const WgslSymbolInfo& s = syms[i];
+        if (!s.name || !s.decl_node || s.decl_node->type != WGSL_NODE_GLOBAL_VAR) continue;
+
+        const GlobalVar& gv = s.decl_node->global_var;
+
+        ResourceTypeDescriptor desc{};
+        desc.location = (uint32_t)(s.has_binding ? s.binding_index : 0);
+        if (s.has_min_binding_size) desc.minBindingSize = (uint32_t)s.min_binding_size;
+
+        // Texture / sampler detection from the declared type
+        const WgslAstNode* T = gv.type;
+        const char* tname = (T && T->type == WGSL_NODE_TYPE) ? T->type_node.name : nullptr;
+
+        bool handled = false;
+        if (tname) {
+            if (str_starts_with(tname, "texture_")) {
+                ParsedTextureMeta meta = parse_texture_typenode(T);
+                if (meta.is_storage) {
+                    if (meta.is_array) {
+                        desc.type = storage_texture2d_array;
+                    } else if (meta.is_3d) {
+                        desc.type = storage_texture3d;
+                    } else {
+                        desc.type = storage_texture2d;
+                    }
+                    desc.fstype = meta.fmt_or_sample;
+                    desc.access = meta.access;
+                } else {
+                    if (meta.is_array) {
+                        desc.type = texture2d_array;
+                    } else if (meta.is_3d) {
+                        desc.type = texture3d;
+                    } else {
+                        desc.type = texture2d;
+                    }
+                    desc.fstype = meta.fmt_or_sample; // sample type for sampled textures
+                }
+                handled = true;
+            } else if (std::strcmp(tname, "sampler") == 0 || str_starts_with(tname, "sampler")) {
+                desc.type = texture_sampler;
+                handled = true;
+            }
+        }
+
+        if (!handled) {
+            // Buffers: infer from address space
+            if (gv.address_space && std::strcmp(gv.address_space, "uniform") == 0) {
+                desc.type = uniform_buffer;
+            } else if (gv.address_space && std::strcmp(gv.address_space, "storage") == 0) {
+                desc.type = storage_buffer;
+                // Access for buffers is expressed in var<storage, read|read_write>.
+                // The simple parser doesn't keep access here, so default to readwrite.
+                desc.access = readwrite;
+            } else {
+                // Private/workgroup not bindable; skip.
+                continue;
+            }
+        }
+
+        out.emplace(s.name, desc);
+    }
+
+    wgsl_resolve_free((void*)syms);
+    wgsl_resolver_free(R);
+    wgsl_free_ast(ast);
+    return out;
+}
+
+// ---- Public surface ----
+// If Tint is not enabled, export the expected symbols with the Simple implementation.
+#if !defined(SUPPORT_WGSL_PARSER) || SUPPORT_WGSL_PARSER == 0
+
+std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL) {
+    return getEntryPointsWGSL_Simple(shaderSourceWGSL);
+}
+
+InOutAttributeInfo getAttributesWGSL(ShaderSources sources) {
+    return getAttributesWGSL_Simple(sources);
+}
+
+std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources sources) {
+    return getBindingsWGSL_Simple(sources);
+}
+
+#endif
+
+
+
 #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1
 #include "src/tint/utils/result.h"
 #include "src/tint/lang/spirv/writer/helpers/generate_bindings.h"
