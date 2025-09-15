@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include "config.h"
 #include <macros_and_constants.h>
 #include <c_fs_utils.h>
 #include <cstddef>
@@ -1521,9 +1522,14 @@ uint32_t rlGetShaderIdDefault(){
     return DefaultShader().id;
 }
 RGAPI uint32_t GetUniformLocation(Shader shader, const char* uniformName){
-    //Returns LOCATION_NOT_FOUND if not found
-    
-    return GetShaderImpl(shader)->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
+    ShaderImpl* impl = GetShaderImpl(shader);
+    BindingIdentifier identifier = {
+        .length = (uint32_t)strlen(uniformName)
+    };
+    rassert(identifier.length <= MAX_BINDING_NAME_LENGTH, "Identifier too short");
+    memcpy(identifier.name, uniformName, identifier.length < MAX_BINDING_NAME_LENGTH ? identifier.length : MAX_BINDING_NAME_LENGTH);
+    const ResourceTypeDescriptor* desc = StringToUniformMap_get(impl->shaderModule.reflectionInfo.uniforms, identifier);
+    return desc ? desc->location : LOCATION_NOT_FOUND;
 }
 RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
     //Returns LOCATION_NOT_FOUND if not found
@@ -1535,7 +1541,13 @@ RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
 //}
 extern "C" uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* uniformName){
     ShaderImpl* impl = GetShaderImplByID(shaderID);
-    return impl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
+    BindingIdentifier identifier = {
+        .length = (uint32_t)strlen(uniformName)
+    };
+    rassert(identifier.length <= MAX_BINDING_NAME_LENGTH, "Identifier too short");
+    memcpy(identifier.name, uniformName, identifier.length < MAX_BINDING_NAME_LENGTH ? identifier.length : MAX_BINDING_NAME_LENGTH);
+    const ResourceTypeDescriptor* desc = StringToUniformMap_get(impl->shaderModule.reflectionInfo.uniforms, identifier);
+    return desc ? desc->location : LOCATION_NOT_FOUND;
 }
 extern "C" uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName){
     ShaderImpl* impl = GetShaderImplByID(shaderID);
@@ -1649,18 +1661,23 @@ fn compute_main(@builtin(global_invocation_id) id: vec3<u32>) {
 )";
 
 DescribedBindGroupLayout LoadBindGroupLayoutMod(const DescribedShaderModule* shaderModule){
-    std::vector<ResourceTypeDescriptor> flat;
-    flat.reserve(shaderModule->reflectionInfo.uniforms->uniforms.size());
-
-    for(const auto& [x, y] : shaderModule->reflectionInfo.uniforms->uniforms){
-        flat.push_back(y);
+    ResourceTypeDescriptor* flat = (ResourceTypeDescriptor*)RL_CALLOC(shaderModule->reflectionInfo.uniforms->current_size, sizeof(ResourceTypeDescriptor));
+    
+    uint32_t insertIndex = 0;
+    for(size_t i = 0;i <  shaderModule->reflectionInfo.uniforms->current_capacity;i++){
+        if(shaderModule->reflectionInfo.uniforms->table[i].key.length > 0){
+            flat[insertIndex++] = shaderModule->reflectionInfo.uniforms->table[i].value;
+        }
     }
 
-    std::sort(flat.begin(), flat.end(), [](const ResourceTypeDescriptor& a, const ResourceTypeDescriptor& b){
+    std::sort(flat, flat + shaderModule->reflectionInfo.uniforms->current_size, [](const ResourceTypeDescriptor& a, const ResourceTypeDescriptor& b){
         return a.location < b.location;
     });
     
-    return LoadBindGroupLayout(flat.data(), flat.size(), false);
+    DescribedBindGroupLayout ret =  LoadBindGroupLayout(flat, shaderModule->reflectionInfo.uniforms->current_size, false);
+
+    RL_FREE(flat);
+    return ret;
 }
 
 extern "C" Texture LoadTextureEx(uint32_t width, uint32_t height, PixelFormat format, bool to_be_used_as_rendertarget){
@@ -2043,19 +2060,20 @@ void UseNoTexture(){
     UseTexture(g_renderstate.whitePixel);
 }
 
-UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
+//UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
+//
+//    auto it = shaderModule.reflectionInfo.uniforms->uniforms.find(uniformName);
+//    if(it == shaderModule.reflectionInfo.uniforms->uniforms.end()){
+//        TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
+//        return UniformAccessor{.index = LOCATION_NOT_FOUND, .bindgroup = nullptr};
+//    }
+//    uint32_t location = it->second.location;
+//    return UniformAccessor{.index = location, .bindgroup = &this->bindGroup};
+//}
 
-    auto it = shaderModule.reflectionInfo.uniforms->uniforms.find(uniformName);
-    if(it == shaderModule.reflectionInfo.uniforms->uniforms.end()){
-        TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
-        return UniformAccessor{.index = LOCATION_NOT_FOUND, .bindgroup = nullptr};
-    }
-    uint32_t location = it->second.location;
-    return UniformAccessor{.index = location, .bindgroup = &this->bindGroup};
-}
-void UniformAccessor::operator=(DescribedBuffer* buf){
-    SetBindgroupStorageBuffer(bindgroup, index, buf);
-}
+//void UniformAccessor::operator=(DescribedBuffer* buf){
+//    SetBindgroupStorageBuffer(bindgroup, index, buf);
+//}
 
 //DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
 //    pl->state.vertexAttributes = vao->attributes;

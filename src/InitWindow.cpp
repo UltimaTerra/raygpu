@@ -1,11 +1,5 @@
 #include <c_fs_utils.h>
 #include <raygpu.h>
-#include <unordered_set>
-#include <iostream>
-#include <optional>
-#include <map>
-#include <deque>
-#include <chrono>
 #include <internals.hpp>
 
 #if SUPPORT_VULKAN_BACKEND == 1
