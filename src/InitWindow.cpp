@@ -234,7 +234,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         #ifdef MAIN_WINDOW_GLFW
         SubWindow createdWindow = InitWindow_GLFW((int)width, (int)height, title);
         #elif defined(MAIN_WINDOW_SDL3)
-        Initialize_SDL3();
+        // Initialize_SDL3();
         SubWindow createdWindow = InitWindow_SDL3(width, height, title);
         #elif defined(MAIN_WINDOW_RGFW)
         SubWindow createdWindow = InitWindow_RGFW(width, height, title);

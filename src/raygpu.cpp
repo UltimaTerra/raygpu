@@ -1513,7 +1513,7 @@ RGAPI Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
 
 #if SUPPORT_GLSL_PARSER == 0 || !defined(SUPPORT_GLSL_PARSER)
 Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode){
-
+    return Shader{};
 }
 #endif
 

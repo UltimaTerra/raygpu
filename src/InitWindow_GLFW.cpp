@@ -392,12 +392,16 @@ extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle){
     g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = xscale;
     return retp;
     #elif defined(__EMSCRIPTEN__)
-    WGPUEmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector;
+    WGPUEmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector{};
     fromCanvasHTMLSelector.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
-    fromCanvasHTMLSelector.selector = (WGPUStringView){ "canvas", WGPU_STRLEN };
+    fromCanvasHTMLSelector.selector = (WGPUStringView){ "#canvas", WGPU_STRLEN };
     WGPUSurfaceDescriptor surfaceDesc = {0};
     surfaceDesc.nextInChain = &fromCanvasHTMLSelector.chain;
-    return wgpuInstanceCreateSurface((WGPUInstance)GetInstance(), &surfaceDesc);
+    WGPUInstance instance = (WGPUInstance)GetInstance();
+    if(instance == NULL){
+        abort();
+    }
+    return wgpuInstanceCreateSurface(instance, &surfaceDesc);
     #else
     float xscale, yscale;
     glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
@@ -412,7 +416,9 @@ void SetWindowShouldClose_GLFW(GLFWwindow* window){
 }
 
 SubWindow InitWindow_GLFW(int width, int height, const char* title){
-    SubWindow ret{};
+    SubWindow ret{
+        .scaleFactor = 1.0f
+    };
     ret.type = windowType_glfw;
     void* window = nullptr;
     if (!glfwInit()) {
@@ -426,11 +432,8 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     });
 
 
-    #ifndef __EMSCRIPTEN__
-
-
-        // Create the test window with no client API.
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    #ifndef __EMSCRIPTEN__        // Create the test window with no client API.
         glfwWindowHint(GLFW_RESIZABLE, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE) ? GLFW_TRUE : GLFW_FALSE);
         //glfwWindowHint(GLFW_REFRESH_RATE, 144);
 

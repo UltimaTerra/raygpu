@@ -55,6 +55,7 @@ void Initialize_SDL3(){
         alreadyInited = true;
         SDL_InitFlags initFlags = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
         SDL_Init(initFlags);
+        TRACELOG(LOG_INFO, "SDL_Init() called");
     }
 }
 
@@ -86,11 +87,15 @@ RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
 
 
 RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
+    #if RAYGPU_USE_WAYLAND == 1
+    if (!SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "wayland", SDL_HINT_OVERRIDE)) {
+        TRACELOG(LOG_DEBUG, "Failed to set Wayland video driver hint.");
+    }
+    else{
+        TRACELOG(LOG_DEBUG, "Successfully set Wayland video driver hint.");
+    }
+    #endif
     Initialize_SDL3();
-    //if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-    //    TRACELOG(LOG_ERROR, "SDL_Init failed: %s\n", SDL_GetError());
-    //    return SubWindow{};
-    //}
     TRACELOG(LOG_INFO, "SDL Successfully inited. Some info:");
     int numDrivers = SDL_GetNumVideoDrivers();
     for (int i = 0; i < numDrivers; i++) {

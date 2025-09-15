@@ -21,14 +21,10 @@ typedef struct {
     int group_index;
     int has_binding;
     int binding_index;
-
-    /* New: present when the symbol is a buffer binding (var<uniform|storage>)
-       and a static minimum size could be computed. */
     int has_min_binding_size;
-    int min_binding_size; /* bytes */
-
-    const WgslAstNode *decl_node;
-    const WgslAstNode *function_node;
+    int min_binding_size;
+    const WgslAstNode* decl_node;
+    const WgslAstNode* function_node;
 } WgslSymbolInfo;
 
 typedef enum {
@@ -40,21 +36,21 @@ typedef enum {
     WGSL_NUM_BOOL
 } WgslNumericType;
 
-typedef struct {
+typedef struct WgslVertexSlot{
     int location;
     int component_count;
     WgslNumericType numeric_type;
     int byte_size;
 } WgslVertexSlot;
 
-typedef enum {
+typedef enum WgslStage{
     WGSL_STAGE_UNKNOWN = 0,
     WGSL_STAGE_VERTEX,
     WGSL_STAGE_FRAGMENT,
     WGSL_STAGE_COMPUTE
 } WgslStage;
 
-typedef struct {
+typedef struct WgslResolverEntrypoint{
     const char *name;
     WgslStage stage;
     const WgslAstNode *function_node;

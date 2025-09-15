@@ -127,23 +127,25 @@ void UpdateTexture(Texture tex, void* data){
     writeSize.height = tex.height;
     wgpuQueueWriteTexture(GetQueue(), &destination, data, (uint64_t)tex.width * (uint64_t)tex.height * (uint64_t)GetPixelSizeInBytes(tex.format), &source, &writeSize);
 }
-extern "C" Texture3D LoadTexture3DPro(uint32_t width, uint32_t height, uint32_t depth, PixelFormat format, WGPUTextureUsage usage, uint32_t sampleCount){
+RGAPI Texture3D LoadTexture3DPro(uint32_t width, uint32_t height, uint32_t depth, PixelFormat format, WGPUTextureUsage usage, uint32_t sampleCount){
     Texture3D ret zeroinit;
     ret.width = width;
     ret.height = height;
     ret.depth = depth;
     ret.sampleCount = sampleCount;
     ret.format = format;
-
-    WGPUTextureDescriptor tDesc zeroinit;
-    tDesc.dimension = WGPUTextureDimension_3D;
-    tDesc.size = {width, height, depth};
-    tDesc.mipLevelCount = 1;
-    tDesc.sampleCount = sampleCount;
-    tDesc.format = toWGPUPixelFormat(format);
-    tDesc.usage  = usage;
-    tDesc.viewFormatCount = 1;
-    tDesc.viewFormats = &tDesc.format;
+    WGPUTextureDescriptor tDesc = {
+        .usage  = usage,
+        .dimension = WGPUTextureDimension_3D,
+        .size = {width, height, depth},
+        .format = toWGPUPixelFormat(format),
+        .mipLevelCount = 1,
+        .sampleCount = sampleCount,
+        .viewFormatCount = 1,
+        .viewFormats = &tDesc.format,
+    };
+    assert(tDesc.size.width > 0);
+    assert(tDesc.size.height > 0);
     
     WGPUTextureViewDescriptor textureViewDesc zeroinit;
     textureViewDesc.aspect = ((format == PIXELFORMAT_DEPTH_24_PLUS || format == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly : WGPUTextureAspect_All);
@@ -802,10 +804,20 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         return;
     }
     else{
-        WGPUSurfaceTexture surfaceTexture;
+        WGPUSurfaceTexture surfaceTexture{};
         
         wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
+        if(surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){
+            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with SuccessOptimal");
+            TRACELOG(LOG_INFO, "Acquired texture is %u x %u", wgpuTextureGetWidth(surfaceTexture.texture), wgpuTextureGetHeight(surfaceTexture.texture));
 
+        }
+        else if(surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal){
+            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with SuccessSubptimal");
+        }
+        else{
+            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with error");
+        }
         // TODO: some better surface recovery handling, doesn't seem to be an issue for now however
         if(surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){
             wgpuSurfaceConfigure((WGPUSurface)fsurface->surface, &fsurface->surfaceConfig);
@@ -821,6 +833,20 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         if(fsurface->renderTarget.texture.view){
             wgpuTextureViewRelease(fsurface->renderTarget.texture.view);
         }
+        WGPUTextureViewDescriptor tvDesc = {
+            .label = WGPUStringView{
+                .data = "SurfaceTextureView",
+                .length = sizeof("SurfaceTextureView") - 1,
+            },
+            .format = wgpuTextureGetFormat(surfaceTexture.texture),
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = 0,
+            .mipLevelCount = 1,
+            .baseArrayLayer = 0,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_All,
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc
+        };
         fsurface->renderTarget.texture.view = wgpuTextureCreateView(surfaceTexture.texture, nullptr);
     }
 }
@@ -935,6 +961,33 @@ inline std::string WGPUStringViewToString(WGPUStringView view) {
         return std::string(view.data, view.length);
     }
 }
+extern "C" void uncapturedErrorCallback(const WGPUDevice* device, WGPUErrorType type, WGPUStringView message, void* _userdata1, void* _userdata2) {
+    const char* errorTypeName = "";
+    switch (type) {
+        case WGPUErrorType_Validation:
+            errorTypeName = "Validation";
+            break;
+        case WGPUErrorType_OutOfMemory:
+            errorTypeName = "Out of memory";
+            break;
+        case WGPUErrorType_Unknown:
+            errorTypeName = "Unknown";
+            break;
+        case WGPUErrorType_NoError:
+            errorTypeName = "No Error";
+            break;
+        case WGPUErrorType_Internal:
+            errorTypeName = "Internal";
+            break;
+        default:
+            break;
+            //abort();
+            //rg_unreachable();
+    }
+    //abort();
+    TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, std::string(message.data, message.length).c_str());
+    rg_trap();
+};
 
 void InitBackend(){
     wgpustate* sample = &g_wgpustate;
@@ -987,9 +1040,7 @@ void InitBackend(){
         case WGPUAdapterType_CPU:
             adapterOptions.forceFallbackAdapter = true;
             break;
-        case WGPUAdapterType_DiscreteGPU:
-            adapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
-            break;
+        case WGPUAdapterType_DiscreteGPU: [[fallthrough]];
         case WGPUAdapterType_IntegratedGPU:
             adapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
             break;
@@ -1034,6 +1085,10 @@ void InitBackend(){
     instanceDescriptor.requiredFeatureCount = 1;
     
     sample->instance = wgpuCreateInstance(&instanceDescriptor);
+    if(sample->instance == NULL){
+        std::cerr << "wgpuCreateInstance failed!!!!\n";
+        abort();
+    }
     #endif  // __EMSCRIPTEN__
 
     //wgpu::WGSLFeatureName wgslfeatures[8];
@@ -1131,30 +1186,7 @@ void InitBackend(){
             TRACELOG(LOG_FATAL, "Device lost because of %s: %s", reasonName, messages.c_str());
     };
 
-    deviceDesc.uncapturedErrorCallbackInfo.callback = [](const WGPUDevice* device, WGPUErrorType type, WGPUStringView message, void* _userdata1, void* _userdata2) {
-        const char* errorTypeName = "";
-        switch (type) {
-            case WGPUErrorType_Validation:
-                errorTypeName = "Validation";
-                break;
-            case WGPUErrorType_OutOfMemory:
-                errorTypeName = "Out of memory";
-                break;
-            case WGPUErrorType_Unknown:
-                errorTypeName = "Unknown";
-                break;
-            case WGPUErrorType_NoError:
-                errorTypeName = "No Error";
-                break;
-            case WGPUErrorType_Internal:
-                errorTypeName = "Internal";
-                break;
-            default:
-                rg_unreachable();
-        }
-        TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, std::string(message.data, message.length).c_str());
-        rg_trap();
-    };
+    deviceDesc.uncapturedErrorCallbackInfo.callback = uncapturedErrorCallback;
 
     
     if(!limitsToBeRequested.requested){
@@ -1315,6 +1347,8 @@ extern "C" Texture2DArray LoadTextureArray(uint32_t width, uint32_t height, uint
         .viewFormatCount = 1,
         .viewFormats = &tDesc.format,
     };
+    assert(tDesc.size.width > 0);
+    assert(tDesc.size.height > 0);
     const WGPUTextureViewDescriptor vDesc = {
         .format = tDesc.format,
         .dimension = WGPUTextureViewDimension_2DArray,
@@ -1339,15 +1373,18 @@ extern "C" Texture2DArray LoadTextureArray(uint32_t width, uint32_t height, uint
     return ret;
 }
 extern "C" Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat format, WGPUTextureUsage usage, uint32_t sampleCount, uint32_t mipmaps){
-    WGPUTextureDescriptor tDesc{};
-    tDesc.dimension = WGPUTextureDimension_2D;
-    tDesc.size = {width, height, 1u};
-    tDesc.mipLevelCount = mipmaps;
-    tDesc.sampleCount = sampleCount;
-    tDesc.format = toWGPUPixelFormat(format);
-    tDesc.usage  = usage;
-    tDesc.viewFormatCount = 1;
-    tDesc.viewFormats = &tDesc.format;
+    WGPUTextureDescriptor tDesc = {
+        .usage  = usage,
+        .dimension = WGPUTextureDimension_2D,
+        .size = {width, height, 1u},
+        .format = toWGPUPixelFormat(format),
+        .mipLevelCount = mipmaps,
+        .sampleCount = sampleCount,
+        .viewFormatCount = 1,
+        .viewFormats = &tDesc.format,
+    };
+    assert(tDesc.size.width > 0);
+    assert(tDesc.size.height > 0);
 
     WGPUTextureViewDescriptor textureViewDesc{};
     char potlabel[128]; 
@@ -1462,7 +1499,8 @@ Texture LoadTextureFromImage(Image img){
             ((Color*)altdata)[i].a = gscv >> 8;
         }
     }
-    WGPUTextureDescriptor desc = {
+
+    WGPUTextureDescriptor tDesc = {
         nullptr,
         WGPUStringView{nullptr, 0},
         WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
@@ -1471,13 +1509,17 @@ Texture LoadTextureFromImage(Image img){
         img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format),
         1,1,1,nullptr
     };
+
+    assert(tDesc.size.width > 0);
+    assert(tDesc.size.height > 0);
+    
     WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format);
-    desc.viewFormats = (WGPUTextureFormat*)&resulting_tf;
-    ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &desc);
+    tDesc.viewFormats = (WGPUTextureFormat*)&resulting_tf;
+    ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &tDesc);
     WGPUTextureViewDescriptor vdesc{};
     vdesc.arrayLayerCount = 0;
     vdesc.aspect = WGPUTextureAspect_All;
-    vdesc.format = desc.format;
+    vdesc.format = tDesc.format;
     vdesc.dimension = WGPUTextureViewDimension_2D;
     vdesc.baseArrayLayer = 0;
     vdesc.arrayLayerCount = 1;
@@ -1494,7 +1536,7 @@ Texture LoadTextureFromImage(Image img){
     source.bytesPerRow = 4 * img.width;
     source.rowsPerImage = img.height;
     //wgpuQueueWriteTexture()
-    wgpuQueueWriteTexture((WGPUQueue)GetQueue(), &destination, altdata ? altdata : img.data, 4 * img.width * img.height, &source, &desc.size);
+    wgpuQueueWriteTexture((WGPUQueue)GetQueue(), &destination, altdata ? altdata : img.data, 4 * img.width * img.height, &source, &tDesc.size);
     ret.view = wgpuTextureCreateView((WGPUTexture)ret.id, &vdesc);
     ret.width = img.width;
     ret.height = img.height;
@@ -2038,7 +2080,47 @@ RGAPI Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidenc
     DescribedShaderModule mod = LoadShaderModule(sources);
     return LoadPipelineMod(mod, attribs, attribCount, uniforms, uniformCount, settings);
 }
-extern "C" Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
+RGAPI Shader LoadPipeline(const char* shaderSource){
+    ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
+    InOutAttributeInfo attribs = getAttributesWGSL(sources);
+    std::vector<AttributeAndResidence> allAttribsInOneBuffer;
+    
+    allAttribsInOneBuffer.reserve(MAX_VERTEX_ATTRIBUTES);
+    uint32_t offset = 0;
+    for(size_t i = 0;i < attribs.vertexAttributeCount;i++){
+        const char* name = attribs.vertexAttributes[i].name;
+        const auto& location = attribs.vertexAttributes[i].location;
+        const auto& format = attribs.vertexAttributes[i].format;
+        allAttribsInOneBuffer.push_back(AttributeAndResidence{
+            .attr = WGPUVertexAttribute{
+                .nextInChain = nullptr,
+                .format = format,
+                .offset = offset,
+                .shaderLocation = location
+            },
+            .bufferSlot = 0,
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .enabled = true}
+        );
+        offset += attributeSize(format);
+    }
+    
+
+    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindingsWGSL(sources);
+    
+
+    std::vector<ResourceTypeDescriptor> values;
+    values.reserve(bindings.size());
+    for(const auto& [x, y] : bindings){
+        values.push_back(y);
+    }
+    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+        return x.location < y.location;
+    });
+    return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
+}
+
+RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
     
     
     Shader retS = {

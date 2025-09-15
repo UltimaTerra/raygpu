@@ -135,7 +135,7 @@ void mainloop(void){
     }
 }
 int main(){
-    SetConfigFlags(FLAG_VSYNC_HINT);
+    //SetConfigFlags(FLAG_VSYNC_HINT);
     //SetConfigFlags(FLAG_STDOUT_TO_FFMPEG);
     //if(headless)
     //    SetConfigFlags(FLAG_HEADLESS);
