@@ -24,8 +24,10 @@
 
 
 #include "config.h"
+#include "macros_and_constants.h"
 #include <memory>
 #include <map>
+#include <string>
 #include <unordered_map>
 #include <bit>
 #include <fstream>
@@ -422,7 +424,7 @@ format_or_sample_type spirvToFormatOrSampleType(SpvImageFormat format){
     }
 }
 
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources sources){
+StringToUniformMap* getBindingsGLSL(ShaderSources sources){
     const int glslVersion = 460;
     
     
@@ -459,6 +461,7 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSo
         if(!shader->parse(&Resources,  glslVersion, ECoreProfile, false, false, messages)){
             const char* lang = (language == EShLangCompute ? "Compute" : ((language == EShLangVertex) ? "Vertex" : "Fragment"));
             TRACELOG(LOG_ERROR, "%s GLSL Parsing Failed: %s", lang, shader->getInfoLog());
+            return NULL;
         }
     }
 
@@ -495,7 +498,8 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSo
         }
     };
 
-    std::unordered_map<std::string, ResourceTypeDescriptor> ret;
+    StringToUniformMap* ret = (StringToUniformMap*)callocnew(StringToUniformMap);
+    StringToUniformMap_init(ret);
     for(const auto& [lang, shader] : shaders){
         glslang::TIntermediate* intermediate = program.getIntermediate(lang);
         std::vector<uint32_t> stageSpirv;
@@ -539,10 +543,17 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSo
                         insert.fstype = traverser.sampleTypes[set->bindings[i]->name];
                     }
                     
+
+                    // TODO review this
                     insert.location = set->bindings[i]->binding;
-                    ret[set->bindings[i]->name] = insert;
-                    auto& inserted = *ret.find(set->bindings[i]->name);
-                    inserted.second.visibility = WGPUShaderStage(inserted.second.visibility | WGPUShaderStage(1u << lang));
+                    insert.visibility = WGPUShaderStage(insert.visibility | WGPUShaderStage(1u << lang));
+                    BindingIdentifier identifier = {
+                        .length = (uint32_t)strlen(set->bindings[i]->name),
+                    };
+                    if(identifier.length <= MAX_BINDING_NAME_LENGTH){
+                        memcpy(identifier.name, set->bindings[i]->name, MAX_BINDING_NAME_LENGTH);
+                    }
+                    StringToUniformMap_put(ret, identifier, insert);
                 }
 
                 //TRACELOG(LOG_WARNING, "Parsed uniforms %s at binding %u", set->bindings[i]->name, (unsigned)set->bindings[i]->binding);// << ": " <<  set->bindings[i]->descriptor_type << "\n";
@@ -553,19 +564,22 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSo
     }
     program.buildReflection();
     for(int i = 0;i < program.getNumUniformBlocks();i++){
-        std::string name = program.getUniformBlockName(i);
-        ResourceTypeDescriptor insert zeroinit;
-
-        insert.location = program.getUniformBlock(i).getBinding();
-        insert.minBindingSize = program.getUniformBlock(i).size;
-        insert.access = program.getUniformBlock(i).getType()->getQualifier().isWriteOnly() ? writeonly : (program.getUniformBlock(i).getType()->getQualifier().isReadOnly() ? readonly : readwrite);
+        const char* name = program.getUniformBlockName(i);
+        const char* storageOrUniform = program.getUniformBlock(i).getType()->getStorageQualifierString();
+        bool uniform = strstr(storageOrUniform, "uniform") != NULL;
+        ResourceTypeDescriptor insert = {
+            .type = uniform ? uniform_buffer : storage_buffer,
+            .minBindingSize = (uint32_t)program.getUniformBlock(i).size,
+            .location = (uint32_t)program.getUniformBlock(i).getBinding(),
+            .access = program.getUniformBlock(i).getType()->getQualifier().isWriteOnly() ? writeonly : (program.getUniformBlock(i).getType()->getQualifier().isReadOnly() ? readonly : readwrite),
+        };
         
-        std::string storageOrUniform = program.getUniformBlock(i).getType()->getStorageQualifierString();
-        bool uniform = storageOrUniform.find("uniform") != std::string::npos;
-        insert.type = uniform ? uniform_buffer : storage_buffer;
-        ret[name] = insert;
-        auto& inserted = *ret.find(name);
-        inserted.second.visibility = WGPUShaderStage(inserted.second.visibility | WGPUShaderStage(program.getUniformBlock(i).stages));
+        BindingIdentifier id = BIfromCString(name);
+        StringToUniformMap_put(ret, id, insert);
+        ResourceTypeDescriptor* inserted = StringToUniformMap_get(ret, id);
+        if(inserted){
+            inserted->visibility = WGPUShaderStage(inserted->visibility | WGPUShaderStage(program.getUniformBlock(i).stages));
+        }
     }
     return ret;
 }
@@ -591,7 +605,7 @@ DescribedShaderModule LoadShaderModuleGLSL(ShaderSources sourcesGLSL){
     ShaderSources spirv = glsl_to_spirv(sourcesGLSL);
     DescribedShaderModule ret = LoadShaderModuleSPIRV(spirv);
     ret.reflectionInfo.uniforms = callocnewpp(StringToUniformMap);
-    ret.reflectionInfo.uniforms->uniforms = getBindingsGLSL(sourcesGLSL);
+    ret.reflectionInfo.uniforms = getBindingsGLSL(sourcesGLSL);
     
     InOutAttributeInfo attribs = getAttributesGLSL(sourcesGLSL);
     ret.reflectionInfo.attributes = attribs;
@@ -612,12 +626,16 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
 
     DescribedShaderModule shaderModule = LoadShaderModuleGLSL(glslSources);
 
-    std::vector<ResourceTypeDescriptor> flat;
-    flat.reserve(shaderModule.reflectionInfo.uniforms->uniforms.size());
-    for(const auto& [x, y] : shaderModule.reflectionInfo.uniforms->uniforms){
-        flat.push_back(y);
+    ResourceTypeDescriptor* flat = (ResourceTypeDescriptor*)RL_CALLOC(shaderModule.reflectionInfo.uniforms->current_size, sizeof(ResourceTypeDescriptor));
+    
+    uint32_t insertIndex = 0;
+    for(size_t i = 0;i <  shaderModule.reflectionInfo.uniforms->current_capacity;i++){
+        if(shaderModule.reflectionInfo.uniforms->table[i].key.length > 0){
+            flat[insertIndex++] = shaderModule.reflectionInfo.uniforms->table[i].value;
+        }
     }
-    std::sort(flat.begin(), flat.end(), [](const ResourceTypeDescriptor& a, const ResourceTypeDescriptor& b){
+
+    std::sort(flat, flat + shaderModule.reflectionInfo.uniforms->current_size, [](const ResourceTypeDescriptor& a, const ResourceTypeDescriptor& b){
         return a.location < b.location;
     });
 
@@ -666,7 +684,9 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     // printf("--- Pipeline Vertex Stride ---\n");
     // printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
     // printf("----------------------------\n");
-    return LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat.data(), flat.size(), GetDefaultSettings());
+    Shader ret = LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat, shaderModule.reflectionInfo.uniforms->current_size, GetDefaultSettings());
+    RL_FREE(flat);
+    return ret;
 }
 
 RGAPI Shader rlLoadShaderCode(char const* vs, char const* fs){

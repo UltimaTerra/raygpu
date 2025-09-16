@@ -127,9 +127,9 @@ static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResiden
  * 
  * @param shaderSource
  */
-StringToUniformMap getBindingsWGSL(ShaderSources source);
-StringToUniformMap getBindingsGLSL(ShaderSources source);
-StringToUniformMap getBindings    (ShaderSources source);
+StringToUniformMap* getBindingsWGSL(ShaderSources source);
+StringToUniformMap* getBindingsGLSL(ShaderSources source);
+StringToUniformMap* getBindings    (ShaderSources source);
 
 
 
@@ -782,8 +782,11 @@ static inline ShaderSources dualStage(const char* code1, const char* code2, Shad
 
 void detectShaderLanguage(ShaderSources* sources);
 ShaderSourceType detectShaderLanguage(const void* sourceptr, size_t size);
-StringToUniformMap getBindingsGLSL(ShaderSources source);
-std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL);
+StringToUniformMap* getBindingsGLSL(ShaderSources source);
+typedef struct EntryPointSet{
+    char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
+}EntryPointSet;
+EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
 extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, const std::vector<AttributeAndResidence>& attribs);
@@ -1188,6 +1191,17 @@ typedef struct BindingIdentifier{
     char name[MAX_BINDING_NAME_LENGTH + 1];
 }BindingIdentifier;
 
+static inline BindingIdentifier BIfromCString(const char* c_str){
+    size_t len = strlen(c_str);
+    BindingIdentifier identifier = {0, 0};
+    if(len > MAX_BINDING_NAME_LENGTH){
+        return identifier;
+    }
+    identifier.length = (uint32_t)len;
+    memcpy(identifier.name, c_str, MAX_BINDING_NAME_LENGTH);
+    return identifier;
+}
+
 static inline size_t hashBindingIdentifier(const BindingIdentifier ident){
     return hash_bytes(ident.name, ident.length);
 }
@@ -1203,9 +1217,7 @@ static inline bool hashBindingCompare(const BindingIdentifier a, const BindingId
     return true;
 }
 
-typedef struct EntryPointSet{
-    char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
-}EntryPointSet;
+
 
 DEFINE_GENERIC_HASH_MAP(static inline, StringToUniformMap, BindingIdentifier, ResourceTypeDescriptor, hashBindingIdentifier, hashBindingCompare, CLITERAL(BindingIdentifier){0})
 

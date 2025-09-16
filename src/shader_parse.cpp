@@ -22,6 +22,7 @@
 * SOFTWARE.
 */
 
+#include "config.h"
 #include <raygpu.h>
 #include <internals.hpp>
 
@@ -36,20 +37,17 @@
 #include <vector>
 
 
-// Simple parser (C implementation in simple_wgsl/*)
 InOutAttributeInfo                                      getAttributesWGSL_Simple(ShaderSources sources);
-StringToUniformMap                                      getBindingsWGSL_Simple  (ShaderSources sources);
-std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Simple(const char* shaderSourceWGSL);
+StringToUniformMap*                                     getBindingsWGSL_Simple  (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL_Simple(const char* shaderSourceWGSL);
 
-// Tint-based implementations
 InOutAttributeInfo                                      getAttributesWGSL_Tint  (ShaderSources sources);
-StringToUniformMap                                      getBindingsWGSL_Tint    (ShaderSources sources);
-std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Tint (const char* shaderSourceWGSL);
+StringToUniformMap*                                     getBindingsWGSL_Tint    (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL_Tint (const char* shaderSourceWGSL);
 
-// Public redirectors required by the rest of the codebase
 InOutAttributeInfo                                      getAttributesWGSL       (ShaderSources sources);
-StringToUniformMap                                      getBindingsWGSL         (ShaderSources sources);
-std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL      (const char* shaderSourceWGSL);
+StringToUniformMap*                                     getBindingsWGSL         (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL      (const char* shaderSourceWGSL);
 
 // =================================================================================================
 // SIMPLE WGSL PARSER BACKEND
@@ -170,8 +168,8 @@ static inline SW_ParsedTextureMeta sw_parse_texture_typenode(const WgslAstNode* 
     return m;
 }
 
-std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
-    std::vector<std::pair<WGPUShaderStageEnum,std::string>> eps;
+EntryPointSet getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
+    EntryPointSet eps;
     if (!shaderSourceWGSL) return eps;
 
     WgslAstNode* ast = wgsl_parse(shaderSourceWGSL);
@@ -182,8 +180,12 @@ std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Simpl
 
     int n = 0;
     const WgslResolverEntrypoint* arr = wgsl_resolver_entrypoints(R, &n);
+    uint32_t insertIndex = 0;
     for (int i = 0; i < n; ++i) {
-        eps.emplace_back(sw_to_stage_enum(arr[i].stage), arr[i].name ? arr[i].name : "");
+        char* insert = eps.names[sw_to_stage_enum(arr[i].stage)];
+        if(arr[i].name && strlen(arr[i].name) <= MAX_SHADER_ENTRYPOINT_NAME_LENGTH){
+            memcpy(insert, arr[i].name, strlen(arr[i].name));
+        }
     }
 
     wgsl_resolve_free((void*)arr);
@@ -231,10 +233,13 @@ InOutAttributeInfo getAttributesWGSL_Simple(ShaderSources sources) {
     return info;
 }
 
-StringToUniformMap getBindingsWGSL_Simple(ShaderSources sources) {
-    StringToUniformMap out = {0};
-    if (sources.sourceCount == 0 || sources.sources[0].data == nullptr) return out;
-    StringToUniformMap_init(&out);
+StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
+    StringToUniformMap* out = NULL;
+    if (sources.sourceCount == 0 || sources.sources[0].data == nullptr){
+        return out;
+    }
+    out = callocnew(StringToUniformMap);
+    StringToUniformMap_init(out);
     const char* src = (const char*)sources.sources[0].data;
 
     WgslAstNode* ast = wgsl_parse(src);
@@ -302,7 +307,7 @@ StringToUniformMap getBindingsWGSL_Simple(ShaderSources sources) {
         if(identifier.length <= MAX_BINDING_NAME_LENGTH){
             memcpy(identifier.name, s.name, MAX_BINDING_NAME_LENGTH);
         }
-        StringToUniformMap_put(&out, identifier, desc);
+        StringToUniformMap_put(out, identifier, desc);
     }
 
     wgsl_resolve_free((void*)syms);
@@ -409,7 +414,7 @@ static inline access_type ti_parse_access(const std::string& s) {
     return readwrite;
 }
 
-std::vector<std::pair<WGPUShaderStageEnum,std::string>>
+getEntryPointsWGSL
 getEntryPointsWGSL_Tint(const char* shaderSourceWGSL) {
     std::vector<std::pair<WGPUShaderStageEnum,std::string>> out;
     if (!shaderSourceWGSL) return out;
@@ -623,7 +628,7 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources) {
 #endif
 }
 
-StringToUniformMap getBindingsWGSL(ShaderSources sources) {
+StringToUniformMap* getBindingsWGSL(ShaderSources sources) {
 #if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
     return getBindingsWGSL_Tint(sources);
 #else
@@ -631,7 +636,7 @@ StringToUniformMap getBindingsWGSL(ShaderSources sources) {
 #endif
 }
 
-std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL) {
+EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL) {
 #if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
     return getEntryPointsWGSL_Tint(shaderSourceWGSL);
 #else
@@ -659,7 +664,7 @@ InOutAttributeInfo getAttributes(ShaderSources sources){
     }
     return {};
 }
-StringToUniformMap getBindings(ShaderSources sources){
+StringToUniformMap* getBindings(ShaderSources sources){
     
     rassert(sources.language != ShaderSourceType::sourceTypeUnknown, "Source type must be known");
     const ShaderSourceType language = sources.language;

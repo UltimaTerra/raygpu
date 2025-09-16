@@ -859,7 +859,7 @@ typedef struct ShaderSources{
     //const char* vertexSource;
     //const char* fragmentSource;
     //const char* vertexAndFragmentSource;
-    //const char* computeSource;
+    //const char* computeSource
     ShaderSourceType language;
 }ShaderSources;
 
