@@ -10,9 +10,7 @@ const char text[] = "Hello WebGPU enjoyer";
 const char title[] = "WebGPU Window";
 #endif
 SubWindow sdlwin;
-int count = 0;
 void mainloop(void){
-    if(count++ > 2)return;
     BeginDrawing();
     //ClearBackground((Color){230, 230, 230, 0});
     ClearBackground(DARKGRAY);

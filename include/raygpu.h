@@ -879,6 +879,10 @@ typedef struct ReflectionFragmentOutput{
     format_or_sample_type type;
 }ReflectionFragmentOutput;
 
+/**
+ * @brief Struct describing vertex input and fragment output of a vertex-fragment pipeline
+ * 
+ */
 typedef struct InOutAttributeInfo{
     uint32_t vertexAttributeCount;
     ReflectionVertexAttribute vertexAttributes[MAX_VERTEX_ATTRIBUTES];

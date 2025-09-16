@@ -146,31 +146,20 @@ void endRecording(GIFRecordState* grst, const char* filename){
         // You might need to allocate memory in the Emscripten heap
         // and copy the data there, but for simplicity, we'll pass the pointer and size
         EM_ASM({
-            var filename = UTF8ToString($0);
-            var dataPtr = $1;
-            var dataSize = $2;
-            
-            // Create a Uint8Array from the Emscripten heap
-            var bytes = new Uint8Array(Module.HEAPU8.buffer, dataPtr, dataSize);
-            
-            // Create a Blob from the byte array
-            var blob = new Blob([bytes], {type: 'image/gif'});
-            
-            // Create a temporary anchor element to trigger the download
+            var fname   = UTF8ToString($0);
+            var dataPtr = $1 >>> 0;
+            var dataLen = $2 >>> 0;
+            // Make a copy so it’s safe after C frees the buffer
+            var bytes = HEAPU8.slice(dataPtr, dataPtr + dataLen);
+            var blob = new Blob([bytes], { type: 'image/gif' });
             var link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            
-            // Append the link to the body (required for Firefox)
+            link.download = fname;
             document.body.appendChild(link);
-            
-            // Programmatically click the link to trigger the download
             link.click();
-            
-            // Clean up by removing the link and revoking the object URL
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
-        }, filename, (uintptr_t)result.data, (int)result.dataSize);
+        }, filename, (uintptr_t)result.data, (int)result.dataSize, filename, (uintptr_t)result.data, (int)result.dataSize);
     #else
         // Native file system approach
         FILE * fp = fopen(filename, "wb");

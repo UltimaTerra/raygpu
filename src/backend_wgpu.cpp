@@ -808,15 +808,15 @@ extern "C" void GetNewTexture(FullSurface* fsurface){
         
         wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
         if(surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){
-            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with SuccessOptimal");
-            TRACELOG(LOG_INFO, "Acquired texture is %u x %u", wgpuTextureGetWidth(surfaceTexture.texture), wgpuTextureGetHeight(surfaceTexture.texture));
+            TRACELOG(LOG_DEBUG, "wgpuSurfaceGetCurrentTexture called with SuccessOptimal");
+            TRACELOG(LOG_DEBUG, "Acquired texture is %u x %u", wgpuTextureGetWidth(surfaceTexture.texture), wgpuTextureGetHeight(surfaceTexture.texture));
 
         }
         else if(surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal){
-            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with SuccessSubptimal");
+            TRACELOG(LOG_DEBUG, "wgpuSurfaceGetCurrentTexture called with SuccessSubptimal");
         }
         else{
-            TRACELOG(LOG_INFO, "wgpuSurfaceGetCurrentTexture called with error");
+            TRACELOG(LOG_DEBUG, "wgpuSurfaceGetCurrentTexture called with error");
         }
         // TODO: some better surface recovery handling, doesn't seem to be an issue for now however
         if(surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal){

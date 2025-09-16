@@ -125,12 +125,11 @@ static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResiden
  * @brief Get the Bindings object, returning a map from 
  * Uniform name -> UniformDescriptor (type and minimum size and binding location)
  * 
- * @param shaderSource 
- * @return std::unordered_map<std::string, std::pair<uint32_t, UniformDescriptor>> 
+ * @param shaderSource
  */
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources source);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources source);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindings(ShaderSources source);
+StringToUniformMap getBindingsWGSL(ShaderSources source);
+StringToUniformMap getBindingsGLSL(ShaderSources source);
+StringToUniformMap getBindings    (ShaderSources source);
 
 
 
@@ -783,7 +782,7 @@ static inline ShaderSources dualStage(const char* code1, const char* code2, Shad
 
 void detectShaderLanguage(ShaderSources* sources);
 ShaderSourceType detectShaderLanguage(const void* sourceptr, size_t size);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources source);
+StringToUniformMap getBindingsGLSL(ShaderSources source);
 std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
@@ -1186,7 +1185,7 @@ static bool VertexArray_disableAttribute(VertexArray* vao, uint32_t shaderLocati
 
 typedef struct BindingIdentifier{
     uint32_t length;
-    char name[MAX_BINDING_NAME_LENGTH];
+    char name[MAX_BINDING_NAME_LENGTH + 1];
 }BindingIdentifier;
 
 static inline size_t hashBindingIdentifier(const BindingIdentifier ident){
@@ -1203,6 +1202,10 @@ static inline bool hashBindingCompare(const BindingIdentifier a, const BindingId
     }
     return true;
 }
+
+typedef struct EntryPointSet{
+    char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
+}EntryPointSet;
 
 DEFINE_GENERIC_HASH_MAP(static inline, StringToUniformMap, BindingIdentifier, ResourceTypeDescriptor, hashBindingIdentifier, hashBindingCompare, CLITERAL(BindingIdentifier){0})
 

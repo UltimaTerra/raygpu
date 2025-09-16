@@ -38,17 +38,17 @@
 
 // Simple parser (C implementation in simple_wgsl/*)
 InOutAttributeInfo                                      getAttributesWGSL_Simple(ShaderSources sources);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Simple  (ShaderSources sources);
+StringToUniformMap                                      getBindingsWGSL_Simple  (ShaderSources sources);
 std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Simple(const char* shaderSourceWGSL);
 
 // Tint-based implementations
 InOutAttributeInfo                                      getAttributesWGSL_Tint  (ShaderSources sources);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Tint    (ShaderSources sources);
+StringToUniformMap                                      getBindingsWGSL_Tint    (ShaderSources sources);
 std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL_Tint (const char* shaderSourceWGSL);
 
 // Public redirectors required by the rest of the codebase
 InOutAttributeInfo                                      getAttributesWGSL       (ShaderSources sources);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL         (ShaderSources sources);
+StringToUniformMap                                      getBindingsWGSL         (ShaderSources sources);
 std::vector<std::pair<WGPUShaderStageEnum,std::string>> getEntryPointsWGSL      (const char* shaderSourceWGSL);
 
 // =================================================================================================
@@ -231,17 +231,22 @@ InOutAttributeInfo getAttributesWGSL_Simple(ShaderSources sources) {
     return info;
 }
 
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Simple(ShaderSources sources) {
-    std::unordered_map<std::string, ResourceTypeDescriptor> out;
-
+StringToUniformMap getBindingsWGSL_Simple(ShaderSources sources) {
+    StringToUniformMap out = {0};
     if (sources.sourceCount == 0 || sources.sources[0].data == nullptr) return out;
+    StringToUniformMap_init(&out);
     const char* src = (const char*)sources.sources[0].data;
 
     WgslAstNode* ast = wgsl_parse(src);
-    if (!ast) return out;
+    if (!ast){
+        return out;
+    }
 
     WgslResolver* R = wgsl_resolver_build(ast);
-    if (!R) { wgsl_free_ast(ast); return out; }
+    if (!R) {
+        wgsl_free_ast(ast);
+        return out;
+    }
 
     int n = 0;
     const WgslSymbolInfo* syms = wgsl_resolver_binding_vars(R, &n);
@@ -291,8 +296,13 @@ std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL_Simple(S
                 continue; // non-bindable
             }
         }
-
-        out.emplace(s.name, desc);
+        BindingIdentifier identifier = {
+            .length = (uint32_t)strlen(s.name),
+        };
+        if(identifier.length <= MAX_BINDING_NAME_LENGTH){
+            memcpy(identifier.name, s.name, MAX_BINDING_NAME_LENGTH);
+        }
+        StringToUniformMap_put(&out, identifier, desc);
     }
 
     wgsl_resolve_free((void*)syms);
@@ -600,7 +610,7 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     #endif
     ret.reflectionInfo.uniforms = callocnewpp(StringToUniformMap);
     ret.reflectionInfo.attributes = CLITERAL(InOutAttributeInfo){0};
-    ret.reflectionInfo.uniforms->uniforms = getBindings(sources);
+    ret.reflectionInfo.uniforms = getBindings(sources);
     ret.reflectionInfo.attributes = getAttributesWGSL(sources);
     return ret;
 }
@@ -613,7 +623,7 @@ InOutAttributeInfo getAttributesWGSL(ShaderSources sources) {
 #endif
 }
 
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources sources) {
+StringToUniformMap getBindingsWGSL(ShaderSources sources) {
 #if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
     return getBindingsWGSL_Tint(sources);
 #else
@@ -649,7 +659,7 @@ InOutAttributeInfo getAttributes(ShaderSources sources){
     }
     return {};
 }
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindings(ShaderSources sources){
+StringToUniformMap getBindings(ShaderSources sources){
     
     rassert(sources.language != ShaderSourceType::sourceTypeUnknown, "Source type must be known");
     const ShaderSourceType language = sources.language;
