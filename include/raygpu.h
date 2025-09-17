@@ -947,19 +947,19 @@ typedef enum windowType {
     windowType_glfw, windowType_rgfw, windowType_sdl2, windowType_sdl3
 }windowType;
 
-typedef struct SubWindow{
+typedef struct RGWindowImpl{
     void* handle;
     FullSurface surface;
     windowType type;
-    double scaleFactor;
-}SubWindow;
+    double width, height;
+    double scaleFactor;  
+    // width/height in pixels are obtained by width * scaleFactor  
+}RGWindowImpl;
+
+typedef struct RGWindowImpl* SubWindow;
 
 typedef struct full_renderstate full_renderstate;
 typedef struct GLFWwindow GLFWwindow;
-
-      
-
-
 
 EXTERN_C_BEGIN
     RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title);

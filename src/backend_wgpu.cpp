@@ -2083,16 +2083,16 @@ RGAPI Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidenc
 RGAPI Shader LoadPipeline(const char* shaderSource){
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     InOutAttributeInfo attribs = getAttributesWGSL(sources);
-    std::vector<AttributeAndResidence> allAttribsInOneBuffer;
     
-    allAttribsInOneBuffer.reserve(MAX_VERTEX_ATTRIBUTES);
+    
+    AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];
+    const uint32_t attributeCount = attribs.vertexAttributeCount;
     uint32_t offset = 0;
-    for(size_t i = 0;i < attribs.vertexAttributeCount;i++){
-        const char* name = attribs.vertexAttributes[i].name;
-        const auto& location = attribs.vertexAttributes[i].location;
-        const auto& format = attribs.vertexAttributes[i].format;
-        allAttribsInOneBuffer.push_back(AttributeAndResidence{
-            .attr = WGPUVertexAttribute{
+    for(uint32_t attribIndex = 0;attribIndex < attribs.vertexAttributeCount;attribIndex++){
+        const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
+        const uint32_t location = attribs.vertexAttributes[attribIndex].location;
+        allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
+            .attr = {
                 .nextInChain = nullptr,
                 .format = format,
                 .offset = offset,
@@ -2100,24 +2100,29 @@ RGAPI Shader LoadPipeline(const char* shaderSource){
             },
             .bufferSlot = 0,
             .stepMode = WGPUVertexStepMode_Vertex,
-            .enabled = true}
-        );
+            .enabled = true
+        };
         offset += attributeSize(format);
     }
     
 
-    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindingsWGSL(sources);
-    
-
-    std::vector<ResourceTypeDescriptor> values;
-    values.reserve(bindings.size());
-    for(const auto& [x, y] : bindings){
-        values.push_back(y);
+    StringToUniformMap* bindings = getBindingsWGSL(sources);
+    ResourceTypeDescriptor* values = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
+    uint32_t insertIndex = 0;
+    for(uint32_t i = 0;i < bindings->current_capacity;i++){
+        if(bindings->table[insertIndex].key.length != 0){
+            values[insertIndex++] = bindings->table[insertIndex].value;
+        }
     }
-    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+    
+    std::sort(values, values + bindings->current_size,[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
         return x.location < y.location;
     });
-    return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
+    Shader ret = LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, bindings->current_size, GetDefaultSettings());
+    RL_FREE(values);
+    StringToUniformMap_free(bindings);
+    RL_FREE(bindings);
+    return ret;
 }
 
 RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
@@ -2178,72 +2183,80 @@ DescribedComputePipeline* LoadComputePipeline(const char* shaderCode){
     ShaderSources sources = singleStage(shaderCode, detectShaderLanguage(shaderCode, std::strlen(shaderCode)), WGPUShaderStageEnum_Compute);
 
 
-    auto bindmap = getBindings(sources);
-    //std::vector<WGPUBindGroupLayoutEntry> udesc;
-    std::vector<ResourceTypeDescriptor> udesc;
-    for(auto& [x,y] : bindmap){
-        WGPUBindGroupLayoutEntry insert{};
-        insert.binding = y.location;
-        insert.visibility = y.visibility;
-        switch(y.type){
-            case uniform_buffer:{
-                insert.buffer.type = WGPUBufferBindingType_Uniform;
-                insert.buffer.minBindingSize = y.minBindingSize;
-            };break;
-            case storage_buffer:{
-                if(y.access == readonly)
-                    insert.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
-                else
-                    insert.buffer.type = WGPUBufferBindingType_Storage;
-                insert.buffer.minBindingSize = y.minBindingSize;
-            }break;
-            case texture2d:{
-                insert.texture.viewDimension = WGPUTextureViewDimension_2D;
-                insert.texture.sampleType = toTextureSampleType(y.fstype);
-            }break;
-            case texture3d:{
-                insert.texture.viewDimension = WGPUTextureViewDimension_3D;
-                insert.texture.sampleType = toTextureSampleType(y.fstype);
-            }break;
-            case texture2d_array:{
-                insert.texture.viewDimension = WGPUTextureViewDimension_2DArray;
-                insert.texture.sampleType = toTextureSampleType(y.fstype);
-            }break;
-            case storage_texture2d:{
-                insert.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
-                insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-            }break;
-            case storage_texture3d:{
-                insert.storageTexture.viewDimension = WGPUTextureViewDimension_3D;
-                insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-            }break;
-            case storage_texture2d_array:{
-                insert.storageTexture.viewDimension = WGPUTextureViewDimension_2DArray;
-                insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-            }break;
-            case texture_sampler: {
-                insert.sampler.type = WGPUSamplerBindingType_Filtering;
-            }break;
-            case uniform_type_undefined:
-            case uniform_type_enumcount:
-            case uniform_type_force32:
-            case combined_image_sampler:
-            case acceleration_structure:
-            rg_unreachable();
-        }
+    StringToUniformMap* bindings = getBindings(sources);
+    
+    ResourceTypeDescriptor* udesc = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
+    uint32_t insertIndex = 0;
+    for(uint32_t i = 0;i < bindings->current_capacity;i++){
+        if(bindings->table[insertIndex].key.length == 0) continue;
+        const ResourceTypeDescriptor y = bindings->table[insertIndex].value;
 
-        udesc.push_back(y);
+        //WGPUBindGroupLayoutEntry insert = {0};
+        //insert.binding = y.location;
+        //insert.visibility = y.visibility;
+        //switch(y.type){
+        //    case uniform_buffer:{
+        //        insert.buffer.type = WGPUBufferBindingType_Uniform;
+        //        insert.buffer.minBindingSize = y.minBindingSize;
+        //    };break;
+        //    case storage_buffer:{
+        //        if(y.access == readonly)
+        //            insert.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
+        //        else
+        //            insert.buffer.type = WGPUBufferBindingType_Storage;
+        //        insert.buffer.minBindingSize = y.minBindingSize;
+        //    }break;
+        //    case texture2d:{
+        //        insert.texture.viewDimension = WGPUTextureViewDimension_2D;
+        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
+        //    }break;
+        //    case texture3d:{
+        //        insert.texture.viewDimension = WGPUTextureViewDimension_3D;
+        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
+        //    }break;
+        //    case texture2d_array:{
+        //        insert.texture.viewDimension = WGPUTextureViewDimension_2DArray;
+        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
+        //    }break;
+        //    case storage_texture2d:{
+        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
+        //    }break;
+        //    case storage_texture3d:{
+        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_3D;
+        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
+        //    }break;
+        //    case storage_texture2d_array:{
+        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_2DArray;
+        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
+        //    }break;
+        //    case texture_sampler: {
+        //        insert.sampler.type = WGPUSamplerBindingType_Filtering;
+        //    }break;
+        //    case uniform_type_undefined:
+        //    case uniform_type_enumcount:
+        //    case uniform_type_force32:
+        //    case combined_image_sampler:
+        //    case acceleration_structure:
+        //    rg_unreachable();
+        //}
+
+        udesc[insertIndex++] = y;
     }
     
     //std::sort(udesc.begin(), udesc.end(), [](const WGPUBindGroupLayoutEntry& x, const WGPUBindGroupLayoutEntry& y){
     //    return x.binding < y.binding;
     //});
 
-    std::sort(udesc.begin(), udesc.end(), [](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+    std::sort(udesc, udesc + insertIndex, [](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
         return x.location < y.location;
     });
 
-    return LoadComputePipelineEx(shaderCode, udesc.data(), udesc.size());    
+    DescribedComputePipeline* ret = LoadComputePipelineEx(shaderCode, udesc, insertIndex);
+    RL_FREE(udesc);
+    StringToUniformMap_free(bindings);
+    RL_FREE(bindings);
+    return ret;
 }
 
 RGAPI DescribedComputePipeline* LoadComputePipelineEx(const char* shaderCode, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount){

@@ -580,7 +580,7 @@ getBindingsWGSL_Tint(ShaderSources sources) {
 
 DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     
-    DescribedShaderModule ret zeroinit;
+    DescribedShaderModule ret = {0};
     #if SUPPORT_WGPU_BACKEND == 1 || SUPPORT_WGPU_BACKEND == 0
 
     rassert(sources.language == sourceTypeWGSL, "Source language must be wgsl for this function");
@@ -601,12 +601,14 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
             }
         }
         
-        std::vector<std::pair<WGPUShaderStageEnum, std::string>> entryPoints = getEntryPointsWGSL((const char*)sources.sources[i].data);
-        for(uint32_t i = 0;i < entryPoints.size();i++){
-            rassert(entryPoints[i].second.size() < 15, "Entrypoint name must be shorter than 15 characters");
-            char* dest = ret.reflectionInfo.ep[entryPoints[i].first].name;
-            char* end = std::copy(entryPoints[i].second.begin(), entryPoints[i].second.end(), dest);
-            *end = '\0';
+        EntryPointSet entryPoints = getEntryPointsWGSL((const char*)sources.sources[i].data);
+        for(uint32_t i = 0;i < 16;i++){
+            //rassert(entryPoints[i].second.size() < 15, "Entrypoint name must be shorter than 15 characters");
+            if(entryPoints.names[i][0] == '\0'){
+                continue;
+            }
+            char* dest = ret.reflectionInfo.ep[i].name;
+            memcpy(dest, entryPoints.names[i], MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1);
         }
     }
     #else

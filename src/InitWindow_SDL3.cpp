@@ -59,29 +59,29 @@ void Initialize_SDL3(){
     }
 }
 
-RGAPI void* CreateSurfaceForWindow_SDL3(void* windowHandle){
-    void* surface = SDL3_GetWGPUSurface((WGPUInstance)GetInstance(), (SDL_Window*)windowHandle);
+RGAPI WGPUSurface CreateSurfaceForWindow_SDL3(void* windowHandle){
+    WGPUSurface surface = SDL3_GetWGPUSurface((WGPUInstance)GetInstance(), (SDL_Window*)windowHandle);
     int px, py;
     int rx, ry;
     
     SDL_GetWindowSizeInPixels((SDL_Window*)windowHandle, &px, &py);
     SDL_GetWindowSize((SDL_Window*)windowHandle, &rx, &ry);
-    TRACELOG(LOG_INFO, "Pixel size: %d, %d", px, py);
-    TRACELOG(LOG_INFO, "Render size: %d, %d", rx, ry);
+    TRACELOG(LOG_INFO, "[SDL_Window] Pixel size: %d, %d", px, py);
+    TRACELOG(LOG_INFO, "[SDL_Window] Render size: %d, %d", rx, ry);
     double scaleFactor = (double)px / rx;
-    g_renderstate.createdSubwindows.find(windowHandle)->second.scaleFactor = scaleFactor;
-    TRACELOG(LOG_INFO, "%f", g_renderstate.createdSubwindows.find(windowHandle)->second.scaleFactor);
+    g_renderstate.createdSubwindows.find(windowHandle)->second->scaleFactor = scaleFactor;
+    TRACELOG(LOG_INFO, "%f", g_renderstate.createdSubwindows.find(windowHandle)->second->scaleFactor);
     return surface;
 }
 
 RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
-    SubWindow ret zeroinit;
-    ret.type = windowType_sdl3;
-    ret.handle = SDL_CreateWindow(title, width, height, 0);
-    SDL_SetWindowResizable((SDL_Window*)ret.handle, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
+    SubWindow ret = callocnew(RGWindowImpl);
+    ret->type = windowType_sdl3;
+    ret->handle = SDL_CreateWindow(title, width, height, 0);
+    SDL_SetWindowResizable((SDL_Window*)ret->handle, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
     
-    g_renderstate.createdSubwindows[ret.handle] = ret;
-    g_renderstate.input_map[(SDL_Window*)ret.handle];
+    g_renderstate.createdSubwindows[ret->handle] = ret;
+    g_renderstate.input_map[(SDL_Window*)ret->handle];
     return ret;
 }
 
@@ -102,36 +102,26 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
         TRACELOG(LOG_INFO, "  Video driver %d: %s", i, SDL_GetVideoDriver(i));
     }
     TRACELOG(LOG_INFO, "  Current video driver: %s", SDL_GetCurrentVideoDriver());
-    SubWindow ret = {
-        .scaleFactor = 1.0
-    };
-    
-    ret.type = windowType_sdl3;
-    //SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, "1");
+    SubWindow ret = callocnew(RGWindowImpl);
+    ret->scaleFactor = 1.0;
+    ret->type = windowType_sdl3;
     SDL_WindowFlags windowFlags = 0;
-    //#if SUPPORT_VULKAN_BACKEND == 1 && !defined(__EMSCRIPTEN__)
-    //windowFlags |= SDL_WINDOW_VULKAN;
-    //#endif
-    #ifdef __APPLE__
-    // windowFlags |= SDL_WINDOW_METAL;
-    #endif
+    
     windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
     SDL_Window *window = SDL_CreateWindow(title, width, height, windowFlags);
-    //int w, h;
-    //SDL_GetRenderOutputSize(SDL_GetRenderer(window), &w, &h);
-    //std::cout << "SDL Rendersize: " << w << " x " << h << std::endl;
+    
     rassert(window != NULL, "SDL_CreateWindow returned NULL");
     SDL_SetWindowResizable(window, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
-    if(g_renderstate.windowFlags & FLAG_FULLSCREEN_MODE)
+    if(g_renderstate.windowFlags & FLAG_FULLSCREEN_MODE){
         SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-
+    }
     
-    ret.handle = window;
+    ret->handle = window;
 
-    g_renderstate.createdSubwindows[ret.handle] = ret;
-    g_renderstate.window = (GLFWwindow*)ret.handle;
-    g_renderstate.mainWindow = &g_renderstate.createdSubwindows[ret.handle];
-    SDL_StartTextInput((SDL_Window*)ret.handle);
+    g_renderstate.createdSubwindows[ret->handle] = ret;
+    g_renderstate.window = (GLFWwindow*)ret->handle;
+    g_renderstate.mainWindow = g_renderstate.createdSubwindows[ret->handle];
+    SDL_StartTextInput((SDL_Window*)ret->handle);
     return ret;
 }
 
@@ -327,9 +317,9 @@ int GetMonitorHeight_SDL3(cwoid){
 void ResizeCallback(SDL_Window* window, int width, int height){
 
     //TRACELOG(LOG_INFO, "SDL3's ResizeCallback called with %d x %d", width, height);
-    ResizeSurface(&g_renderstate.createdSubwindows[window].surface, width, height);
+    ResizeSurface(&g_renderstate.createdSubwindows[window]->surface, width, height);
     if((void*)window == (void*)g_renderstate.window){
-        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[window].surface.renderTarget;
+        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[window]->surface.renderTarget;
     }
     Matrix newcamera = ScreenMatrix(width, height);
 }
@@ -364,13 +354,13 @@ void MouseButtonCallback(SDL_Window* window, int button, int action){
     }
 }
 void MousePositionCallback(SDL_Window* window, double x, double y){
-    float scale = g_renderstate.createdSubwindows.at(window).scaleFactor;
-    g_renderstate.input_map[window].mousePos = Vector2{float(x) * scale, float(y) * scale};
+    double scale = g_renderstate.createdSubwindows.at(window)->scaleFactor;
+    g_renderstate.input_map[window].mousePos = CLITERAL(Vector2){(float)(x * scale), (float)(y * scale)};
 }
 
 void ScrollCallback(SDL_Window* window, double xoffset, double yoffset){
-    g_renderstate.input_map[window].scrollThisFrame.x += xoffset;
-    g_renderstate.input_map[window].scrollThisFrame.y += yoffset;
+    g_renderstate.input_map[window].scrollThisFrame.x += (float)xoffset;
+    g_renderstate.input_map[window].scrollThisFrame.y += (float)yoffset;
 }
 
 void KeyUpCallback (SDL_Window* window, int key, int scancode, int mods){
@@ -412,36 +402,7 @@ RGAPI void PollEvents_SDL3() {
             int newWidth = event.window.data1;
             int newHeight = event.window.data2;
             ResizeCallback(window, newWidth, newHeight);
-            //if (event.window.event == SDL_WINDOWEVENT_RESIZED || event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-            //    int newWidth = event.window.data1;
-            //    int newHeight = event.window.data2;
-            //    ResizeCallback(window, newWidth, newHeight);
-            //} else if (event.window.event == SDL_WINDOWEVENT_ENTER) {
-            //    CursorEnterCallback(window, true);
-            //} else if (event.window.event == SDL_WINDOWEVENT_LEAVE) {
-            //    CursorEnterCallback(window, false);
-            //} else if(event.window.event == SDL_WINDOWEVENT_CLOSE){
-            //    g_renderstate.closeFlag = true;
-            //}
-            // Handle other window events if necessary
         } break;
-        //case SDL_MULTIGESTURE:{
-        //    //SDL_Window *window = SDL_GetWindowFromID(event.tfinger.windowID);
-        //    if(lastTouched)
-        //        GestureCallback(lastTouched, event.mgesture.dDist, event.mgesture.dTheta);
-        //}break;
-        //case SDL_FINGERDOWN:{
-        //    lastTouched = SDL_GetWindowFromID(event.tfinger.windowID);
-        //    int w, h;
-        //    SDL_GetWindowSize(lastTouched, &w, &h);
-        //    FingerDownCallback(lastTouched, event.tfinger.fingerId, event.tfinger.x * w, event.tfinger.y * h);
-        //}break;
-        //case SDL_FINGERUP:{
-        //    lastTouched = SDL_GetWindowFromID(event.tfinger.windowID);
-        //    int w, h;
-        //    SDL_GetWindowSize(lastTouched, &w, &h);
-        //    FingerUpCallback(lastTouched, event.tfinger.fingerId, event.tfinger.x * w, event.tfinger.y * h);
-        //}break;
         case SDL_EVENT_FINGER_MOTION:{
             SDL_Window* lastTouched = SDL_GetWindowFromID(event.tfinger.windowID);
             int w, h;
@@ -511,34 +472,19 @@ void ToggleFullscreen_SDL3(cwoid){
     if(alreadyFullscreen){
         //We need to exit fullscreen
         g_renderstate.windowFlags &= ~FLAG_FULLSCREEN_MODE;
-        //SDL_SetWindowResizable((SDL_Window*)g_renderstate.window, SDL_FALSE);
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, 0);
-
         SDL_SetWindowSize((SDL_Window*)g_renderstate.window, (int)g_renderstate.input_map[g_renderstate.window].windowPosition.width, (int)g_renderstate.input_map[g_renderstate.window].windowPosition.height);
-        
-        //SDL_SetWindowSize((SDL_Window*)g_renderstate.window, g_renderstate.input_map[g_renderstate.window].windowPosition.width, g_renderstate.input_map[g_renderstate.window].windowPosition.height);
-        //SDL_SetWindowSize((SDL_Window*)g_renderstate.window, g_renderstate.input_map[g_renderstate.window].windowPosition.width, g_renderstate.input_map[g_renderstate.window].windowPosition.height);
-        //SDL_SetWindowSize((SDL_Window*)g_renderstate.window, g_renderstate.input_map[g_renderstate.window].windowPosition.width, g_renderstate.input_map[g_renderstate.window].windowPosition.height);
-        //TRACELOG(LOG_WARNING, "Setting the size to  %d x %d", (int)g_renderstate.input_map[g_renderstate.window].windowPosition.width, (int)g_renderstate.input_map[g_renderstate.window].windowPosition.height);
     }
     else{
-        //We need to enter fullscreen
         int xpos = 0, ypos = 0;
         int xs, ys;
-        #ifndef DAWN_USE_WAYLAND
+        #if RAYGPU_USE_WAYLAND != 1
         SDL_GetWindowPosition((SDL_Window*)g_renderstate.window, &xpos, &ypos);
         #endif
         SDL_GetWindowSize((SDL_Window*)g_renderstate.window, &xs, &ys);
         g_renderstate.input_map[g_renderstate.window].windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         SDL_SetWindowSize((SDL_Window*)g_renderstate.window, GetMonitorWidth_SDL3(), GetMonitorHeight_SDL3());
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, SDL_WINDOW_FULLSCREEN);
-        //int monitorCount = 0;
-        //int monitorIndex = GetCurrentMonitor_GLFW(g_renderstate.window);
-        //GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
-        //// Use current monitor, so we correctly get the display the window is on
-        //GLFWmonitor *monitor = (monitorIndex < monitorCount)? monitors[monitorIndex] : NULL;
-        //auto vm = glfwGetVideoMode(monitor);
-        //glfwSetWindowMonitor(g_renderstate.window, glfwGetPrimaryMonitor(), 0, 0, vm->width, vm->height, vm->refreshRate);
     }
 }
 

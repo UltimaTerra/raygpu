@@ -130,7 +130,7 @@ struct renderstate{
     std::mutex drawmutex;
     GIFRecordState* grst;
 
-    SubWindow* mainWindow{};
+    SubWindow mainWindow{};
     std::map<void*, SubWindow> createdSubwindows;
     SubWindow activeSubWindow{};
 

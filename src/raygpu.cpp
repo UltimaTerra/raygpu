@@ -770,14 +770,14 @@ RGAPI void BeginDrawing(){
         #endif
 
         //g_renderstate.drawmutex.lock();
-        g_renderstate.renderExtentX = g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture.width;
-        g_renderstate.width = g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture.width;
-        g_renderstate.renderExtentY = g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture.height;
-        g_renderstate.height = g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture.height;
+        g_renderstate.renderExtentX = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
+        g_renderstate.width = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
+        g_renderstate.renderExtentY = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
+        g_renderstate.height = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
         //std::cout << g_renderstate.createdSubwindows[g_renderstate.window].surface.frameBuffer.depth.width << std::endl;
-        GetNewTexture(&g_renderstate.createdSubwindows[g_renderstate.window].surface);
-        g_renderstate.renderTargetStack.push(g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget);
-        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget;
+        GetNewTexture(&g_renderstate.createdSubwindows[g_renderstate.window]->surface);
+        g_renderstate.renderTargetStack.push(g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget);
+        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget;
         //g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition] = g_renderstate.mainWindowRenderTarget;
         //__builtin_dump_struct(&(g_renderstate.mainWindowRenderTarget.depth), printf);
     }
@@ -1440,24 +1440,23 @@ Shader LoadShader(const char *vsFileName, const char *fsFileName){
     return shader;
 }
 
-extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
+Shader LoadShaderSingleSource(const char* shaderSource){
     ShaderSources sources zeroinit;
     #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1 
     sources.language = sourceTypeWGSL;
     auto& src = sources.sources[sources.sourceCount++];
     src.data = shaderSource;
     src.sizeInBytes = std::strlen(shaderSource);
-    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
-
+    StringToUniformMap* bindings = getBindings(sources);
     InOutAttributeInfo attribs = getAttributes(sources);
     
-    std::vector<AttributeAndResidence> allAttribsInOneBuffer;
-    allAttribsInOneBuffer.reserve(attribs.vertexAttributeCount);
+    AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];
+    const uint32_t attributeCount = attribs.vertexAttributeCount;
     uint32_t offset = 0;
     for(uint32_t attribIndex = 0;attribIndex < attribs.vertexAttributeCount;attribIndex++){
         const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
-        allAttribsInOneBuffer.push_back(AttributeAndResidence{
+        allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
             .attr = WGPUVertexAttribute{
                 .nextInChain = nullptr,
                 .format = format,
@@ -1466,19 +1465,27 @@ extern "C" Shader LoadShaderSingleSource(const char* shaderSource){
             },
             .bufferSlot = 0,
             .stepMode = WGPUVertexStepMode_Vertex,
-            .enabled = true}
-        );
+            .enabled = true
+        };
         offset += attributeSize(format);
     }
-    std::vector<ResourceTypeDescriptor> values;
-    values.reserve(bindings.size());
-    for(const auto& [x,y] : bindings){
-        values.push_back(y);
+    ResourceTypeDescriptor* values = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
+    uint32_t insertIndex = 0;
+    for(uint32_t i = 0;i < bindings->current_capacity;i++){
+        if(bindings->table[insertIndex].key.length != 0){
+            values[insertIndex++] = bindings->table[insertIndex].value;
+        }
     }
-    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
+    
+    std::sort(values, values + bindings->current_size, [](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
         return x.location < y.location;
     });
-    return LoadPipelineEx(shaderSource, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), values.data(), values.size(), GetDefaultSettings());
+
+    Shader ret = LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, insertIndex, GetDefaultSettings());
+    RL_FREE(values);
+    StringToUniformMap_free(bindings);
+    RL_FREE(bindings);
+    return ret;
     #else
     return CLITERAL(Shader){0};
     #endif
@@ -2049,20 +2056,26 @@ void UseNoTexture(){
     UseTexture(g_renderstate.whitePixel);
 }
 
-//UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
-//
-//    auto it = shaderModule.reflectionInfo.uniforms->uniforms.find(uniformName);
-//    if(it == shaderModule.reflectionInfo.uniforms->uniforms.end()){
-//        TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
-//        return UniformAccessor{.index = LOCATION_NOT_FOUND, .bindgroup = nullptr};
-//    }
-//    uint32_t location = it->second.location;
-//    return UniformAccessor{.index = location, .bindgroup = &this->bindGroup};
-//}
+UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
+    
+    const ResourceTypeDescriptor* it = StringToUniformMap_get(shaderModule.reflectionInfo.uniforms, BIfromCString(uniformName));
+    if(it != NULL){
+        TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
+        return UniformAccessor{
+            .index = LOCATION_NOT_FOUND,
+            .bindgroup = nullptr
+        };
+    }
+    uint32_t location = it->location;
+    return UniformAccessor{
+        .index = location, 
+        .bindgroup = &this->bindGroup
+    };
+}
 
-//void UniformAccessor::operator=(DescribedBuffer* buf){
-//    SetBindgroupStorageBuffer(bindgroup, index, buf);
-//}
+void UniformAccessor::operator=(DescribedBuffer* buf){
+    SetBindgroupStorageBuffer(bindgroup, index, buf);
+}
 
 //DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
 //    pl->state.vertexAttributes = vao->attributes;
@@ -2141,43 +2154,33 @@ void EndTextureMode(){
         BeginRenderpass();
     }
 }
-extern "C" void BeginWindowMode(SubWindow sw){
-    auto& swref = g_renderstate.createdSubwindows.at(sw.handle);
+RGAPI void BeginWindowMode(SubWindow sw){
+    SubWindow swref = g_renderstate.createdSubwindows.at(sw->handle);
     g_renderstate.activeSubWindow = sw;
-    GetNewTexture(&swref.surface);
-    BeginTextureMode(swref.surface.renderTarget);
+    GetNewTexture(&swref->surface);
+    BeginTextureMode(swref->surface.renderTarget);
 }
 
 
-extern "C" void EndWindowMode(){
-    
-    { //This is an inlined EndTextureMode that passes false for EndRenderpassPro
-        //drawCurrentBatch();
-        //EndRenderpassPro(GetActiveRenderPass(), false);
-
-        EndTextureMode();
-        
-        if(!g_renderstate.renderTargetStack.empty()){
-            g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
-            g_renderstate.renderExtentY = g_renderstate.renderTargetStack.peek().texture.height;
-            Matrix mat = ScreenMatrix((int)g_renderstate.renderExtentX, (int)g_renderstate.renderExtentY);
-            //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
-            PopMatrix();
-            SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
-            BeginRenderpass();
-        }
+RGAPI void EndWindowMode(){
+    EndTextureMode();
+    if(!g_renderstate.renderTargetStack.empty()){
+        g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
+        g_renderstate.renderExtentY = g_renderstate.renderTargetStack.peek().texture.height;
+        Matrix mat = ScreenMatrix((int)g_renderstate.renderExtentX, (int)g_renderstate.renderExtentY);
+        //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
+        PopMatrix();
+        SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
+        BeginRenderpass();
     }
-
-    PresentSurface(&g_renderstate.activeSubWindow.surface);
+    PresentSurface(&g_renderstate.activeSubWindow->surface);
     auto& ipstate = g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()];
     std::copy(ipstate.keydown.begin(), ipstate.keydown.end(), ipstate.keydownPrevious.begin());
     ipstate.mousePosPrevious = ipstate.mousePos;
     ipstate.scrollPreviousFrame = ipstate.scrollThisFrame;
     ipstate.scrollThisFrame = Vector2{0, 0};
     std::copy(ipstate.mouseButtonDown.begin(), ipstate.mouseButtonDown.end(), ipstate.mouseButtonDownPrevious.begin());
-    
-    g_renderstate.activeSubWindow = SubWindow zeroinit;
-    
+    g_renderstate.activeSubWindow = NULL;
     return;
 }
 
