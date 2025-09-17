@@ -125,12 +125,11 @@ static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResiden
  * @brief Get the Bindings object, returning a map from 
  * Uniform name -> UniformDescriptor (type and minimum size and binding location)
  * 
- * @param shaderSource 
- * @return std::unordered_map<std::string, std::pair<uint32_t, UniformDescriptor>> 
+ * @param shaderSource
  */
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsWGSL(ShaderSources source);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources source);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindings(ShaderSources source);
+StringToUniformMap* getBindingsWGSL(ShaderSources source);
+StringToUniformMap* getBindingsGLSL(ShaderSources source);
+StringToUniformMap* getBindings    (ShaderSources source);
 
 
 
@@ -783,8 +782,11 @@ static inline ShaderSources dualStage(const char* code1, const char* code2, Shad
 
 void detectShaderLanguage(ShaderSources* sources);
 ShaderSourceType detectShaderLanguage(const void* sourceptr, size_t size);
-std::unordered_map<std::string, ResourceTypeDescriptor> getBindingsGLSL(ShaderSources source);
-std::vector<std::pair<WGPUShaderStageEnum, std::string>> getEntryPointsWGSL(const char* shaderSourceWGSL);
+StringToUniformMap* getBindingsGLSL(ShaderSources source);
+typedef struct EntryPointSet{
+    char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
+}EntryPointSet;
+EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
 extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, const std::vector<AttributeAndResidence>& attribs);
@@ -1186,12 +1188,24 @@ static bool VertexArray_disableAttribute(VertexArray* vao, uint32_t shaderLocati
 
 typedef struct BindingIdentifier{
     uint32_t length;
-    char name[MAX_BINDING_NAME_LENGTH];
+    char name[MAX_BINDING_NAME_LENGTH + 1];
 }BindingIdentifier;
+
+static inline BindingIdentifier BIfromCString(const char* c_str){
+    size_t len = strlen(c_str);
+    BindingIdentifier identifier = {0, 0};
+    if(len > MAX_BINDING_NAME_LENGTH){
+        return identifier;
+    }
+    identifier.length = (uint32_t)len;
+    memcpy(identifier.name, c_str, MAX_BINDING_NAME_LENGTH);
+    return identifier;
+}
 
 static inline size_t hashBindingIdentifier(const BindingIdentifier ident){
     return hash_bytes(ident.name, ident.length);
 }
+
 static inline bool hashBindingCompare(const BindingIdentifier a, const BindingIdentifier b){
     if(a.length != b.length){
         return false;
@@ -1203,6 +1217,8 @@ static inline bool hashBindingCompare(const BindingIdentifier a, const BindingId
     }
     return true;
 }
+
+
 
 DEFINE_GENERIC_HASH_MAP(static inline, StringToUniformMap, BindingIdentifier, ResourceTypeDescriptor, hashBindingIdentifier, hashBindingCompare, CLITERAL(BindingIdentifier){0})
 
@@ -1308,29 +1324,28 @@ std::vector<uint32_t> wgsl_to_spirv(const char* anything);
 std::vector<uint32_t> glsl_to_spirv(const char* cs);
 ShaderSources wgsl_to_spirv(ShaderSources sources);
 ShaderSources glsl_to_spirv(ShaderSources sources);
-extern "C" void UpdatePipeline(DescribedPipeline* pl);
-extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle);
-extern "C" void ResetSyncState(cwoid);
-extern "C" void CharCallback(void* window, unsigned int codePoint);
+RGAPI void UpdatePipeline(DescribedPipeline* pl);
+RGAPI void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle);
+RGAPI void ResetSyncState(cwoid);
+RGAPI void CharCallback(void* window, unsigned int codePoint);
 struct RGFW_window;
-extern "C" void* RGFW_GetWGPUSurface(void* instance, RGFW_window* window);
 
-extern "C" void* CreateSurfaceForWindow(SubWindow window);
-extern "C" void* CreateSurfaceForWindow_SDL2(void* windowHandle);
-extern "C" void* CreateSurfaceForWindow_SDL3(void* windowHandle);
-extern "C" void* CreateSurfaceForWindow_GLFW(void* windowHandle);
-extern "C" void* CreateSurfaceForWindow_RGFW(void* windowHandle);
-
+RGAPI WGPUSurface RGFW_GetWGPUSurface(void* instance, RGFW_window* window);
+RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window);
+RGAPI WGPUSurface CreateSurfaceForWindow_SDL2(void* windowHandle);
+RGAPI WGPUSurface CreateSurfaceForWindow_SDL3(void* windowHandle);
+RGAPI WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle);
+RGAPI WGPUSurface CreateSurfaceForWindow_RGFW(void* windowHandle);
 
 static inline WGPUFilterMode toWGPUFilterMode(TextureFilter fm){
     switch(fm){
-        case TEXTURE_FILTER_BILINEAR:return WGPUFilterMode_Linear;
+        case TEXTURE_FILTER_BILINEAR: return WGPUFilterMode_Linear;
         default: return WGPUFilterMode_Nearest;
     }
 }
 static inline WGPUMipmapFilterMode toWGPUMipmapFilterMode(TextureFilter fm){
     switch(fm){
-        case TEXTURE_FILTER_BILINEAR:return WGPUMipmapFilterMode_Linear;
+        case TEXTURE_FILTER_BILINEAR: return WGPUMipmapFilterMode_Linear;
         default: return WGPUMipmapFilterMode_Nearest;
     }
 }

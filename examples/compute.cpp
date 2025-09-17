@@ -66,34 +66,25 @@ void main() {
 
 const char computeSource[] = R"(#version 450 core
 
-// Define the workgroup size (matches WGSL's @workgroup_size)
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-// Define storage buffers (SSBOs) matching WGSL bindings
-// Use std430 layout for more predictable packing of arrays/structs in SSBOs
-
-// Binding 0: Position Buffer (Read/Write)
 layout(set = 0, binding = 0, std430) buffer posBuffer {
-    vec2 posBufferdata[]; // Unsized array of vec2
+    vec2 posBufferdata[];
 };
 
-// Binding 1: Velocity Buffer (Read-Only recommended)
-// Adding 'readonly' keyword is good practice if the buffer isn't written to
 layout(set = 0, binding = 1, std430) buffer velBuffer {
-    vec2 velBufferdata[]; // Unsized array of vec2
+    vec2 velBufferdata[];
 };
 
 void main() {
     // Get the global invocation ID (matches WGSL's @builtin(global_invocation_id))
     uvec3 id = gl_GlobalInvocationID;
-    //return;
+    
     uint index = id.x;// * 64u + id.y;
     vec2 pos = posBufferdata[index];
     vec2 accel = -pos / pow(dot(pos, pos), 1);
     velBufferdata[index] += accel * 0.000001f;
     posBufferdata[index] = posBufferdata[index] + velBufferdata[index];
-    
-
 }
 
 )";
