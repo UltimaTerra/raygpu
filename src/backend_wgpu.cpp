@@ -481,7 +481,8 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* unifo
 
     for(size_t i = 0;i < uniformCount;i++){
         blayouts[i].binding = uniforms[i].location;
-        switch(uniforms[i].type){
+        const uniform_type type = uniforms[i].type;
+        switch(type){
             default:
                 rg_unreachable();
             case uniform_buffer:
@@ -2110,8 +2111,8 @@ RGAPI Shader LoadPipeline(const char* shaderSource){
     ResourceTypeDescriptor* values = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
     uint32_t insertIndex = 0;
     for(uint32_t i = 0;i < bindings->current_capacity;i++){
-        if(bindings->table[insertIndex].key.length != 0){
-            values[insertIndex++] = bindings->table[insertIndex].value;
+        if(bindings->table[i].key.length != 0){
+            values[insertIndex++] = bindings->table[i].value;
         }
     }
     
@@ -2188,9 +2189,11 @@ DescribedComputePipeline* LoadComputePipeline(const char* shaderCode){
     ResourceTypeDescriptor* udesc = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
     uint32_t insertIndex = 0;
     for(uint32_t i = 0;i < bindings->current_capacity;i++){
-        if(bindings->table[insertIndex].key.length == 0) continue;
-        const ResourceTypeDescriptor y = bindings->table[insertIndex].value;
-
+        StringToUniformMap_kv_pair* entry = bindings->table + i;
+        if(bindings->table[i].key.length == 0) {
+            continue;
+        }
+        udesc[insertIndex++] = entry->value;
         //WGPUBindGroupLayoutEntry insert = {0};
         //insert.binding = y.location;
         //insert.visibility = y.visibility;
@@ -2241,7 +2244,7 @@ DescribedComputePipeline* LoadComputePipeline(const char* shaderCode){
         //    rg_unreachable();
         //}
 
-        udesc[insertIndex++] = y;
+        
     }
     
     //std::sort(udesc.begin(), udesc.end(), [](const WGPUBindGroupLayoutEntry& x, const WGPUBindGroupLayoutEntry& y){
@@ -2287,6 +2290,7 @@ RGAPI DescribedComputePipeline* LoadComputePipelineEx(const char* shaderCode, co
     ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
     return ret;
 }
+
 Shader LoadShaderFromMemoryOld(const char *vertexSource, const char *fragmentSource){
     Shader shader zeroinit;
     

@@ -1472,8 +1472,8 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     ResourceTypeDescriptor* values = (ResourceTypeDescriptor*)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
     uint32_t insertIndex = 0;
     for(uint32_t i = 0;i < bindings->current_capacity;i++){
-        if(bindings->table[insertIndex].key.length != 0){
-            values[insertIndex++] = bindings->table[insertIndex].value;
+        if(bindings->table[i].key.length != 0){
+            values[insertIndex++] = bindings->table[i].value;
         }
     }
     
@@ -2059,7 +2059,7 @@ void UseNoTexture(){
 UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
     
     const ResourceTypeDescriptor* it = StringToUniformMap_get(shaderModule.reflectionInfo.uniforms, BIfromCString(uniformName));
-    if(it != NULL){
+    if(it == NULL){
         TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
         return UniformAccessor{
             .index = LOCATION_NOT_FOUND,
