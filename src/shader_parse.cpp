@@ -56,11 +56,8 @@ EntryPointSet                                           getEntryPointsWGSL      
 #if !defined(SUPPORT_TINT_WGSL_PARSER) || (SUPPORT_TINT_WGSL_PARSER != 1)
 
 extern "C" {
-    // Pull in the C parser/resolver only for the simple backend.
     #include "simple_wgsl/wgsl_parser.c"
-    //#include "simple_wgsl/wgsl_parser.h"
     #include "simple_wgsl/wgsl_resolve.c"
-    //#include "simple_wgsl/wgsl_resolve.h"
 }
 
 static inline bool sw_starts_with(const char* s, const char* prefix) {
@@ -169,7 +166,7 @@ static inline SW_ParsedTextureMeta sw_parse_texture_typenode(const WgslAstNode* 
 }
 
 EntryPointSet getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
-    EntryPointSet eps;
+    EntryPointSet eps = {0};
     if (!shaderSourceWGSL) return eps;
 
     WgslAstNode* ast = wgsl_parse(shaderSourceWGSL);

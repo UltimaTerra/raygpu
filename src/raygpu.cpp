@@ -323,10 +323,10 @@ RGAPI void DrawArraysInstanced(PrimitiveType drawMode, uint32_t vertexCount, uin
 }
 
 RGAPI Texture GetDepthTexture(){
-    return g_renderstate.renderTargetStack.peek().depth;
+    return RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture;
 }
 RGAPI Texture GetMultisampleColorTarget(){
-    return g_renderstate.renderTargetStack.peek().colorMultisample;
+    return RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample;
 }
 
 
@@ -413,24 +413,31 @@ RGAPI void drawCurrentBatch(){
     vboptr = vboptr_base;
 }
 
-void LoadIdentity(cwoid){
-    g_renderstate.matrixStack.peek().first = MatrixIdentity();
+void LoadIdentity(void) {
+    g_renderstate.matrixStack.data[g_renderstate.matrixStack.current_pos - 1].matrix = MatrixIdentity();
 }
-void PushMatrix(){
-    g_renderstate.matrixStack.push(std::pair<Matrix, WGPUBuffer>{});
+
+void PushMatrix(void) {
+    MatrixBufferPair pair = {0};
+    MatrixBufferPair_stack_push(&g_renderstate.matrixStack, pair);
 }
-void PopMatrix(){
-    g_renderstate.matrixStack.pop();
+
+void PopMatrix(void) {
+    MatrixBufferPair_stack_pop(&g_renderstate.matrixStack);
 }
-Matrix GetMatrix(){
-    return g_renderstate.matrixStack.peek().first;
+
+Matrix GetMatrix(void) {
+    return g_renderstate.matrixStack.data[g_renderstate.matrixStack.current_pos - 1].matrix;
 }
-Matrix* GetMatrixPtr(){
-    return &g_renderstate.matrixStack.peek().first;
+
+Matrix* GetMatrixPtr(void) {
+    return &g_renderstate.matrixStack.data[g_renderstate.matrixStack.current_pos - 1].matrix;
 }
-void SetMatrix(Matrix m){
-    g_renderstate.matrixStack.peek().first = m;
+
+void SetMatrix(Matrix m) {
+    g_renderstate.matrixStack.data[g_renderstate.matrixStack.current_pos - 1].matrix = m;
 }
+
 
 void adaptRenderPass(DescribedRenderpass* drp, const ModifiablePipelineState& settings){
     drp->settings = settings.settings;
@@ -500,7 +507,7 @@ RGAPI void BeginShaderMode(Shader shader){
     g_renderstate.activeShader = shader;
     uint32_t location = GetUniformLocation(shader, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
     if(location != LOCATION_NOT_FOUND){
-        SetUniformBufferData(location, &g_renderstate.matrixStack.peek().first, sizeof(Matrix));
+        SetUniformBufferData(location, &MatrixBufferPair_stack_peek(&g_renderstate.matrixStack)->matrix, sizeof(Matrix));
     }
     //BindPipeline(pipeline, drawMode);
 }
@@ -761,25 +768,13 @@ RGAPI void BeginDrawing(){
     }
     
     {
-        
-        //if(g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition].texture.id)
-        //    UnloadTexture(g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition].texture);
-        #if SUPPORT_WGPU_BACKEND == 1
-        //if(g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture.id)
-        //    UnloadTexture(g_renderstate.createdSubwindows[g_renderstate.window].surface.renderTarget.texture);
-        #endif
-
-        //g_renderstate.drawmutex.lock();
         g_renderstate.renderExtentX = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
         g_renderstate.width = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
         g_renderstate.renderExtentY = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
         g_renderstate.height = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
-        //std::cout << g_renderstate.createdSubwindows[g_renderstate.window].surface.frameBuffer.depth.width << std::endl;
         GetNewTexture(&g_renderstate.createdSubwindows[g_renderstate.window]->surface);
-        g_renderstate.renderTargetStack.push(g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget);
+        RenderTexture_stack_push(&g_renderstate.renderTargetStack, g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget);
         g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget;
-        //g_renderstate.renderTargetStack[g_renderstate.renderTargetStackPosition] = g_renderstate.mainWindowRenderTarget;
-        //__builtin_dump_struct(&(g_renderstate.mainWindowRenderTarget.depth), printf);
     }
     BeginRenderpassEx(&g_renderstate.renderpass);
     //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
@@ -841,11 +836,17 @@ RGAPI void EndDrawing(){
     if(g_renderstate.grst->recording){
         uint64_t stmp = NanoTime();
         if(stmp - g_renderstate.grst->lastFrameTimestamp > g_renderstate.grst->delayInCentiseconds * 10000000ull){
-            g_renderstate.renderTargetStack.peek().texture.format = g_renderstate.frameBufferFormat;
-            Texture fbCopy = LoadTextureEx(g_renderstate.renderTargetStack.peek().texture.width, g_renderstate.renderTargetStack.peek().texture.height, g_renderstate.frameBufferFormat, false);
+            RenderTexture_stack_peek(&g_renderstate.renderTargetStack)->texture.format = g_renderstate.frameBufferFormat;
+            
+            Texture fbCopy = LoadTextureEx(
+                RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.width,
+                RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.height,
+                g_renderstate.frameBufferFormat,
+                false
+            );
             BeginComputepass();
             ComputepassEndOnlyComputing();
-            CopyTextureToTexture(g_renderstate.renderTargetStack.peek().texture, fbCopy);
+            CopyTextureToTexture(RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture, fbCopy);
             EndComputepass();
             BeginRenderpass();
             int recordingTextX = GetScreenWidth() - MeasureText("Recording", 30);
@@ -880,37 +881,36 @@ RGAPI void EndDrawing(){
     
     std::copy(g_renderstate.smallBufferRecyclingBin.begin(), g_renderstate.smallBufferRecyclingBin.end(), std::back_inserter(g_renderstate.smallBufferPool));
     g_renderstate.smallBufferRecyclingBin.clear();
-    auto& ipstate = g_renderstate.input_map[g_renderstate.window];
-    std::copy(ipstate.keydown.begin(), ipstate.keydown.end(), ipstate.keydownPrevious.begin());
-    ipstate.mousePosPrevious = ipstate.mousePos;
-    ipstate.scrollPreviousFrame = ipstate.scrollThisFrame;
-    ipstate.scrollThisFrame = Vector2{0, 0};
-    std::copy(ipstate.mouseButtonDown.begin(), ipstate.mouseButtonDown.end(), ipstate.mouseButtonDownPrevious.begin());
-    for(auto& [_, ipstate] : g_renderstate.input_map){
-        ipstate.charQueue.clear();
-        ipstate.gestureAngleThisFrame = 0;
-        ipstate.gestureZoomThisFrame = 1;
+    window_input_state* ipstate = &(g_renderstate.input_map[g_renderstate.window]);
+    
+    memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
+
+    ipstate->mousePosPrevious = ipstate->mousePos;
+    ipstate->scrollPreviousFrame = ipstate->scrollThisFrame;
+    ipstate->scrollThisFrame = CLITERAL(Vector2){0, 0};
+    memcpy(ipstate->mouseButtonDownPrevious, ipstate->mouseButtonDown, MOUSEBTN_MAX);
+
+    for(auto& [_, ipstate_] : g_renderstate.input_map){
+        memset(ipstate_.charQueue, 0, CHARQ_MAX * sizeof(int));
+        ipstate_.gestureAngleThisFrame = 0;
+        ipstate_.gestureZoomThisFrame = 1;
     }
+
     PollEvents();
+    
     if(g_renderstate.wantsToggleFullscreen){
         g_renderstate.wantsToggleFullscreen = false;
         ToggleFullscreenImpl();
     }
-    //if(!(g_renderstate.windowFlags & FLAG_HEADLESS))
-    //    g_renderstate.drawmutex.unlock();
+    
     uint64_t nanosecondsPerFrame = GetTargetFPS() > 0 ? std::floor(1e9 / GetTargetFPS()) : 0;
     uint64_t beginframe_stmp = g_renderstate.last_timestamps[(g_renderstate.total_frames - 1) % 64];
     ++g_renderstate.total_frames;
     g_renderstate.last_timestamps[g_renderstate.total_frames % 64] = NanoTime();
     uint64_t elapsed = NanoTime() - beginframe_stmp;
     if(elapsed & (1ull << 63))return;
-    //std::cout << elapsed << "\n";
-    std::this_thread::sleep_for(std::chrono::nanoseconds(nanosecondsPerFrame - elapsed));
-    //if(!(g_renderstate.windowFlags & FLAG_VSYNC_HINT) && nanosecondsPerFrame > elapsed && GetTargetFPS() > 0)
-    //    NanoWait(nanosecondsPerFrame - elapsed);
-    
-    g_renderstate.renderTargetStack.pop();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    NanoWait(nanosecondsPerFrame - elapsed);
+    RenderTexture_stack_pop(&g_renderstate.renderTargetStack);
 }
 void StartGIFRecording(){
     startRecording(g_renderstate.grst, 4);
@@ -1342,13 +1342,15 @@ RGAPI bool IsKeyDown(int key){
 RGAPI bool IsKeyPressed(int key){
     return g_renderstate.input_map[GetActiveWindowHandle()].keydown[key] && !g_renderstate.input_map[GetActiveWindowHandle()].keydownPrevious[key];
 }
-RGAPI int GetCharPressed(){
-    int fc = 0;
-    if(!g_renderstate.input_map     [GetActiveWindowHandle()].charQueue.empty()){
-        fc = g_renderstate.input_map[GetActiveWindowHandle()].charQueue.front();
-        g_renderstate.input_map     [GetActiveWindowHandle()].charQueue.pop_front();
+RGAPI int GetCharPressed(void) {
+    window_input_state* ipstate = &g_renderstate.input_map[GetActiveWindowHandle()];
+    if (ipstate->charQueueCount == 0){
+        return 0;
     }
-    return fc;
+    int ret = ipstate->charQueue[ipstate->charQueueHead];
+    ipstate->charQueueHead = (ipstate->charQueueHead + 1) % CHARQ_MAX;
+    ipstate->charQueueCount--;
+    return ret;
 }
 RGAPI int GetMouseX(cwoid){
     return (int)GetMousePosition().x;
@@ -1875,7 +1877,7 @@ DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode){
 
 
 WGPUTexture GetActiveColorTarget(){
-    return g_renderstate.renderTargetStack.peek().texture.id;
+    return RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.id;
 }
 
 extern "C" char* LoadFileText(const char *fileName) {
@@ -2090,7 +2092,7 @@ void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl){
     if(g_renderstate.activeRenderpass){
         EndRenderpass();
     }
-    g_renderstate.renderTargetStack.push(rtex);
+    RenderTexture_stack_push(&g_renderstate.renderTargetStack, rtex);
     g_renderstate.renderExtentX = rtex.texture.width;
     g_renderstate.renderExtentY = rtex.texture.height;
     PushMatrix();
@@ -2100,7 +2102,7 @@ void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl){
     g_renderstate.activeShader = pl;
     uint32_t location = GetUniformLocation(g_renderstate.activeShader, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
     if(location != LOCATION_NOT_FOUND){
-        SetUniformBufferData(location, &g_renderstate.matrixStack.peek().first, sizeof(Matrix));
+        SetUniformBufferData(location, &MatrixBufferPair_stack_cpeek(&g_renderstate.matrixStack)->matrix, sizeof(Matrix));
     }
     BeginRenderpass();
 }
@@ -2109,7 +2111,7 @@ void BeginTextureMode(RenderTexture rtex){
     if(g_renderstate.activeRenderpass){
         EndRenderpass();
     }
-    g_renderstate.renderTargetStack.push(rtex);
+    RenderTexture_stack_push(&g_renderstate.renderTargetStack, rtex);
     g_renderstate.renderExtentX = rtex.texture.width;
     g_renderstate.renderExtentY = rtex.texture.height;
 
@@ -2122,17 +2124,14 @@ void BeginTextureMode(RenderTexture rtex){
 
 void EndTextureAndPipelineMode(){
     drawCurrentBatch();
-
     EndRenderpassPro(GetActiveRenderPass(), true);
-
-    g_renderstate.renderTargetStack.pop();
+    RenderTexture_stack_pop(&g_renderstate.renderTargetStack);
     g_renderstate.activeShader = g_renderstate.defaultShader;
     PopMatrix();
-    if(!g_renderstate.renderTargetStack.empty()){
-        g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
-        g_renderstate.renderExtentY = g_renderstate.renderTargetStack.peek().texture.height;
+    if(!RenderTexture_stack_empty(&g_renderstate.renderTargetStack)){
+        g_renderstate.renderExtentX = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.width;
+        g_renderstate.renderExtentY = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.height;
         Matrix mat = ScreenMatrix((int)g_renderstate.renderExtentX, (int)g_renderstate.renderExtentY);
-        //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
         SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
         BeginRenderpass();
     }
@@ -2140,16 +2139,13 @@ void EndTextureAndPipelineMode(){
 
 void EndTextureMode(){
     drawCurrentBatch();
-
     EndRenderpassPro(GetActiveRenderPass(), true);
-
-    g_renderstate.renderTargetStack.pop();
+    RenderTexture_stack_pop(&g_renderstate.renderTargetStack);
     PopMatrix();
-    if(!g_renderstate.renderTargetStack.empty()){
-        g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
-        g_renderstate.renderExtentY = g_renderstate.renderTargetStack.peek().texture.height;
+    if(!RenderTexture_stack_empty(&g_renderstate.renderTargetStack)){
+        g_renderstate.renderExtentX = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.width;
+        g_renderstate.renderExtentY = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.height;
         Matrix mat = ScreenMatrix((int)g_renderstate.renderExtentX, (int)g_renderstate.renderExtentY);
-        //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
         SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
         BeginRenderpass();
     }
@@ -2164,22 +2160,23 @@ RGAPI void BeginWindowMode(SubWindow sw){
 
 RGAPI void EndWindowMode(){
     EndTextureMode();
-    if(!g_renderstate.renderTargetStack.empty()){
-        g_renderstate.renderExtentX = g_renderstate.renderTargetStack.peek().texture.width;
-        g_renderstate.renderExtentY = g_renderstate.renderTargetStack.peek().texture.height;
+    if(!RenderTexture_stack_empty(&g_renderstate.renderTargetStack)){
+        g_renderstate.renderExtentX = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.width;
+        g_renderstate.renderExtentY = RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.height;
         Matrix mat = ScreenMatrix((int)g_renderstate.renderExtentX, (int)g_renderstate.renderExtentY);
-        //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
         PopMatrix();
         SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
         BeginRenderpass();
     }
+
     PresentSurface(&g_renderstate.activeSubWindow->surface);
-    auto& ipstate = g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()];
-    std::copy(ipstate.keydown.begin(), ipstate.keydown.end(), ipstate.keydownPrevious.begin());
-    ipstate.mousePosPrevious = ipstate.mousePos;
-    ipstate.scrollPreviousFrame = ipstate.scrollThisFrame;
-    ipstate.scrollThisFrame = Vector2{0, 0};
-    std::copy(ipstate.mouseButtonDown.begin(), ipstate.mouseButtonDown.end(), ipstate.mouseButtonDownPrevious.begin());
+    window_input_state* ipstate = &g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()];
+    
+    memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
+    ipstate->mousePosPrevious = ipstate->mousePos;
+    ipstate->scrollPreviousFrame = ipstate->scrollThisFrame;
+    ipstate->scrollThisFrame = CLITERAL(Vector2){0, 0};
+    memcpy(ipstate->mouseButtonDownPrevious, ipstate->mouseButtonDown, MOUSEBTN_MAX);
     g_renderstate.activeSubWindow = NULL;
     return;
 }

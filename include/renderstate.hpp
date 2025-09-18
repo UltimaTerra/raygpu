@@ -1,81 +1,96 @@
-#include <set>
-#include <map>
 #include <array>
 #include <deque>
+#include <map>
 #include <mutex>
-#include <vector>
 #include <raygpu.h>
+#include <set>
+#include <vector>
 #if SUPPORT_WGPU_BACKEND == 1
-    #include <webgpu/webgpu.h>
+#include <webgpu/webgpu.h>
 #else
-    #include <wgvk.h>
+#include <wgvk.h>
 #endif
-struct PenInputState{
+
+typedef struct {
     float axes[16];
     Vector2 position;
-};
+} PenInputState;
 
+#define KEYS_MAX 512
+#define MOUSEBTN_MAX 16
+#define TOUCH_MAX 32
+#define CHARQ_MAX 256
+#define PEN_MAX 16
 
-struct window_input_state{
-    Rectangle windowPosition; // Recovery after fullscreen
-    std::vector<uint8_t> keydownPrevious = std::vector<uint8_t>(512, 0);
-    std::vector<uint8_t> keydown = std::vector<uint8_t>(512, 0);
+typedef struct {
+    int64_t id;
+    Vector2 pos;
+} TouchPoint;
+
+typedef struct {
+    Rectangle windowPosition;
+    uint8_t keydownPrevious[KEYS_MAX];
+    uint8_t keydown[KEYS_MAX];
     Vector2 scrollThisFrame, scrollPreviousFrame;
-    float gestureZoomThisFrame = 1.0f;
+    float gestureZoomThisFrame;
     float gestureAngleThisFrame;
     Vector2 mousePosPrevious;
     Vector2 mousePos;
     int cursorInWindow;
-    std::array<uint8_t, 16> mouseButtonDownPrevious;
-    std::array<uint8_t, 16> mouseButtonDown;
+    uint8_t mouseButtonDownPrevious[MOUSEBTN_MAX];
+    uint8_t mouseButtonDown[MOUSEBTN_MAX];
+    TouchPoint touchPoints[TOUCH_MAX];
+    size_t touchPointsCount;
+
+    int charQueue[CHARQ_MAX];
+    size_t charQueueHead, charQueueTail, charQueueCount;
     
-    std::vector<std::pair<int64_t, Vector2>> touchPoints; //Map from SDL_FingerID to Vector2
-    std::deque<int> charQueue;
+    struct {
+        unsigned int key;
+        PenInputState value;
+        int used;
+    } penStates[PEN_MAX];
+    size_t penStatesCount;
+} window_input_state;
 
-    std::unordered_map<unsigned int, PenInputState> penStates;
-};
-template <typename T, size_t N>
-struct array_stack{
-    std::array<T, N> data;
-    using iterator = std::array<T, N>::iterator;
-    using const_iterator = std::array<T, N>::const_iterator;
-    //iterator current_pos;
-    uint32_t current_pos;
-    array_stack() noexcept : current_pos(0){}
+#define DEFINE_ARRAY_STACK(T, LINKAGE, N)                                       \
+typedef struct {                                                                \
+    T data[N];                                                                  \
+    uint32_t current_pos;                                                       \
+} T##_stack;                                                                    \
+LINKAGE void T##_stack_init(T##_stack *s) { s->current_pos = 0; }               \
+LINKAGE void T##_stack_push(T##_stack *s, T v) {                                \
+    rassert(s->current_pos < (N), "Out of bounds access");                      \
+    s->data[s->current_pos++] = v;                                              \
+}                                                                               \
+LINKAGE T T##_stack_pop(T##_stack *s) {                                         \
+    rassert(s->current_pos > 0, "Out of bounds access");                        \
+    return s->data[--s->current_pos];                                           \
+}                                                                               \
+LINKAGE T *T##_stack_peek(T##_stack *s) {                                       \
+    rassert(s->current_pos > 0, "Out of bounds access");                        \
+    return &s->data[s->current_pos - 1];                                        \
+}                                                                               \
+LINKAGE const T *T##_stack_cpeek(const T##_stack *s) {                          \
+    rassert(s->current_pos > 0, "Out of bounds access");                        \
+    return &s->data[s->current_pos - 1];                                        \
+}                                                                               \
+LINKAGE size_t T##_stack_size(const T##_stack *s) { return s->current_pos; }    \
+LINKAGE int T##_stack_empty(const T##_stack *s) { return s->current_pos == 0; }
+typedef struct MatrixBufferPair{
+    Matrix matrix;
+    WGPUBuffer buffer;
+}MatrixBufferPair;
 
-    void push(T d)noexcept{
-        rassert(current_pos < N, "Stack is full");
-        data[current_pos++] = d;
-    }
-    T pop()noexcept{
-        rassert(current_pos > 0, "Stack is empty");
-        T ret = peek();
-        --current_pos;
-        return ret;
-    }
-    T& peek()noexcept{
-        rassert(!empty(), "Stack is empty");
-        return data[current_pos - 1];
-    }
-    const T& peek()const noexcept{
-        rassert(!empty(), "Stack is empty");
-        return data[current_pos - 1];
-    }
-    size_t size() const noexcept{
-        return current_pos;
-    }
-    bool empty()const noexcept{
-        return current_pos == 0;
-    }
-};
+DEFINE_ARRAY_STACK(MatrixBufferPair, static inline, 8);
+DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
 
-struct renderstate{
-
+struct renderstate {
 
     WGPUPresentMode unthrottled_PresentMode;
     WGPUPresentMode throttled_PresentMode;
- 
-    GLFWwindow* window;
+
+    GLFWwindow *window;
     uint32_t width, height;
 
     PixelFormat frameBufferFormat;
@@ -87,38 +102,36 @@ struct renderstate{
     DescribedRenderpass clearPass;
     DescribedRenderpass renderpass;
     DescribedComputepass computepass;
-    DescribedRenderpass* activeRenderpass;
-    DescribedComputepass* activeComputepass;
-    
+    DescribedRenderpass *activeRenderpass;
+    DescribedComputepass *activeComputepass;
+
     uint32_t renderExtentX; // Dimensions of the current viewport
     uint32_t renderExtentY; // Required for camera function
 
-    std::vector<DescribedBuffer*> smallBufferPool;
-    std::vector<DescribedBuffer*> smallBufferRecyclingBin;
+    std::vector<DescribedBuffer *> smallBufferPool;
+    std::vector<DescribedBuffer *> smallBufferRecyclingBin;
 
-    //std::unordered_map<uint64_t, WGPUBindGroup> bindGroupPool;
-    //std::unordered_map<uint64_t, WGPUBindGroup> bindGroupRecyclingBin;
+    // std::unordered_map<uint64_t, WGPUBindGroup> bindGroupPool;
+    // std::unordered_map<uint64_t, WGPUBindGroup> bindGroupRecyclingBin;
 
-    DescribedBuffer* identityMatrix;
+    DescribedBuffer *identityMatrix;
     DescribedSampler defaultSampler;
-    
-    DescribedBuffer* quadindicesCache{};
+
+    DescribedBuffer *quadindicesCache{};
 
     Texture whitePixel;
 
-    
-    array_stack<std::pair<Matrix, WGPUBuffer>, 16> matrixStack;
-
-    array_stack<RenderTexture, 8> renderTargetStack;
+    MatrixBufferPair_stack matrixStack;
+    RenderTexture_stack renderTargetStack;
 
     bool wantsToggleFullscreen;
     bool minimized;
 
     RenderTexture mainWindowRenderTarget;
-    //RenderTexture currentDefaultRenderTarget;
-    
-    std::unordered_map<void*, window_input_state> input_map;
-    
+    // RenderTexture currentDefaultRenderTarget;
+
+    std::unordered_map<void *, window_input_state> input_map;
+
     int windowFlags = 0;
     // Frame timing / FPS
     int targetFPS;
@@ -128,10 +141,10 @@ struct renderstate{
     int64_t last_timestamps[64] = {0};
 
     std::mutex drawmutex;
-    GIFRecordState* grst;
+    GIFRecordState *grst;
 
     SubWindow mainWindow{};
-    std::map<void*, SubWindow> createdSubwindows;
+    std::map<void *, SubWindow> createdSubwindows;
     SubWindow activeSubWindow{};
 
     bool closeFlag = false;

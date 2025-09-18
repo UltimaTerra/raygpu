@@ -1612,12 +1612,12 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
     
     WGPURenderPassColorAttachment colorAttachment zeroinit;
     WGPURenderPassDepthStencilAttachment depthAttachment zeroinit;
-    if(g_renderstate.renderTargetStack.peek().colorMultisample.view){
-        colorAttachment.view          = (WGPUTextureView)g_renderstate.renderTargetStack.peek().colorMultisample.view;
-        colorAttachment.resolveTarget = (WGPUTextureView)g_renderstate.renderTargetStack.peek().texture.view;
+    if(RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample.view){
+        colorAttachment.view          = (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample.view;
+        colorAttachment.resolveTarget = (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.view;
     }
     else{
-        colorAttachment.view = (WGPUTextureView)g_renderstate.renderTargetStack.peek().texture.view;
+        colorAttachment.view = (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.view;
         colorAttachment.resolveTarget = nullptr;
     }
     
@@ -1631,7 +1631,7 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
         renderPass->colorClear.a,
     };
 
-    depthAttachment.view =         (WGPUTextureView)g_renderstate.renderTargetStack.peek().depth.view;
+    depthAttachment.view =         (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->depth.view;
     depthAttachment.depthLoadOp  = (WGPULoadOp)renderPass->depthLoadOp;
     depthAttachment.depthStoreOp = (WGPUStoreOp)renderPass->depthStoreOp;
     depthAttachment.depthClearValue = 1.0f;
@@ -1650,6 +1650,25 @@ void BeginRenderpassEx(DescribedRenderpass* renderPass){
 
 // WGPUBuffer readtex = NULL;
 // volatile bool waitflag = false;
+
+static inline void onBuffer2Mapped(WGPUMapAsyncStatus status, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2){
+    if (status != WGPUMapAsyncStatus_Success) {
+        TRACELOG(LOG_ERROR, "onBuffer2Mapped failed with status: %d", status);
+        return;
+    }
+    
+    Image* udImage = (Image*)userdata1;
+    WGPUBuffer bufferToMap = (WGPUBuffer)userdata2;
+    uint64_t bufferSize = wgpuBufferGetSize(bufferToMap);
+    const void* map = wgpuBufferGetConstMappedRange(bufferToMap, 0, bufferSize);
+    
+    udImage->data = std::calloc(bufferSize / 4, 4);
+    if (udImage->data) {
+        std::memcpy(udImage->data, map, bufferSize);
+    }
+    wgpuBufferUnmap(bufferToMap);
+    wgpuBufferRelease(bufferToMap);
+};
 
 Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel) {
     WGPUTextureFormat wFormat = wgpuTextureGetFormat(tex);
@@ -1710,26 +1729,7 @@ Image LoadImageFromTextureEx(WGPUTexture tex, uint32_t miplevel) {
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(command);
 
-    auto onBuffer2Mapped = [](WGPUMapAsyncStatus status, WGPUStringView message, WGPU_NULLABLE void* userdata1, WGPU_NULLABLE void* userdata2){
-        if (status != WGPUMapAsyncStatus_Success) {
-            TRACELOG(LOG_ERROR, "onBuffer2Mapped failed with status: %d", status);
-            return;
-        }
-        
-        Image* udImage = (Image*)userdata1;
-        WGPUBuffer bufferToMap = (WGPUBuffer)userdata2;
-
-        uint64_t bufferSize = wgpuBufferGetSize(bufferToMap);
-        const void* map = wgpuBufferGetConstMappedRange(bufferToMap, 0, bufferSize);
-        
-        udImage->data = std::calloc(bufferSize / 4, 4);
-        if (udImage->data) {
-            std::memcpy(udImage->data, map, bufferSize);
-        }
-
-        wgpuBufferUnmap(bufferToMap);
-        wgpuBufferRelease(bufferToMap);
-    };
+    
 
     WGPUBufferMapCallbackInfo mapCallbackInfo = {
         .mode = WGPUCallbackMode_WaitAnyOnly,
@@ -1994,16 +1994,18 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst, co
     for(uint32_t i = 0;i < vlayout_complete.number_of_buffers;i++){
         layouts_converted.push_back(WGPUVertexBufferLayout{
             .nextInChain    = nullptr,
-            .stepMode       = (WGPUVertexStepMode)vlayout_complete.layouts[i].stepMode,
+            .stepMode       = vlayout_complete.layouts[i].stepMode,
             .arrayStride    = vlayout_complete.layouts[i].arrayStride,
             .attributeCount = vlayout_complete.layouts[i].attributeCount,
-            //TODO: this relies on the fact that VertexAttribute and WGPUVertexAttribute are exactly compatible
-            .attributes     = (WGPUVertexAttribute*)vlayout_complete.layouts[i].attributes,
+            .attributes     = vlayout_complete.layouts[i].attributes,
         });
     }
     vertexState.buffers = layouts_converted.data();
     vertexState.constantCount = 0;
-    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
+    vertexState.entryPoint = WGPUStringView{
+        shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name,
+        std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)
+    };
     pipelineDesc.vertex = vertexState;
 
 
@@ -2139,10 +2141,8 @@ RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndReside
     ret->bglayout = LoadBindGroupLayout(uniforms, uniformCount, false);
     ret->shaderModule = mod;
     ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.attributes.attachmentCount;
-
+    
     std::fill(ret->state.colorAttachmentState.attachmentFormats, ret->state.colorAttachmentState.attachmentFormats  + ret->state.colorAttachmentState.colorAttachmentCount, PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
-    //auto [spirV, spirF] = glsl_to_spirv(vsSource, fsSource);
-    //ret->sh = LoadShaderModuleFromSPIRV_Vk(spirV.data(), spirV.size() * 4, spirF.data(), spirF.size() * 4);
     
     WGPUPipelineLayoutDescriptor pldesc zeroinit;
     pldesc.bindGroupLayoutCount = 1;
@@ -2153,8 +2153,9 @@ RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndReside
     std::vector<WGPUBindGroupEntry> bge(uniformCount);
 
     for(uint32_t i = 0;i < bge.size();i++){
-        bge[i] = WGPUBindGroupEntry{};
-        bge[i].binding = uniforms[i].location;
+        bge[i] = WGPUBindGroupEntry{
+            .binding = uniforms[i].location
+        };
     }
     ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
     return retS;
@@ -2171,14 +2172,6 @@ WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage){
     wgpuQueueSubmit(GetQueue(), 1, &buffer);
     return ret;
 }
-
-//DescribedPipeline* ClonePipelineWithSettings(const DescribedPipeline* pl, RenderSettings settings){
-//    DescribedPipeline* cloned = ClonePipeline(pl);
-//
-//    cloned->settings = settings;
-//    UpdatePipeline(cloned);
-//    return cloned;
-//}
 
 DescribedComputePipeline* LoadComputePipeline(const char* shaderCode){
     ShaderSources sources = singleStage(shaderCode, detectShaderLanguage(shaderCode, std::strlen(shaderCode)), WGPUShaderStageEnum_Compute);

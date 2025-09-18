@@ -333,13 +333,10 @@ static KeyboardKey ConvertScancodeToKey(SDL_Scancode sdlScancode){
 }
 
 void PenAxisCallback(SDL_Window* window, SDL_PenID penID, SDL_PenAxis axis, float value){
-    g_renderstate.input_map[window].penStates[penID].axes[axis] = value;
-    if(axis == SDL_PEN_AXIS_PRESSURE){
-        std::cout << value << std::endl;
-    }
+    g_renderstate.input_map[window].penStates[penID].value.axes[axis] = value;
 }
 void PenMotionCallback(SDL_Window* window, SDL_PenID penID, float x, float y){
-    g_renderstate.input_map[window].penStates[penID].position = Vector2{x,y };
+    g_renderstate.input_map[window].penStates[penID].value.position = Vector2{x,y };
 }
 void FingerMotionCallback(SDL_Window* window, SDL_FingerID finger, float x, float y){
     
@@ -379,7 +376,7 @@ void KeyDownCallback (SDL_Window* window, int key, int scancode, int mods){
     //}
 }
 RGAPI void PollEvents_SDL3() {
-    SDL_Event event;
+    SDL_Event event = {0};
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_EVENT_QUIT:{

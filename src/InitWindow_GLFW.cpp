@@ -149,9 +149,16 @@ EM_BOOL EmscriptenKeydownCallback(int eventType, const EmscriptenKeyboardEvent *
         modifier |= GLFW_MOD_SHIFT;
     if(keyEvent->altKey)
         modifier |= GLFW_MOD_ALT;
-    glfwKeyCallback(g_renderstate.window, emscriptenToGLFWKeyMap.at(keyEvent->code), emscriptenToGLFWKeyMap.at(keyEvent->code), GLFW_PRESS, modifier);
-    //__builtin_dump_struct(keyEvent, printf);
-    //printf("Pressed %u\n", keyEvent->which);
+    auto it = emscriptenToGLFWKeyMap.find(keyEvent->code);
+    if(it == emscriptenToGLFWKeyMap.end()){
+        char codeCertainlyNullTerminated[33];
+        memcpy(codeCertainlyNullTerminated, keyEvent->code, 32);
+        codeCertainlyNullTerminated[32] = '\0';
+        TRACELOG(LOG_WARNING, "Discarding EmscriptenKeyboardEvent with code = %s", codeCertainlyNullTerminated);
+    }
+    else{
+        glfwKeyCallback(g_renderstate.window, it->second, it->second, GLFW_PRESS, modifier);
+    }
     return 0;
 }
 EM_BOOL EmscriptenKeyupCallback(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData){
@@ -163,8 +170,16 @@ EM_BOOL EmscriptenKeyupCallback(int eventType, const EmscriptenKeyboardEvent *ke
         modifier |= GLFW_MOD_SHIFT;
     if(keyEvent->altKey)
         modifier |= GLFW_MOD_ALT;
-    glfwKeyCallback(g_renderstate.window, emscriptenToGLFWKeyMap.at(keyEvent->code), emscriptenToGLFWKeyMap.at(keyEvent->code), GLFW_RELEASE, modifier);
-    //printf("Released %u\n", keyEvent->which);
+    auto it = emscriptenToGLFWKeyMap.find(keyEvent->code);
+    if(it == emscriptenToGLFWKeyMap.end()){
+        char codeCertainlyNullTerminated[33];
+        memcpy(codeCertainlyNullTerminated, keyEvent->code, 32);
+        codeCertainlyNullTerminated[32] = '\0';
+        TRACELOG(LOG_WARNING, "Discarding EmscriptenKeyboardEvent with code = %s", codeCertainlyNullTerminated);
+    }
+    else{
+        glfwKeyCallback(g_renderstate.window, it->second, it->second, GLFW_RELEASE, modifier);
+    }
     return 1;
 }
 #endif// __EMSCRIPTEN__

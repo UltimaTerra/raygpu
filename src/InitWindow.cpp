@@ -366,15 +366,11 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         indices[i * 6 + 5] = (i * 4 + 3);
     }
     BufferData(g_renderstate.quadindicesCache, indices.data(), 6 * quadCount * sizeof(uint32_t));
-    //g_renderstate.quadindicesCache->usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
-    //WGPUCommandEncoderDescriptor cedesc{};
-    //cedesc.label = STRVIEW("Global Command Encoder");
-    //g_renderstate.renderpass.cmdEncoder = wgpuDeviceCreateCommandEncoder(g_wgpustate.device.Get(), &cedesc);
+    
     Matrix m = ScreenMatrix(width, height);
     static_assert(sizeof(Matrix) == 64, "non 4 byte floats? or what");
-    g_renderstate.matrixStack.push(std::pair<Matrix, WGPUBuffer>{});
-    //g_wgpustate.defaultScreenMatrix = GenUniformBuffer(&m, sizeof(Matrix));
-    //SetUniformBuffer(0, g_wgpustate.defaultScreenMatrix);
+
+    MatrixBufferPair_stack_push(&g_renderstate.matrixStack, MatrixBufferPair{});
     SetTexture(1, g_renderstate.whitePixel);
     Matrix iden = MatrixIdentity();
     SetStorageBufferData(3, &iden, 64);
@@ -387,10 +383,7 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
     #ifndef __EMSCRIPTEN__
     if((g_renderstate.windowFlags & FLAG_VSYNC_HINT))
         SetTargetFPS(60);
-    //if(!(g_wgpustate.windowFlags & FLAG_HEADLESS) && (g_wgpustate.windowFlags & FLAG_VSYNC_HINT)){
-    //    auto rate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate;
-    //    SetTargetFPS(rate);
-    //}
+    
     else
         SetTargetFPS(0);
     
@@ -440,9 +433,20 @@ RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window){
     TRACELOG(LOG_INFO, "Created surface: %p", surfacePtr);
     return surfacePtr;
 }
-extern "C" void CharCallback(void* window, unsigned int codePoint){
-    g_renderstate.input_map[window].charQueue.push_back((int)codePoint);
+static inline void CharQueue_Push(window_input_state* s, int codePoint) {
+    s->charQueue[s->charQueueTail] = codePoint;
+    s->charQueueTail = (s->charQueueTail + 1) % CHARQ_MAX;
+    if (s->charQueueCount < CHARQ_MAX) {
+        s->charQueueCount++;
+    } else {
+        s->charQueueHead = (s->charQueueHead + 1) % CHARQ_MAX;
+    }
 }
+
+extern "C" void CharCallback(void* window, unsigned int codePoint) {
+    CharQueue_Push(&g_renderstate.input_map[window], (int)codePoint);
+}
+
 extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
     SubWindow createdWindow = NULL;
     #ifdef MAIN_WINDOW_GLFW
@@ -507,7 +511,7 @@ Vector2 GetTouchPosition(int index){
     #endif
 }
 int GetTouchPointCount(cwoid){
-    return static_cast<int>(g_renderstate.input_map[g_renderstate.activeSubWindow->handle].touchPoints.size());
+    return static_cast<int>(g_renderstate.input_map[g_renderstate.activeSubWindow->handle].touchPointsCount);
 }
 int GetMonitorWidth(cwoid){
     #ifdef MAIN_WINDOW_GLFW

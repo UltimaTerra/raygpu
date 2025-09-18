@@ -12,7 +12,7 @@ int main(void){
     SubWindow third = OpenSubWindow(secondWidth, secondHeight, "Third Window");
     RenderTexture rtex = LoadRenderTexture(800, 800);
     while(!WindowShouldClose()){
-
+        
         // Start drawing with the third window
         // Input functions, e.g. GetMouseX() are specific to this window
         // inside BeginWindowMode() / EndWindowMode() 
