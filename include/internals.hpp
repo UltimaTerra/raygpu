@@ -1,3 +1,4 @@
+// begin file include/internals.hpp
 /*
  * MIT License
  * 
@@ -30,7 +31,7 @@
 #include "config.h"
 #include <cstring>
 #if SUPPORT_VULKAN_BACKEND == 1
-#include <wgvk.h>
+    #include <wgvk.h>
 #endif
 #include "raygpu.h"
 #include <memory>
@@ -76,33 +77,7 @@ static inline uint32_t bitcount64(uint64_t x){
     return std::popcount(x);
     #endif
 }
-extern const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTable;
-extern const std::unordered_map<WGPUPresentMode, std::string> presentModeSpellingTable;
-extern const std::unordered_map<WGPUBackendType, std::string> backendTypeSpellingTable;
-extern const std::unordered_map<WGPUFeatureName, std::string> featureSpellingTable;
-#if defined(__cplusplus) && SUPPORT_WGPU_BACKEND == 1
-wgpu::Instance& GetCXXInstance();
-wgpu::Adapter&  GetCXXAdapter ();
-wgpu::Device&   GetCXXDevice  ();
-wgpu::Queue&    GetCXXQueue   ();
-wgpu::Surface&  GetCXXSurface ();
-#endif
-#ifdef __cplusplus
-struct xorshiftstate{
-    uint64_t x64;
-    constexpr void update(uint64_t x) noexcept{
-        x64 ^= x * 0x2545F4914F6CDD1D;
-        x64 ^= x64 << 13;
-        x64 ^= x64 >> 7;
-        x64 ^= x64 << 17;
-    }
-    constexpr void update(uint32_t x, uint32_t y)noexcept{
-        x64 ^= ((uint64_t(x) << 32) | uint64_t(y)) * 0x2545F4914F6CDD1D;
-        x64 ^= x64 << 13;
-        x64 ^= x64 >> 7;
-        x64 ^= x64 << 17;
-    }
-};
+
 static inline size_t hashAttributeAndResidence(const AttributeAndResidence* res){
     uint64_t attrh = ROT_BYTES(res->attr.shaderLocation * uint64_t(41), 31) ^ ROT_BYTES(res->attr.offset, 11);
     attrh *= 111;
@@ -119,8 +94,6 @@ static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResiden
     }
     return hv;
 }
-
-#endif
 /**
  * @brief Get the Bindings object, returning a map from 
  * Uniform name -> UniformDescriptor (type and minimum size and binding location)
@@ -237,32 +210,31 @@ static inline uint64_t hash_bytes(const void* bytes, size_t count) {
 }
 
 static inline size_t hashVertexBufferLayoutSet(const VertexBufferLayoutSet* set){
-    xorshiftstate xsstate{uint64_t(0x1919846573) * uint64_t(set->number_of_buffers << 14)};
+    xorshiftstate_c99 xsstate{uint64_t(0x1919846573) * uint64_t(set->number_of_buffers << 14)};
     for(uint32_t i = 0;i < set->number_of_buffers;i++){
         for(uint32_t j = 0;j < set->layouts[i].attributeCount;j++){
-            xsstate.update(set->layouts[i].attributes[j].offset, set->layouts[i].attributes[j].shaderLocation);
+            update_xorshiftstate(&xsstate, (set->layouts[i].attributes[j].offset << 32) | set->layouts[i].attributes[j].shaderLocation);
         }
     }
     return xsstate.x64;
 }
 
-struct vblayoutVectorCompare{
-    inline bool operator()(const VertexBufferLayoutSet& a, const VertexBufferLayoutSet& b)const noexcept{
-        
-        if(a.number_of_buffers != b.number_of_buffers)return false;
-        for(uint32_t i = 0;i < a.number_of_buffers;i++){
-            if(a.layouts[i].attributeCount != b.layouts[i].attributeCount)return false;
-            for(uint32_t j = 0;j < a.layouts[i].attributeCount;j++){
-                if(
-                    a.layouts[i].attributes[j].format != b.layouts[i].attributes[j].format
-                 || a.layouts[i].attributes[j].shaderLocation != b.layouts[i].attributes[j].shaderLocation
-                 || a.layouts[i].attributes[j].offset != b.layouts[i].attributes[j].offset
-                )return false;
-            }
-        }
-        return true;
-    }
-};
+
+//static inline bool vblayoutVectorCompare(const VertexBufferLayoutSet& a, const VertexBufferLayoutSet& b){
+//    
+//    if(a.number_of_buffers != b.number_of_buffers)return false;
+//    for(uint32_t i = 0;i < a.number_of_buffers;i++){
+//        if(a.layouts[i].attributeCount != b.layouts[i].attributeCount)return false;
+//        for(uint32_t j = 0;j < a.layouts[i].attributeCount;j++){
+//            if(
+//                a.layouts[i].attributes[j].format != b.layouts[i].attributes[j].format
+//             || a.layouts[i].attributes[j].shaderLocation != b.layouts[i].attributes[j].shaderLocation
+//             || a.layouts[i].attributes[j].offset != b.layouts[i].attributes[j].offset
+//            )return false;
+//        }
+//    }
+//    return true;
+//}
 
 
 struct ColorAttachmentState{
@@ -1205,6 +1177,11 @@ static inline BindingIdentifier BIfromCString(const char* c_str){
 static inline size_t hashBindingIdentifier(const BindingIdentifier ident){
     return hash_bytes(ident.name, ident.length);
 }
+static inline void deleteBindingIdentifier(const BindingIdentifier ident){}
+static inline void deleteResourceType(const ResourceTypeDescriptor ident){}
+static inline BindingIdentifier copyBindingIdentifier(const BindingIdentifier ident){return ident;}
+static inline ResourceTypeDescriptor copyResourceType(const ResourceTypeDescriptor rtype){return rtype;}
+
 
 static inline bool hashBindingCompare(const BindingIdentifier a, const BindingIdentifier b){
     if(a.length != b.length){
@@ -1218,31 +1195,21 @@ static inline bool hashBindingCompare(const BindingIdentifier a, const BindingId
     return true;
 }
 
+// SCOPE, Name, KeyType, ValueType, KeyHashFunc, KeyCmpFunc, KeyEmptyVal, KeyCopyFunc, ValueCopyFunc, KeyDeleteFunc, ValueDeleteFunc
 
-
-DEFINE_GENERIC_HASH_MAP(static inline, StringToUniformMap, BindingIdentifier, ResourceTypeDescriptor, hashBindingIdentifier, hashBindingCompare, CLITERAL(BindingIdentifier){0})
-
-//typedef struct StringToUniformMap{
-//    std::unordered_map<std::string, ResourceTypeDescriptor> uniforms;
-//    ResourceTypeDescriptor operator[](const std::string& v)const noexcept{
-//        return uniforms.find(v)->second;
-//    }
-//    uint32_t GetLocation(const std::string& v)const noexcept{
-//        auto it = uniforms.find(v);
-//        if(it == uniforms.end())
-//            return LOCATION_NOT_FOUND;
-//        return it->second.location;
-//    }
-//    ResourceTypeDescriptor operator[](const char* v)const noexcept{
-//        return uniforms.find(v)->second;
-//    }
-//    uint32_t GetLocation(const char* v)const noexcept{
-//        auto it = uniforms.find(std::string(v));
-//        if(it == uniforms.end())
-//            return LOCATION_NOT_FOUND;
-//        return it->second.location;
-//    }
-//}StringToUniformMap;
+RG_DEFINE_GENERIC_HASH_MAP(
+    static inline,
+    StringToUniformMap,
+    BindingIdentifier,
+    ResourceTypeDescriptor,
+    hashBindingIdentifier,
+    hashBindingCompare,
+    CLITERAL(BindingIdentifier){0},
+    copyBindingIdentifier,
+    copyResourceType,
+    deleteBindingIdentifier,
+    deleteResourceType
+)
 
 typedef struct StringToAttributeMap{
     std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>> attributes;
@@ -1265,7 +1232,6 @@ typedef struct StringToAttributeMap{
         return it->second.second;
     }
 }StringToAttributeMap;
-
 
 static size_t hashVertexArray(const VertexArray va){
     size_t hashValue = 0;
@@ -1362,3 +1328,5 @@ static inline WGPUAddressMode toWGPUAddressMode(TextureWrap am){
 
 
 #endif
+
+// end file include/internals.hpp

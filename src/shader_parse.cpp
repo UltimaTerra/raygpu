@@ -1,3 +1,4 @@
+// begin file src/shader_parse.cpp
 /*
 * MIT License
 * 
@@ -685,3 +686,5 @@ StringToUniformMap* getBindings(ShaderSources sources){
     return {};
 }
 
+
+// end file src/shader_parse.cpp

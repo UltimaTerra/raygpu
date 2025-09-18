@@ -1,3 +1,4 @@
+// begin file src/windows_stuff.c
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -21,3 +22,5 @@
 bool IsATerminal(FILE *stream) {
     return PORTABLE_ISATTY(PORTABLE_FILENO(stream));
 }
+
+// end file src/windows_stuff.c

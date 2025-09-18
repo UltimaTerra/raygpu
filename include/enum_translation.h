@@ -1,3 +1,4 @@
+// begin file include/enum_translation.h
 /*
  * MIT License
  *
@@ -1017,3 +1018,5 @@ static inline WGPUTextureFormat toWGPUTextureFormat(PixelFormat format) {
 #endif // SUPPORT_WGPU_BACKEND
 
 #endif // ENUM_HEADER_H
+
+// end file include/enum_translation.h

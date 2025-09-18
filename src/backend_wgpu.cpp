@@ -1,3 +1,4 @@
+// begin file src/backend_wgpu.cpp
 #include <raygpu.h>
 #ifdef SUPPORT_VULKAN_BACKEND
 #include <wgvk.h>
@@ -202,111 +203,6 @@ void PresentSurface(FullSurface* fsurface){
     wgpuSurfacePresent((WGPUSurface)fsurface->surface);
 }
 
-/*
-extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, const std::vector<AttributeAndResidence>& attribs){
-    uint32_t attribCount = attribs.size();
-    auto it = pl->createdPipelines->pipelines.find(attribs);
-    if(it != pl->createdPipelines->pipelines.end()){
-        //TRACELOG(LOG_INFO, "Reusing cached pipeline triplet");
-        return it->second;
-    }
-    TRACELOG(LOG_DEBUG, "Creating new pipeline triplet");
-    VertexBufferLayoutSet layoutset = getBufferLayoutRepresentation(attribs.data(), attribs.size());
-    pl->vertexLayout = layoutset;
-    
-
-    WGPURenderPipelineDescriptor pipelineDesc zeroinit;
-    const RenderSettings& settings = pl->settings; 
-    pipelineDesc.multisample.count = pl->settings.sampleCount ? pl->settings.sampleCount : 1;
-    pipelineDesc.multisample.mask = 0xFFFFFFFF;
-    pipelineDesc.multisample.alphaToCoverageEnabled = false;
-    pipelineDesc.layout = (WGPUPipelineLayout)pl->layout.layout;
-
-    WGPUVertexState vertexState{};
-    WGPUFragmentState fragmentState{};
-    WGPUBlendState blendState{};
-
-    vertexState.module = (WGPUShaderModule)pl->sh.stages[ShaderStage_Vertex].module;
-
-    VertexBufferLayoutSet& vlayout_complete = pl->vertexLayout;
-    vertexState.bufferCount = vlayout_complete.number_of_buffers;
-
-    std::vector<WGPUVertexBufferLayout> layouts_converted;
-    for(uint32_t i = 0;i < vlayout_complete.number_of_buffers;i++){
-        layouts_converted.push_back(WGPUVertexBufferLayout{
-            .nextInChain = nullptr,
-            .stepMode       = (WGPUVertexStepMode)vlayout_complete.layouts[i].stepMode,
-            .arrayStride    = vlayout_complete.layouts[i].arrayStride,
-            .attributeCount = vlayout_complete.layouts[i].attributeCount,
-            //TODO: this relies on the fact that VertexAttribute and WGPUVertexAttribute are exactly compatible
-            .attributes     = (WGPUVertexAttribute*)vlayout_complete.layouts[i].attributes,
-        });
-    }
-    vertexState.buffers = layouts_converted.data();
-    vertexState.constantCount = 0;
-    vertexState.entryPoint = WGPUStringView{pl->sh.reflectionInfo.ep[ShaderStage_Vertex].name, std::strlen(pl->sh.reflectionInfo.ep[ShaderStage_Vertex].name)};
-    pipelineDesc.vertex = vertexState;
-
-
-    
-    fragmentState.module = (WGPUShaderModule)pl->sh.stages[ShaderStage_Fragment].module;
-    fragmentState.entryPoint = WGPUStringView{pl->sh.reflectionInfo.ep[ShaderStage_Fragment].name, std::strlen(pl->sh.reflectionInfo.ep[ShaderStage_Fragment].name)};
-    fragmentState.constantCount = 0;
-    fragmentState.constants = nullptr;
-
-    blendState.color.srcFactor = (WGPUBlendFactor   )settings.blendFactorSrcColor;
-    blendState.color.dstFactor = (WGPUBlendFactor   )settings.blendFactorDstColor;
-    blendState.color.operation = (WGPUBlendOperation)settings.blendOperationColor;
-    blendState.alpha.srcFactor = (WGPUBlendFactor   )settings.blendFactorSrcAlpha;
-    blendState.alpha.dstFactor = (WGPUBlendFactor   )settings.blendFactorDstAlpha;
-    blendState.alpha.operation = (WGPUBlendOperation)settings.blendOperationAlpha;
-    WGPUColorTargetState colorTarget{};
-
-    colorTarget.format = toWGPUPixelFormat(g_renderstate.frameBufferFormat);
-    colorTarget.blend = &blendState;
-    colorTarget.writeMask = WGPUColorWriteMask_All;
-    fragmentState.targetCount = 1;
-    fragmentState.targets = &colorTarget;
-    pipelineDesc.fragment = &fragmentState;
-    // We setup a depth buffer state for the render pipeline
-    WGPUDepthStencilState depthStencilState{};
-    if(settings.depthTest){
-        // Keep a fragment only if its depth is lower than the previously blended one
-        // Each time a fragment is blended into the target, we update the value of the Z-buffer
-        // Store the format in a variable as later parts of the code depend on it
-        // Deactivate the stencil alltogether
-        WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
-
-        depthStencilState.depthCompare = (WGPUCompareFunction)settings.depthCompare;
-        depthStencilState.depthWriteEnabled = WGPUOptionalBool_True;
-        depthStencilState.format = depthTextureFormat;
-        depthStencilState.stencilReadMask = 0;
-        depthStencilState.stencilWriteMask = 0;
-        depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
-        depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
-    }
-    pipelineDesc.depthStencil = settings.depthTest ? &depthStencilState : nullptr;
-    
-    pipelineDesc.primitive.frontFace = (WGPUFrontFace)settings.frontFace;
-    pipelineDesc.primitive.cullMode = settings.faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
-    RenderPipelineQuartet quartet;
-    //if(attribCount != 0){
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_PointList;
-    quartet.pipeline_PointList = wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-    quartet.pipeline_TriangleList = wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_LineList;
-    quartet.pipeline_LineList = wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleStrip;
-    pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Uint32;
-    quartet.pipeline_TriangleStrip = wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-    pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
-
-    pl->createdPipelines->pipelines[attribs] = quartet;
-    return quartet;
-}
-*/
 
 inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
     const uint32_t rotation = (bge.binding * 7) & 63;
@@ -333,28 +229,6 @@ extern "C" void BindShader(Shader shader, PrimitiveType drawMode){
 }
 extern "C" void BindPipeline(DescribedPipeline* pipeline){
     wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, (WGPURenderPipeline)pipeline->activePipeline);
-    //BindPipelineWithSettings(pipeline, drawMode, g_renderstate.currentSettings);
-
-    //switch(drawMode){
-    //    case RL_TRIANGLES:
-    //    //std::cout << "Binding: " <<  pipeline->pipeline << "\n";
-    //    wgpuRenderPassEncoderSetPipeline ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, (WGPURenderPipeline)pipeline->quartet.pipeline_TriangleList);
-    //    break;
-    //    case RL_TRIANGLE_STRIP:
-    //    wgpuRenderPassEncoderSetPipeline ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, (WGPURenderPipeline)pipeline->quartet.pipeline_TriangleStrip);
-    //    break;
-    //    case RL_LINES:
-    //    wgpuRenderPassEncoderSetPipeline ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, (WGPURenderPipeline)pipeline->quartet.pipeline_LineList);
-    //    break;
-    //    case RL_POINTS:
-    //    wgpuRenderPassEncoderSetPipeline ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, (WGPURenderPipeline)pipeline->quartet.pipeline_PointList);
-    //    break;
-    //    default:
-    //        assert(false && "Unsupported Drawmode");
-    //        abort();
-    //}
-    //pipeline->lastUsedAs = drawMode;
-    //wgpuRenderPassEncoderSetBindGroup ((WGPURenderPassEncoder)g_renderstate.renderpass.rpEncoder, 0, (WGPUBindGroup)UpdateAndGetNativeBindGroup(&pipeline->bindGroup), 0, 0);
 }
 
 void ResizeBuffer(DescribedBuffer* buffer, size_t newSize){
@@ -570,8 +444,9 @@ RGAPI FullSurface CompleteSurface(void* nsurface, int width, int height){
     } else {
         presentMode = um;
     }
-    
-    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeSpellingTable.at(presentMode).c_str());
+    const char* presentModeName;
+    switch(presentMode){case WGPUPresentMode_Undefined:presentModeName="WGPUPresentMode_Undefined";break;case WGPUPresentMode_Fifo:presentModeName="WGPUPresentMode_Fifo";break;case WGPUPresentMode_FifoRelaxed:presentModeName="WGPUPresentMode_FifoRelaxed";break;case WGPUPresentMode_Immediate:presentModeName="WGPUPresentMode_Immediate";break;case WGPUPresentMode_Mailbox:presentModeName="WGPUPresentMode_Mailbox";break;default:presentModeName="Not a WGPUPresentMode enum";break;}
+    TRACELOG(LOG_INFO, "Initialized surface with %s", presentModeName);
     WGPUSurfaceConfiguration config = {
         .device = (WGPUDevice)GetDevice(),
         .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
@@ -766,21 +641,7 @@ extern "C" void UpdateBindGroupEntry(DescribedBindGroup* bg, size_t index, WGPUB
         bg->entries[index].textureView = 0;
     }
     
-    //bool donotcache = false;
-    //if(bg->releaseOnClear & (1 << index)){
-    //    //donotcache = true;
-    //    if(bg->entries[index].buffer){
-    //        wgpuBufferRelease((WGPUBuffer)bg->entries[index].buffer);
-    //    }
-    //    else if(bg->entries[index].textureView){
-    //        //Todo: currently not the case anyway, but this is nadinöf
-    //        wgpuTextureViewRelease((WGPUTextureView)bg->entries[index].textureView);
-    //    }
-    //    else if(bg->entries[index].sampler){
-    //        wgpuSamplerRelease((WGPUSampler)bg->entries[index].sampler);
-    //    }
-    //    bg->releaseOnClear &= ~(1 << index);
-    //}
+    
     bg->entries[index] = entry;
     bg->descriptorHash ^= bgEntryHash(bg->entries[index]);
 
@@ -1123,22 +984,22 @@ void InitBackend(){
     //std::string vendor = WGPUStringViewToString(info.vendor);
     
     const char* adapterTypeString = info.adapterType == WGPUAdapterType_CPU ? "CPU" : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
-    const char* backendString = backendTypeSpellingTable.at(info.backendType).c_str();
+    //const char* backendString = backendTypeSpellingTable.at(info.backendType).c_str();
 
     //TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
     TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
     TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture.c_str());
-    TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
+    //TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
     // Create device descriptor with callbacks and toggles
     {
-        WGPUSupportedFeatures features = {};
-        wgpuAdapterGetFeatures(sample->adapter, &features);
-        std::string featuresString;
-        for(size_t i = 0; i < features.featureCount;i++){
-            featuresString += featureSpellingTable.contains((WGPUFeatureName)features.features[i]) ? featureSpellingTable.at((WGPUFeatureName)features.features[i]) : "<unknown feature>";
-            if(i < features.featureCount - 1)featuresString += ", ";
-        }
-        TRACELOG(LOG_INFO, "Features supported: %s ", featuresString.c_str());
+        //WGPUSupportedFeatures features = {};
+        //wgpuAdapterGetFeatures(sample->adapter, &features);
+        //std::string featuresString;
+        //for(size_t i = 0; i < features.featureCount;i++){
+        //    featuresString += featureSpellingTable.contains((WGPUFeatureName)features.features[i]) ? featureSpellingTable.at((WGPUFeatureName)features.features[i]) : "<unknown feature>";
+        //    if(i < features.featureCount - 1)featuresString += ", ";
+        //}
+        //TRACELOG(LOG_INFO, "Features supported: %s ", featuresString.c_str());
     }
     WGPULimits adapterLimits = {0};
     wgpuAdapterGetLimits(sample->adapter, &adapterLimits);
@@ -1226,7 +1087,7 @@ void InitBackend(){
     sample->queue = wgpuDeviceGetQueue(sample->device);
 }
 
-
+extern "C" const char* TextureFormatName(WGPUTextureFormat fmt);
 bool negotiateSurfaceFormatAndPresentMode_called = false;
 extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     const WGPUSurface surf = (WGPUSurface)SurfaceHandle;
@@ -1235,20 +1096,20 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     WGPUSurfaceCapabilities capabilities;
     wgpuSurfaceGetCapabilities(surf, (WGPUAdapter)GetAdapter(), &capabilities);
     {
-        std::string presentModeString;
-        for(uint32_t i = 0;i < capabilities.presentModeCount;i++){
-            presentModeString += presentModeSpellingTable.at((WGPUPresentMode)capabilities.presentModes[i]).c_str();
-            if(i < capabilities.presentModeCount - 1){
-                presentModeString += ", ";
-            }
-        }
-        TRACELOG(LOG_INFO, "Supported present modes: %s", presentModeString.c_str());
+        // std::string presentModeString;
+        // for(uint32_t i = 0;i < capabilities.presentModeCount;i++){
+        //     presentModeString += presentModeSpellingTable.at((WGPUPresentMode)capabilities.presentModes[i]).c_str();
+        //     if(i < capabilities.presentModeCount - 1){
+        //         presentModeString += ", ";
+        //     }
+        // }
+        // TRACELOG(LOG_INFO, "Supported present modes: %s", presentModeString.c_str());
     }
     if(capabilities.presentModeCount == 0){
         TRACELOG(LOG_ERROR, "No presentation modes supported! This surface is most likely invalid");
     }
     else if(capabilities.presentModeCount == 1){
-        TRACELOG(LOG_INFO, "Only %s supported", presentModeSpellingTable.at((WGPUPresentMode)capabilities.presentModes[0]).c_str());
+        //TRACELOG(LOG_INFO, "Only %s supported", presentModeSpellingTable.at((WGPUPresentMode)capabilities.presentModes[0]).c_str());
         g_renderstate.unthrottled_PresentMode = capabilities.presentModes[0];
         g_renderstate.throttled_PresentMode = capabilities.presentModes[0];
     }
@@ -1273,7 +1134,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
     {
         std::string formatsString;
         for(uint32_t i = 0;i < capabilities.formatCount;i++){
-            formatsString += textureFormatSpellingTable.at(capabilities.formats[i]).c_str();
+            formatsString += TextureFormatName(capabilities.formats[i]);
             if(i < capabilities.formatCount - 1){
                 formatsString += ", ";
             }
@@ -1302,7 +1163,7 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void* SurfaceHandle){
         g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     }
     
-    TRACELOG(LOG_INFO, "Selected surface format %s", textureFormatSpellingTable.at(toWGPUPixelFormat(g_renderstate.frameBufferFormat)).c_str());
+    TRACELOG(LOG_INFO, "Selected surface format %s", TextureFormatName(toWGPUPixelFormat(g_renderstate.frameBufferFormat)));
     
     //TRACELOG(LOG_INFO, "Selected present mode %s", presentModeSpellingTable.at((WGPUPresentMode)g_renderstate.throttled_PresentMode).c_str());
 }
@@ -1813,93 +1674,6 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height){
     return ret;
 }
 
-
-
-
-/*
- * MIT License
- * 
- * Copyright (c) 2025 @manuel5975p
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-
-
-/*WGPUBindGroupLayout bindGroupLayoutFromUniformTypes(const UniformDescriptor* uniforms, uint32_t uniformCount){
-    std::vector<WGPUBindGroupLayoutEntry> blayouts(uniformCount);
-    WGPUBindGroupLayoutDescriptor bglayoutdesc{};
-    std::memset(blayouts.data(), 0, blayouts.size() * sizeof(WGPUBindGroupLayoutEntry));
-    for(size_t i = 0;i < uniformCount;i++){
-        blayouts[i].binding = i;
-        switch(uniforms[i].type){
-            case uniform_buffer:
-                blayouts[i].visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
-                blayouts[i].buffer.type = WGPUBufferBindingType_Uniform;
-                blayouts[i].buffer.minBindingSize = uniforms[i].minBindingSize;
-            break;
-            case storage_buffer:{
-                blayouts[i].visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
-                blayouts[i].buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
-                blayouts[i].buffer.minBindingSize = 0;
-            }
-            break;
-            case texture2d:
-                blayouts[i].visibility = WGPUShaderStage_Fragment;
-                blayouts[i].texture.sampleType = WGPUTextureSampleType_Float;
-                blayouts[i].texture.viewDimension = WGPUTextureViewDimension_2D;
-            break;
-            case sampler:
-                blayouts[i].visibility = WGPUShaderStage_Fragment;
-                blayouts[i].sampler.type = WGPUSamplerBindingType_Filtering;
-            break;
-            default:break;
-        }
-    }
-    bglayoutdesc.entryCount = uniformCount;
-    bglayoutdesc.entries = blayouts.data();
-    return wgpuDeviceCreateBindGroupLayout((WGPUDevice)GetDevice(), &bglayoutdesc);
-}*/
-
-
-//extern "C" Shader LoadShaderForVAO(const char* shaderSource, VertexArray* vao){
-//    ShaderSources sources zeroinit;
-//    sources.sourceCount = 1;
-//    sources.language = sourceTypeWGSL;
-//
-//    sources.sources[0].stageMask = (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment);
-//    sources.sources[0].data = shaderSource;
-//    sources.sources[0].sizeInBytes = std::strlen(shaderSource);
-//
-//    std::unordered_map<std::string, ResourceTypeDescriptor> bindings = getBindings(sources);
-//    std::vector<ResourceTypeDescriptor> values;
-//    values.reserve(bindings.size());
-//    for(const auto& [x,y] : bindings){
-//        values.push_back(y);
-//    }
-//    std::sort(values.begin(), values.end(),[](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
-//        return x.location < y.location;
-//    });
-//    return LoadShaderForVAOEx(sources, vao, values.data(), values.size(), GetDefaultSettings());
-//
-//}
-
 Shader LoadShaderForVAOEx(const char* shaderSource, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings){
     Shader pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
     //PreparePipeline(pl, vao);
@@ -2187,62 +1961,7 @@ DescribedComputePipeline* LoadComputePipeline(const char* shaderCode){
             continue;
         }
         udesc[insertIndex++] = entry->value;
-        //WGPUBindGroupLayoutEntry insert = {0};
-        //insert.binding = y.location;
-        //insert.visibility = y.visibility;
-        //switch(y.type){
-        //    case uniform_buffer:{
-        //        insert.buffer.type = WGPUBufferBindingType_Uniform;
-        //        insert.buffer.minBindingSize = y.minBindingSize;
-        //    };break;
-        //    case storage_buffer:{
-        //        if(y.access == readonly)
-        //            insert.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
-        //        else
-        //            insert.buffer.type = WGPUBufferBindingType_Storage;
-        //        insert.buffer.minBindingSize = y.minBindingSize;
-        //    }break;
-        //    case texture2d:{
-        //        insert.texture.viewDimension = WGPUTextureViewDimension_2D;
-        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
-        //    }break;
-        //    case texture3d:{
-        //        insert.texture.viewDimension = WGPUTextureViewDimension_3D;
-        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
-        //    }break;
-        //    case texture2d_array:{
-        //        insert.texture.viewDimension = WGPUTextureViewDimension_2DArray;
-        //        insert.texture.sampleType = toTextureSampleType(y.fstype);
-        //    }break;
-        //    case storage_texture2d:{
-        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
-        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-        //    }break;
-        //    case storage_texture3d:{
-        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_3D;
-        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-        //    }break;
-        //    case storage_texture2d_array:{
-        //        insert.storageTexture.viewDimension = WGPUTextureViewDimension_2DArray;
-        //        insert.storageTexture.format = toStorageTextureFormat(y.fstype);
-        //    }break;
-        //    case texture_sampler: {
-        //        insert.sampler.type = WGPUSamplerBindingType_Filtering;
-        //    }break;
-        //    case uniform_type_undefined:
-        //    case uniform_type_enumcount:
-        //    case uniform_type_force32:
-        //    case combined_image_sampler:
-        //    case acceleration_structure:
-        //    rg_unreachable();
-        //}
-
-        
     }
-    
-    //std::sort(udesc.begin(), udesc.end(), [](const WGPUBindGroupLayoutEntry& x, const WGPUBindGroupLayoutEntry& y){
-    //    return x.binding < y.binding;
-    //});
 
     std::sort(udesc, udesc + insertIndex, [](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
         return x.location < y.location;
@@ -2385,62 +2104,6 @@ const std::unordered_map<WGPUFeatureName, std::string> featureSpellingTable = []
     ret[WGPUFeatureName_DualSourceBlending] = "WGPUFeatureName_DualSourceBlending";
     ret[WGPUFeatureName_Subgroups] = "WGPUFeatureName_Subgroups";
     ret[WGPUFeatureName_CoreFeaturesAndLimits] = "WGPUFeatureName_CoreFeaturesAndLimits";
-    //ret[WGPUFeatureName_DawnInternalUsages] = "WGPUFeatureName_DawnInternalUsages";
-    //ret[WGPUFeatureName_DawnMultiPlanarFormats] = "WGPUFeatureName_DawnMultiPlanarFormats";
-    //ret[WGPUFeatureName_DawnNative] = "WGPUFeatureName_DawnNative";
-    //ret[WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses] = "WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses";
-    //ret[WGPUFeatureName_ImplicitDeviceSynchronization] = "WGPUFeatureName_ImplicitDeviceSynchronization";
-    //ret[WGPUFeatureName_TransientAttachments] = "WGPUFeatureName_TransientAttachments";
-    //ret[WGPUFeatureName_MSAARenderToSingleSampled] = "WGPUFeatureName_MSAARenderToSingleSampled";
-    //ret[WGPUFeatureName_D3D11MultithreadProtected] = "WGPUFeatureName_D3D11MultithreadProtected";
-    //ret[WGPUFeatureName_ANGLETextureSharing] = "WGPUFeatureName_ANGLETextureSharing";
-    //ret[WGPUFeatureName_PixelLocalStorageCoherent] = "WGPUFeatureName_PixelLocalStorageCoherent";
-    //ret[WGPUFeatureName_PixelLocalStorageNonCoherent] = "WGPUFeatureName_PixelLocalStorageNonCoherent";
-    //ret[WGPUFeatureName_Unorm16TextureFormats] = "WGPUFeatureName_Unorm16TextureFormats";
-    //ret[WGPUFeatureName_Snorm16TextureFormats] = "WGPUFeatureName_Snorm16TextureFormats";
-    //ret[WGPUFeatureName_MultiPlanarFormatExtendedUsages] = "WGPUFeatureName_MultiPlanarFormatExtendedUsages";
-    //ret[WGPUFeatureName_MultiPlanarFormatP010] = "WGPUFeatureName_MultiPlanarFormatP010";
-    //ret[WGPUFeatureName_HostMappedPointer] = "WGPUFeatureName_HostMappedPointer";
-    //ret[WGPUFeatureName_MultiPlanarRenderTargets] = "WGPUFeatureName_MultiPlanarRenderTargets";
-    //ret[WGPUFeatureName_MultiPlanarFormatNv12a] = "WGPUFeatureName_MultiPlanarFormatNv12a";
-    //ret[WGPUFeatureName_FramebufferFetch] = "WGPUFeatureName_FramebufferFetch";
-    //ret[WGPUFeatureName_BufferMapExtendedUsages] = "WGPUFeatureName_BufferMapExtendedUsages";
-    //ret[WGPUFeatureName_AdapterPropertiesMemoryHeaps] = "WGPUFeatureName_AdapterPropertiesMemoryHeaps";
-    //ret[WGPUFeatureName_AdapterPropertiesD3D] = "WGPUFeatureName_AdapterPropertiesD3D";
-    //ret[WGPUFeatureName_AdapterPropertiesVk] = "WGPUFeatureName_AdapterPropertiesVk";
-    //ret[WGPUFeatureName_R8UnormStorage] = "WGPUFeatureName_R8UnormStorage";
-    //ret[WGPUFeatureName_DawnFormatCapabilities] = "WGPUFeatureName_DawnFormatCapabilities";
-    //ret[WGPUFeatureName_DawnDrmFormatCapabilities] = "WGPUFeatureName_DawnDrmFormatCapabilities";
-    //ret[WGPUFeatureName_Norm16TextureFormats] = "WGPUFeatureName_Norm16TextureFormats";
-    //ret[WGPUFeatureName_MultiPlanarFormatNv16] = "WGPUFeatureName_MultiPlanarFormatNv16";
-    //ret[WGPUFeatureName_MultiPlanarFormatNv24] = "WGPUFeatureName_MultiPlanarFormatNv24";
-    //ret[WGPUFeatureName_MultiPlanarFormatP210] = "WGPUFeatureName_MultiPlanarFormatP210";
-    //ret[WGPUFeatureName_MultiPlanarFormatP410] = "WGPUFeatureName_MultiPlanarFormatP410";
-    //ret[WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation] = "WGPUFeatureName_SharedTextureMemoryVkDedicatedAllocation";
-    //ret[WGPUFeatureName_SharedTextureMemoryAHardwareBuffer] = "WGPUFeatureName_SharedTextureMemoryAHardwareBuffer";
-    //ret[WGPUFeatureName_SharedTextureMemoryDmaBuf] = "WGPUFeatureName_SharedTextureMemoryDmaBuf";
-    //ret[WGPUFeatureName_SharedTextureMemoryOpaqueFD] = "WGPUFeatureName_SharedTextureMemoryOpaqueFD";
-    //ret[WGPUFeatureName_SharedTextureMemoryZirconHandle] = "WGPUFeatureName_SharedTextureMemoryZirconHandle";
-    //ret[WGPUFeatureName_SharedTextureMemoryDXGISharedHandle] = "WGPUFeatureName_SharedTextureMemoryDXGISharedHandle";
-    //ret[WGPUFeatureName_SharedTextureMemoryD3D11Texture2D] = "WGPUFeatureName_SharedTextureMemoryD3D11Texture2D";
-    //ret[WGPUFeatureName_SharedTextureMemoryIOSurface] = "WGPUFeatureName_SharedTextureMemoryIOSurface";
-    //ret[WGPUFeatureName_SharedTextureMemoryEGLImage] = "WGPUFeatureName_SharedTextureMemoryEGLImage";
-    //ret[WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD] = "WGPUFeatureName_SharedFenceVkSemaphoreOpaqueFD";
-    //ret[WGPUFeatureName_SharedFenceSyncFD] = "WGPUFeatureName_SharedFenceSyncFD";
-    //ret[WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle] = "WGPUFeatureName_SharedFenceVkSemaphoreZirconHandle";
-    //ret[WGPUFeatureName_SharedFenceDXGISharedHandle] = "WGPUFeatureName_SharedFenceDXGISharedHandle";
-    //ret[WGPUFeatureName_SharedFenceMTLSharedEvent] = "WGPUFeatureName_SharedFenceMTLSharedEvent";
-    //ret[WGPUFeatureName_SharedBufferMemoryD3D12Resource] = "WGPUFeatureName_SharedBufferMemoryD3D12Resource";
-    //ret[WGPUFeatureName_StaticSamplers] = "WGPUFeatureName_StaticSamplers";
-    //ret[WGPUFeatureName_YCbCrVulkanSamplers] = "WGPUFeatureName_YCbCrVulkanSamplers";
-    //ret[WGPUFeatureName_ShaderModuleCompilationOptions] = "WGPUFeatureName_ShaderModuleCompilationOptions";
-    //ret[WGPUFeatureName_DawnLoadResolveTexture] = "WGPUFeatureName_DawnLoadResolveTexture";
-    //ret[WGPUFeatureName_DawnPartialLoadResolveTexture] = "WGPUFeatureName_DawnPartialLoadResolveTexture";
-    //ret[WGPUFeatureName_MultiDrawIndirect] = "WGPUFeatureName_MultiDrawIndirect";
-    //ret[WGPUFeatureName_DawnTexelCopyBufferRowAlignment] = "WGPUFeatureName_DawnTexelCopyBufferRowAlignment";
-    //ret[WGPUFeatureName_FlexibleTextureViews] = "WGPUFeatureName_FlexibleTextureViews";
-    //ret[WGPUFeatureName_ChromiumExperimentalSubgroupMatrix] = "WGPUFeatureName_ChromiumExperimentalSubgroupMatrix";
-    //ret[WGPUFeatureName_SharedFenceEGLSync] = "WGPUFeatureName_SharedFenceEGLSync";
     #endif
     return ret;
 }();
@@ -2467,127 +2130,125 @@ const std::unordered_map<WGPUPresentMode, std::string> presentModeSpellingTable 
     //map[WGPUPresentMode_Force32] = "WGPUPresentMode_Force32";
     return map;
 }();
-const std::unordered_map<WGPUTextureFormat, std::string> textureFormatSpellingTable = [](){
-    std::unordered_map<WGPUTextureFormat, std::string> map;
-    map[WGPUTextureFormat_Undefined] = "WGPUTextureFormat_Undefined";
-    map[WGPUTextureFormat_R8Unorm] = "WGPUTextureFormat_R8Unorm";
-    map[WGPUTextureFormat_R8Snorm] = "WGPUTextureFormat_R8Snorm";
-    map[WGPUTextureFormat_R8Uint] = "WGPUTextureFormat_R8Uint";
-    map[WGPUTextureFormat_R8Sint] = "WGPUTextureFormat_R8Sint";
-    map[WGPUTextureFormat_R16Uint] = "WGPUTextureFormat_R16Uint";
-    map[WGPUTextureFormat_R16Sint] = "WGPUTextureFormat_R16Sint";
-    map[WGPUTextureFormat_R16Float] = "WGPUTextureFormat_R16Float";
-    map[WGPUTextureFormat_RG8Unorm] = "WGPUTextureFormat_RG8Unorm";
-    map[WGPUTextureFormat_RG8Snorm] = "WGPUTextureFormat_RG8Snorm";
-    map[WGPUTextureFormat_RG8Uint] = "WGPUTextureFormat_RG8Uint";
-    map[WGPUTextureFormat_RG8Sint] = "WGPUTextureFormat_RG8Sint";
-    map[WGPUTextureFormat_R32Float] = "WGPUTextureFormat_R32Float";
-    map[WGPUTextureFormat_R32Uint] = "WGPUTextureFormat_R32Uint";
-    map[WGPUTextureFormat_R32Sint] = "WGPUTextureFormat_R32Sint";
-    map[WGPUTextureFormat_RG16Uint] = "WGPUTextureFormat_RG16Uint";
-    map[WGPUTextureFormat_RG16Sint] = "WGPUTextureFormat_RG16Sint";
-    map[WGPUTextureFormat_RG16Float] = "WGPUTextureFormat_RG16Float";
-    map[WGPUTextureFormat_RGBA8Unorm] = "WGPUTextureFormat_RGBA8Unorm";
-    map[WGPUTextureFormat_RGBA8UnormSrgb] = "WGPUTextureFormat_RGBA8UnormSrgb";
-    map[WGPUTextureFormat_RGBA8Snorm] = "WGPUTextureFormat_RGBA8Snorm";
-    map[WGPUTextureFormat_RGBA8Uint] = "WGPUTextureFormat_RGBA8Uint";
-    map[WGPUTextureFormat_RGBA8Sint] = "WGPUTextureFormat_RGBA8Sint";
-    map[WGPUTextureFormat_BGRA8Unorm] = "WGPUTextureFormat_BGRA8Unorm";
-    map[WGPUTextureFormat_BGRA8UnormSrgb] = "WGPUTextureFormat_BGRA8UnormSrgb";
-    map[WGPUTextureFormat_RGB10A2Uint] = "WGPUTextureFormat_RGB10A2Uint";
-    map[WGPUTextureFormat_RGB10A2Unorm] = "WGPUTextureFormat_RGB10A2Unorm";
-    map[WGPUTextureFormat_RG11B10Ufloat] = "WGPUTextureFormat_RG11B10Ufloat";
-    map[WGPUTextureFormat_RGB9E5Ufloat] = "WGPUTextureFormat_RGB9E5Ufloat";
-    map[WGPUTextureFormat_RG32Float] = "WGPUTextureFormat_RG32Float";
-    map[WGPUTextureFormat_RG32Uint] = "WGPUTextureFormat_RG32Uint";
-    map[WGPUTextureFormat_RG32Sint] = "WGPUTextureFormat_RG32Sint";
-    map[WGPUTextureFormat_RGBA16Uint] = "WGPUTextureFormat_RGBA16Uint";
-    map[WGPUTextureFormat_RGBA16Sint] = "WGPUTextureFormat_RGBA16Sint";
-    map[WGPUTextureFormat_RGBA16Float] = "WGPUTextureFormat_RGBA16Float";
-    map[WGPUTextureFormat_RGBA32Float] = "WGPUTextureFormat_RGBA32Float";
-    map[WGPUTextureFormat_RGBA32Uint] = "WGPUTextureFormat_RGBA32Uint";
-    map[WGPUTextureFormat_RGBA32Sint] = "WGPUTextureFormat_RGBA32Sint";
-    map[WGPUTextureFormat_Stencil8] = "WGPUTextureFormat_Stencil8";
-    map[WGPUTextureFormat_Depth16Unorm] = "WGPUTextureFormat_Depth16Unorm";
-    map[WGPUTextureFormat_Depth24Plus] = "WGPUTextureFormat_Depth24Plus";
-    map[WGPUTextureFormat_Depth24PlusStencil8] = "WGPUTextureFormat_Depth24PlusStencil8";
-    map[WGPUTextureFormat_Depth32Float] = "WGPUTextureFormat_Depth32Float";
-    map[WGPUTextureFormat_Depth32FloatStencil8] = "WGPUTextureFormat_Depth32FloatStencil8";
-    map[WGPUTextureFormat_BC1RGBAUnorm] = "WGPUTextureFormat_BC1RGBAUnorm";
-    map[WGPUTextureFormat_BC1RGBAUnormSrgb] = "WGPUTextureFormat_BC1RGBAUnormSrgb";
-    map[WGPUTextureFormat_BC2RGBAUnorm] = "WGPUTextureFormat_BC2RGBAUnorm";
-    map[WGPUTextureFormat_BC2RGBAUnormSrgb] = "WGPUTextureFormat_BC2RGBAUnormSrgb";
-    map[WGPUTextureFormat_BC3RGBAUnorm] = "WGPUTextureFormat_BC3RGBAUnorm";
-    map[WGPUTextureFormat_BC3RGBAUnormSrgb] = "WGPUTextureFormat_BC3RGBAUnormSrgb";
-    map[WGPUTextureFormat_BC4RUnorm] = "WGPUTextureFormat_BC4RUnorm";
-    map[WGPUTextureFormat_BC4RSnorm] = "WGPUTextureFormat_BC4RSnorm";
-    map[WGPUTextureFormat_BC5RGUnorm] = "WGPUTextureFormat_BC5RGUnorm";
-    map[WGPUTextureFormat_BC5RGSnorm] = "WGPUTextureFormat_BC5RGSnorm";
-    map[WGPUTextureFormat_BC6HRGBUfloat] = "WGPUTextureFormat_BC6HRGBUfloat";
-    map[WGPUTextureFormat_BC6HRGBFloat] = "WGPUTextureFormat_BC6HRGBFloat";
-    map[WGPUTextureFormat_BC7RGBAUnorm] = "WGPUTextureFormat_BC7RGBAUnorm";
-    map[WGPUTextureFormat_BC7RGBAUnormSrgb] = "WGPUTextureFormat_BC7RGBAUnormSrgb";
-    map[WGPUTextureFormat_ETC2RGB8Unorm] = "WGPUTextureFormat_ETC2RGB8Unorm";
-    map[WGPUTextureFormat_ETC2RGB8UnormSrgb] = "WGPUTextureFormat_ETC2RGB8UnormSrgb";
-    map[WGPUTextureFormat_ETC2RGB8A1Unorm] = "WGPUTextureFormat_ETC2RGB8A1Unorm";
-    map[WGPUTextureFormat_ETC2RGB8A1UnormSrgb] = "WGPUTextureFormat_ETC2RGB8A1UnormSrgb";
-    map[WGPUTextureFormat_ETC2RGBA8Unorm] = "WGPUTextureFormat_ETC2RGBA8Unorm";
-    map[WGPUTextureFormat_ETC2RGBA8UnormSrgb] = "WGPUTextureFormat_ETC2RGBA8UnormSrgb";
-    map[WGPUTextureFormat_EACR11Unorm] = "WGPUTextureFormat_EACR11Unorm";
-    map[WGPUTextureFormat_EACR11Snorm] = "WGPUTextureFormat_EACR11Snorm";
-    map[WGPUTextureFormat_EACRG11Unorm] = "WGPUTextureFormat_EACRG11Unorm";
-    map[WGPUTextureFormat_EACRG11Snorm] = "WGPUTextureFormat_EACRG11Snorm";
-    map[WGPUTextureFormat_ASTC4x4Unorm] = "WGPUTextureFormat_ASTC4x4Unorm";
-    map[WGPUTextureFormat_ASTC4x4UnormSrgb] = "WGPUTextureFormat_ASTC4x4UnormSrgb";
-    map[WGPUTextureFormat_ASTC5x4Unorm] = "WGPUTextureFormat_ASTC5x4Unorm";
-    map[WGPUTextureFormat_ASTC5x4UnormSrgb] = "WGPUTextureFormat_ASTC5x4UnormSrgb";
-    map[WGPUTextureFormat_ASTC5x5Unorm] = "WGPUTextureFormat_ASTC5x5Unorm";
-    map[WGPUTextureFormat_ASTC5x5UnormSrgb] = "WGPUTextureFormat_ASTC5x5UnormSrgb";
-    map[WGPUTextureFormat_ASTC6x5Unorm] = "WGPUTextureFormat_ASTC6x5Unorm";
-    map[WGPUTextureFormat_ASTC6x5UnormSrgb] = "WGPUTextureFormat_ASTC6x5UnormSrgb";
-    map[WGPUTextureFormat_ASTC6x6Unorm] = "WGPUTextureFormat_ASTC6x6Unorm";
-    map[WGPUTextureFormat_ASTC6x6UnormSrgb] = "WGPUTextureFormat_ASTC6x6UnormSrgb";
-    map[WGPUTextureFormat_ASTC8x5Unorm] = "WGPUTextureFormat_ASTC8x5Unorm";
-    map[WGPUTextureFormat_ASTC8x5UnormSrgb] = "WGPUTextureFormat_ASTC8x5UnormSrgb";
-    map[WGPUTextureFormat_ASTC8x6Unorm] = "WGPUTextureFormat_ASTC8x6Unorm";
-    map[WGPUTextureFormat_ASTC8x6UnormSrgb] = "WGPUTextureFormat_ASTC8x6UnormSrgb";
-    map[WGPUTextureFormat_ASTC8x8Unorm] = "WGPUTextureFormat_ASTC8x8Unorm";
-    map[WGPUTextureFormat_ASTC8x8UnormSrgb] = "WGPUTextureFormat_ASTC8x8UnormSrgb";
-    map[WGPUTextureFormat_ASTC10x5Unorm] = "WGPUTextureFormat_ASTC10x5Unorm";
-    map[WGPUTextureFormat_ASTC10x5UnormSrgb] = "WGPUTextureFormat_ASTC10x5UnormSrgb";
-    map[WGPUTextureFormat_ASTC10x6Unorm] = "WGPUTextureFormat_ASTC10x6Unorm";
-    map[WGPUTextureFormat_ASTC10x6UnormSrgb] = "WGPUTextureFormat_ASTC10x6UnormSrgb";
-    map[WGPUTextureFormat_ASTC10x8Unorm] = "WGPUTextureFormat_ASTC10x8Unorm";
-    map[WGPUTextureFormat_ASTC10x8UnormSrgb] = "WGPUTextureFormat_ASTC10x8UnormSrgb";
-    map[WGPUTextureFormat_ASTC10x10Unorm] = "WGPUTextureFormat_ASTC10x10Unorm";
-    map[WGPUTextureFormat_ASTC10x10UnormSrgb] = "WGPUTextureFormat_ASTC10x10UnormSrgb";
-    map[WGPUTextureFormat_ASTC12x10Unorm] = "WGPUTextureFormat_ASTC12x10Unorm";
-    map[WGPUTextureFormat_ASTC12x10UnormSrgb] = "WGPUTextureFormat_ASTC12x10UnormSrgb";
-    map[WGPUTextureFormat_ASTC12x12Unorm] = "WGPUTextureFormat_ASTC12x12Unorm";
-    map[WGPUTextureFormat_ASTC12x12UnormSrgb] = "WGPUTextureFormat_ASTC12x12UnormSrgb";
-    #if !defined(__EMSCRIPTEN__)  //why??
-    map[WGPUTextureFormat_R16Unorm] = "WGPUTextureFormat_R16Unorm";
-    map[WGPUTextureFormat_RG16Unorm] = "WGPUTextureFormat_RG16Unorm";
-    map[WGPUTextureFormat_RGBA16Unorm] = "WGPUTextureFormat_RGBA16Unorm";
-    map[WGPUTextureFormat_R16Snorm] = "WGPUTextureFormat_R16Snorm";
-    map[WGPUTextureFormat_RG16Snorm] = "WGPUTextureFormat_RG16Snorm";
-    map[WGPUTextureFormat_RGBA16Snorm] = "WGPUTextureFormat_RGBA16Snorm";
-    map[WGPUTextureFormat_R8BG8Biplanar420Unorm] = "WGPUTextureFormat_R8BG8Biplanar420Unorm";
-    map[WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm] = "WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm";
-    map[WGPUTextureFormat_R8BG8A8Triplanar420Unorm] = "WGPUTextureFormat_R8BG8A8Triplanar420Unorm";
-    map[WGPUTextureFormat_R8BG8Biplanar422Unorm] = "WGPUTextureFormat_R8BG8Biplanar422Unorm";
-    map[WGPUTextureFormat_R8BG8Biplanar444Unorm] = "WGPUTextureFormat_R8BG8Biplanar444Unorm";
-    map[WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm] = "WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm";
-    map[WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm] = "WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm";
-    map[WGPUTextureFormat_External] = "WGPUTextureFormat_External";
-    map[WGPUTextureFormat_Force32] = "WGPUTextureFormat_Force32";
-    #endif
-    return map;
-}();
+
 const char* TextureFormatName(WGPUTextureFormat fmt){
-    auto it = textureFormatSpellingTable.find(fmt);
-    if(it == textureFormatSpellingTable.end()){
+    switch(fmt){
+        case WGPUTextureFormat_Undefined: return "WGPUTextureFormat_Undefined";
+        case WGPUTextureFormat_R8Unorm: return "WGPUTextureFormat_R8Unorm";
+        case WGPUTextureFormat_R8Snorm: return "WGPUTextureFormat_R8Snorm";
+        case WGPUTextureFormat_R8Uint: return "WGPUTextureFormat_R8Uint";
+        case WGPUTextureFormat_R8Sint: return "WGPUTextureFormat_R8Sint";
+        case WGPUTextureFormat_R16Uint: return "WGPUTextureFormat_R16Uint";
+        case WGPUTextureFormat_R16Sint: return "WGPUTextureFormat_R16Sint";
+        case WGPUTextureFormat_R16Float: return "WGPUTextureFormat_R16Float";
+        case WGPUTextureFormat_RG8Unorm: return "WGPUTextureFormat_RG8Unorm";
+        case WGPUTextureFormat_RG8Snorm: return "WGPUTextureFormat_RG8Snorm";
+        case WGPUTextureFormat_RG8Uint: return "WGPUTextureFormat_RG8Uint";
+        case WGPUTextureFormat_RG8Sint: return "WGPUTextureFormat_RG8Sint";
+        case WGPUTextureFormat_R32Float: return "WGPUTextureFormat_R32Float";
+        case WGPUTextureFormat_R32Uint: return "WGPUTextureFormat_R32Uint";
+        case WGPUTextureFormat_R32Sint: return "WGPUTextureFormat_R32Sint";
+        case WGPUTextureFormat_RG16Uint: return "WGPUTextureFormat_RG16Uint";
+        case WGPUTextureFormat_RG16Sint: return "WGPUTextureFormat_RG16Sint";
+        case WGPUTextureFormat_RG16Float: return "WGPUTextureFormat_RG16Float";
+        case WGPUTextureFormat_RGBA8Unorm: return "WGPUTextureFormat_RGBA8Unorm";
+        case WGPUTextureFormat_RGBA8UnormSrgb: return "WGPUTextureFormat_RGBA8UnormSrgb";
+        case WGPUTextureFormat_RGBA8Snorm: return "WGPUTextureFormat_RGBA8Snorm";
+        case WGPUTextureFormat_RGBA8Uint: return "WGPUTextureFormat_RGBA8Uint";
+        case WGPUTextureFormat_RGBA8Sint: return "WGPUTextureFormat_RGBA8Sint";
+        case WGPUTextureFormat_BGRA8Unorm: return "WGPUTextureFormat_BGRA8Unorm";
+        case WGPUTextureFormat_BGRA8UnormSrgb: return "WGPUTextureFormat_BGRA8UnormSrgb";
+        case WGPUTextureFormat_RGB10A2Uint: return "WGPUTextureFormat_RGB10A2Uint";
+        case WGPUTextureFormat_RGB10A2Unorm: return "WGPUTextureFormat_RGB10A2Unorm";
+        case WGPUTextureFormat_RG11B10Ufloat: return "WGPUTextureFormat_RG11B10Ufloat";
+        case WGPUTextureFormat_RGB9E5Ufloat: return "WGPUTextureFormat_RGB9E5Ufloat";
+        case WGPUTextureFormat_RG32Float: return "WGPUTextureFormat_RG32Float";
+        case WGPUTextureFormat_RG32Uint: return "WGPUTextureFormat_RG32Uint";
+        case WGPUTextureFormat_RG32Sint: return "WGPUTextureFormat_RG32Sint";
+        case WGPUTextureFormat_RGBA16Uint: return "WGPUTextureFormat_RGBA16Uint";
+        case WGPUTextureFormat_RGBA16Sint: return "WGPUTextureFormat_RGBA16Sint";
+        case WGPUTextureFormat_RGBA16Float: return "WGPUTextureFormat_RGBA16Float";
+        case WGPUTextureFormat_RGBA32Float: return "WGPUTextureFormat_RGBA32Float";
+        case WGPUTextureFormat_RGBA32Uint: return "WGPUTextureFormat_RGBA32Uint";
+        case WGPUTextureFormat_RGBA32Sint: return "WGPUTextureFormat_RGBA32Sint";
+        case WGPUTextureFormat_Stencil8: return "WGPUTextureFormat_Stencil8";
+        case WGPUTextureFormat_Depth16Unorm: return "WGPUTextureFormat_Depth16Unorm";
+        case WGPUTextureFormat_Depth24Plus: return "WGPUTextureFormat_Depth24Plus";
+        case WGPUTextureFormat_Depth24PlusStencil8: return "WGPUTextureFormat_Depth24PlusStencil8";
+        case WGPUTextureFormat_Depth32Float: return "WGPUTextureFormat_Depth32Float";
+        case WGPUTextureFormat_Depth32FloatStencil8: return "WGPUTextureFormat_Depth32FloatStencil8";
+        case WGPUTextureFormat_BC1RGBAUnorm: return "WGPUTextureFormat_BC1RGBAUnorm";
+        case WGPUTextureFormat_BC1RGBAUnormSrgb: return "WGPUTextureFormat_BC1RGBAUnormSrgb";
+        case WGPUTextureFormat_BC2RGBAUnorm: return "WGPUTextureFormat_BC2RGBAUnorm";
+        case WGPUTextureFormat_BC2RGBAUnormSrgb: return "WGPUTextureFormat_BC2RGBAUnormSrgb";
+        case WGPUTextureFormat_BC3RGBAUnorm: return "WGPUTextureFormat_BC3RGBAUnorm";
+        case WGPUTextureFormat_BC3RGBAUnormSrgb: return "WGPUTextureFormat_BC3RGBAUnormSrgb";
+        case WGPUTextureFormat_BC4RUnorm: return "WGPUTextureFormat_BC4RUnorm";
+        case WGPUTextureFormat_BC4RSnorm: return "WGPUTextureFormat_BC4RSnorm";
+        case WGPUTextureFormat_BC5RGUnorm: return "WGPUTextureFormat_BC5RGUnorm";
+        case WGPUTextureFormat_BC5RGSnorm: return "WGPUTextureFormat_BC5RGSnorm";
+        case WGPUTextureFormat_BC6HRGBUfloat: return "WGPUTextureFormat_BC6HRGBUfloat";
+        case WGPUTextureFormat_BC6HRGBFloat: return "WGPUTextureFormat_BC6HRGBFloat";
+        case WGPUTextureFormat_BC7RGBAUnorm: return "WGPUTextureFormat_BC7RGBAUnorm";
+        case WGPUTextureFormat_BC7RGBAUnormSrgb: return "WGPUTextureFormat_BC7RGBAUnormSrgb";
+        case WGPUTextureFormat_ETC2RGB8Unorm: return "WGPUTextureFormat_ETC2RGB8Unorm";
+        case WGPUTextureFormat_ETC2RGB8UnormSrgb: return "WGPUTextureFormat_ETC2RGB8UnormSrgb";
+        case WGPUTextureFormat_ETC2RGB8A1Unorm: return "WGPUTextureFormat_ETC2RGB8A1Unorm";
+        case WGPUTextureFormat_ETC2RGB8A1UnormSrgb: return "WGPUTextureFormat_ETC2RGB8A1UnormSrgb";
+        case WGPUTextureFormat_ETC2RGBA8Unorm: return "WGPUTextureFormat_ETC2RGBA8Unorm";
+        case WGPUTextureFormat_ETC2RGBA8UnormSrgb: return "WGPUTextureFormat_ETC2RGBA8UnormSrgb";
+        case WGPUTextureFormat_EACR11Unorm: return "WGPUTextureFormat_EACR11Unorm";
+        case WGPUTextureFormat_EACR11Snorm: return "WGPUTextureFormat_EACR11Snorm";
+        case WGPUTextureFormat_EACRG11Unorm: return "WGPUTextureFormat_EACRG11Unorm";
+        case WGPUTextureFormat_EACRG11Snorm: return "WGPUTextureFormat_EACRG11Snorm";
+        case WGPUTextureFormat_ASTC4x4Unorm: return "WGPUTextureFormat_ASTC4x4Unorm";
+        case WGPUTextureFormat_ASTC4x4UnormSrgb: return "WGPUTextureFormat_ASTC4x4UnormSrgb";
+        case WGPUTextureFormat_ASTC5x4Unorm: return "WGPUTextureFormat_ASTC5x4Unorm";
+        case WGPUTextureFormat_ASTC5x4UnormSrgb: return "WGPUTextureFormat_ASTC5x4UnormSrgb";
+        case WGPUTextureFormat_ASTC5x5Unorm: return "WGPUTextureFormat_ASTC5x5Unorm";
+        case WGPUTextureFormat_ASTC5x5UnormSrgb: return "WGPUTextureFormat_ASTC5x5UnormSrgb";
+        case WGPUTextureFormat_ASTC6x5Unorm: return "WGPUTextureFormat_ASTC6x5Unorm";
+        case WGPUTextureFormat_ASTC6x5UnormSrgb: return "WGPUTextureFormat_ASTC6x5UnormSrgb";
+        case WGPUTextureFormat_ASTC6x6Unorm: return "WGPUTextureFormat_ASTC6x6Unorm";
+        case WGPUTextureFormat_ASTC6x6UnormSrgb: return "WGPUTextureFormat_ASTC6x6UnormSrgb";
+        case WGPUTextureFormat_ASTC8x5Unorm: return "WGPUTextureFormat_ASTC8x5Unorm";
+        case WGPUTextureFormat_ASTC8x5UnormSrgb: return "WGPUTextureFormat_ASTC8x5UnormSrgb";
+        case WGPUTextureFormat_ASTC8x6Unorm: return "WGPUTextureFormat_ASTC8x6Unorm";
+        case WGPUTextureFormat_ASTC8x6UnormSrgb: return "WGPUTextureFormat_ASTC8x6UnormSrgb";
+        case WGPUTextureFormat_ASTC8x8Unorm: return "WGPUTextureFormat_ASTC8x8Unorm";
+        case WGPUTextureFormat_ASTC8x8UnormSrgb: return "WGPUTextureFormat_ASTC8x8UnormSrgb";
+        case WGPUTextureFormat_ASTC10x5Unorm: return "WGPUTextureFormat_ASTC10x5Unorm";
+        case WGPUTextureFormat_ASTC10x5UnormSrgb: return "WGPUTextureFormat_ASTC10x5UnormSrgb";
+        case WGPUTextureFormat_ASTC10x6Unorm: return "WGPUTextureFormat_ASTC10x6Unorm";
+        case WGPUTextureFormat_ASTC10x6UnormSrgb: return "WGPUTextureFormat_ASTC10x6UnormSrgb";
+        case WGPUTextureFormat_ASTC10x8Unorm: return "WGPUTextureFormat_ASTC10x8Unorm";
+        case WGPUTextureFormat_ASTC10x8UnormSrgb: return "WGPUTextureFormat_ASTC10x8UnormSrgb";
+        case WGPUTextureFormat_ASTC10x10Unorm: return "WGPUTextureFormat_ASTC10x10Unorm";
+        case WGPUTextureFormat_ASTC10x10UnormSrgb: return "WGPUTextureFormat_ASTC10x10UnormSrgb";
+        case WGPUTextureFormat_ASTC12x10Unorm: return "WGPUTextureFormat_ASTC12x10Unorm";
+        case WGPUTextureFormat_ASTC12x10UnormSrgb: return "WGPUTextureFormat_ASTC12x10UnormSrgb";
+        case WGPUTextureFormat_ASTC12x12Unorm: return "WGPUTextureFormat_ASTC12x12Unorm";
+        case WGPUTextureFormat_ASTC12x12UnormSrgb: return "WGPUTextureFormat_ASTC12x12UnormSrgb";
+        #if !defined(__EMSCRIPTEN__)  //why??
+        case WGPUTextureFormat_R16Unorm: return "WGPUTextureFormat_R16Unorm";
+        case WGPUTextureFormat_RG16Unorm: return "WGPUTextureFormat_RG16Unorm";
+        case WGPUTextureFormat_RGBA16Unorm: return "WGPUTextureFormat_RGBA16Unorm";
+        case WGPUTextureFormat_R16Snorm: return "WGPUTextureFormat_R16Snorm";
+        case WGPUTextureFormat_RG16Snorm: return "WGPUTextureFormat_RG16Snorm";
+        case WGPUTextureFormat_RGBA16Snorm: return "WGPUTextureFormat_RGBA16Snorm";
+        case WGPUTextureFormat_R8BG8Biplanar420Unorm: return "WGPUTextureFormat_R8BG8Biplanar420Unorm";
+        case WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm: return "WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm";
+        case WGPUTextureFormat_R8BG8A8Triplanar420Unorm: return "WGPUTextureFormat_R8BG8A8Triplanar420Unorm";
+        case WGPUTextureFormat_R8BG8Biplanar422Unorm: return "WGPUTextureFormat_R8BG8Biplanar422Unorm";
+        case WGPUTextureFormat_R8BG8Biplanar444Unorm: return "WGPUTextureFormat_R8BG8Biplanar444Unorm";
+        case WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm: return "WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm";
+        case WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm: return "WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm";
+        case WGPUTextureFormat_External: return "WGPUTextureFormat_External";
+        case WGPUTextureFormat_Force32: return "WGPUTextureFormat_Force32";
+        #endif
+        default:
         return "?? Unknown WGPUTextureFormat value ??";
     }
-    return it->second.c_str();
 }
+
+// end file src/backend_wgpu.cpp

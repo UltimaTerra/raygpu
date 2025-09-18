@@ -1,3 +1,4 @@
+// begin file src/InitWindow_RGFW.cpp
 #define RGFW_IMPLEMENTATION
 #define RGFW_USE_XDL
 
@@ -306,3 +307,5 @@ SubWindow InitWindow_RGFW(int width, int height, const char* title){
     setupRGFWCallbacks((RGFW_window*)ret.handle);
     return ret;
 }
+
+// end file src/InitWindow_RGFW.cpp

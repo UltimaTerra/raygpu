@@ -1,3 +1,4 @@
+// begin file include/config.h
 #ifndef CONFIG_H_INCLUDED
 #define CONFIG_H_INCLUDED
 
@@ -109,3 +110,5 @@
 
 
 #endif // CONFIG_H_INCLUDED
+
+// end file include/config.h

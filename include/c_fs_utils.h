@@ -1,3 +1,4 @@
+// begin file include/c_fs_utils.h
 #ifndef C_FS_UTILS_H
 #define C_FS_UTILS_H
 
@@ -347,3 +348,4 @@ static inline void cfs_free_path_list(cfs_path_list* list) {
 }
 
 #endif /* CFS_H */
+// end file include/c_fs_utils.h

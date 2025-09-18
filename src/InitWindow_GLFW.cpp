@@ -1,3 +1,4 @@
+// begin file src/InitWindow_GLFW.cpp
 #include <raygpu.h>
 #define GLFW_INCLUDE_NONE
 #if SUPPORT_VULKAN_BACKEND == 1
@@ -627,3 +628,5 @@ const std::unordered_map<std::string, int> emscriptenToGLFWKeyMap = {
     {"IntlBackslash", GLFW_KEY_UNKNOWN}, // Example of an unmapped key
     // ... add other keys as necessary
 };
+
+// end file src/InitWindow_GLFW.cpp

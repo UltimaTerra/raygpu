@@ -1,3 +1,4 @@
+// begin file src/stb_impl.c
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #pragma GCC diagnostic push
@@ -7,3 +8,5 @@
 #include <raygpu.h>
 #include <external/stb_image.h>
 #include <external/stb_image_write.h>
+
+// end file src/stb_impl.c

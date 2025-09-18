@@ -1,3 +1,4 @@
+// begin file include/raygpu.h
 #ifndef RAYGPU_H
 #define RAYGPU_H
 #include <config.h>
@@ -1344,7 +1345,6 @@ EXTERN_C_BEGIN
 
     RGAPI RenderTexture LoadRenderTexture(uint32_t width, uint32_t height);
     RGAPI RenderTexture LoadRenderTextureEx(uint32_t width, uint32_t height, PixelFormat colorFormat, uint32_t sampleCount, uint32_t attachmentCount);
-    RGAPI const char* TextureFormatName(PixelFormat fmt);
     RGAPI size_t GetPixelSizeInBytes(PixelFormat format);
     
     RGAPI Texture LoadBlankTexture(uint32_t width, uint32_t height);
@@ -1593,3 +1593,5 @@ typedef struct renderstate renderstate;
 extern renderstate g_renderstate;
 
 #endif
+
+// end file include/raygpu.h

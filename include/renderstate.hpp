@@ -1,3 +1,4 @@
+// begin file include/renderstate.hpp
 #include <array>
 #include <deque>
 #include <map>
@@ -149,3 +150,4 @@ struct renderstate {
 
     bool closeFlag = false;
 };
+// end file include/renderstate.hpp

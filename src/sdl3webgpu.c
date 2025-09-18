@@ -1,3 +1,4 @@
+// begin file src/sdl3webgpu.c
 #define Font rlFont
 #include <raygpu.h>
 #undef Font
@@ -158,3 +159,5 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     //#endif
     return NULL;
 }
+
+// end file src/sdl3webgpu.c

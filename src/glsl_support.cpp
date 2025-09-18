@@ -1,3 +1,4 @@
+// begin file src/glsl_support.cpp
 /*
  * MIT License
  * 
@@ -896,3 +897,5 @@ std::unordered_map<uint32_t, std::string> uniformTypeNames = []{
 }();
 
 
+
+// end file src/glsl_support.cpp

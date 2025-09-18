@@ -1,11 +1,7 @@
+// begin file src/InitWindow.cpp
 #include <c_fs_utils.h>
 #include <raygpu.h>
 #include <internals.hpp>
-
-#if SUPPORT_VULKAN_BACKEND == 1
-#include "backend_vulkan/vulkan_internals.hpp"
-#endif
-
 
 const char shaderSource[] = R"(
 struct VertexInput {
@@ -568,3 +564,5 @@ extern "C" size_t GetPixelSizeInBytes(PixelFormat format) {
 }
 
 
+
+// end file src/InitWindow.cpp

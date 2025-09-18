@@ -1,3 +1,4 @@
+// begin file src/models.c
 #include <raygpu.h>
 #ifndef RL_CALLOC
 #define RL_CALLOC calloc
@@ -2968,3 +2969,4 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 
     return mesh;
 }
+// end file src/models.c

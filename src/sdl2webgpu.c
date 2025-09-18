@@ -1,3 +1,4 @@
+// begin file src/sdl2webgpu.c
 /**
  * This is an extension of SDL2 for WebGPU, abstracting away the details of
  * OS-specific operations.
@@ -186,3 +187,5 @@ void usedefinedawnmacro___(void){ //Silence warning
     int x = WEBGPU_BACKEND_DAWN;
     (void)x;
 }
+
+// end file src/sdl2webgpu.c

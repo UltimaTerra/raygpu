@@ -1,3 +1,4 @@
+// begin file src/sdl2webgpu.h
 /**
  * This is an extension of SDL2 for WebGPU, abstracting away the details of
  * OS-specific operations.
@@ -47,3 +48,5 @@ WGPUSurface SDL_GetWGPUSurface(WGPUInstance instance, SDL_Window* window);
 #endif
 
 #endif // _sdl2_webgpu_h_
+
+// end file src/sdl2webgpu.h

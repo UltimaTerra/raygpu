@@ -1,3 +1,4 @@
+// begin file src/rtext.c
 /**********************************************************************************************
 *
 *   rtext - Basic functions to load fonts and draw text
@@ -2501,3 +2502,5 @@ static GlyphInfo *LoadFontDataBDF(const unsigned char *fileData, int dataSize, i
 #endif      // SUPPORT_FILEFORMAT_BDF
 
 #endif      // SUPPORT_MODULE_RTEXT
+
+// end file src/rtext.c

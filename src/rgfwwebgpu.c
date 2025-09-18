@@ -1,3 +1,4 @@
+// begin file src/rgfwwebgpu.c
 #ifdef __EMSCRIPTEN__
 #define RGFW_WASM
 #endif
@@ -147,3 +148,4 @@ WGPUSurface RGFW_GetWGPUSurface(WGPUInstance instance, RGFW_window* window) {
     return NULL;
 #endif
 }
+// end file src/rgfwwebgpu.c

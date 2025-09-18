@@ -1,3 +1,4 @@
+// begin file src/rshapes.c
 /**********************************************************************************************
 *
 *   rshapes - Basic functions to draw 2d shapes and check collisions
@@ -2601,3 +2602,4 @@ void DrawTexturePro(Texture texture, Rectangle source, Rectangle dest, Vector2 o
         */
     }
 }
+// end file src/rshapes.c

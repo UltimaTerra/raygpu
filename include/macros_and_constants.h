@@ -1,3 +1,4 @@
+// begin file include/macros_and_constants.h
 #ifndef MACROS_AND_CONSTANTS
 #define MACROS_AND_CONSTANTS
 #ifdef __cplusplus
@@ -158,3 +159,5 @@ do {                                                                            
 typedef uint32_t Bool32;
 
 #endif // MACROS_AND_CONSTANTS
+
+// end file include/macros_and_constants.h

@@ -1,3 +1,4 @@
+// begin file src/dawn_glfwrip.cpp
 // Copyright 2020 The Dawn & Tint Authors
 //
 // Redistribution and use in source and binary forms, with or without
@@ -109,3 +110,5 @@ SetupWindowAndGetSurfaceDescriptor(GLFWwindow* window) {
 }
 
 }  // namespace wgpu::glfw
+
+// end file src/dawn_glfwrip.cpp

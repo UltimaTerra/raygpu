@@ -1,3 +1,4 @@
+// begin file include/mathutils.h
 #ifndef MATHUTILS_H
 #define MATHUTILS_H
 /*   Copyright (c) 2015-2024 Ramon Santamaria (@raysan5)
@@ -1604,3 +1605,5 @@ MAPI std::ostream& operator<<(std::ostream& str, const Matrix& m){
 #endif //__cplusplus
 
 #endif // Include guard
+
+// end file include/mathutils.h

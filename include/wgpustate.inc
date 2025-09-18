@@ -8,10 +8,10 @@
 
 
 struct wgpustate{
-    WGPUInstance instance{};
-    WGPUAdapter adapter{};
-    WGPUDevice device{};
-    WGPUQueue queue{};
+    WGPUInstance instance;
+    WGPUAdapter adapter;
+    WGPUDevice device;
+    WGPUQueue queue;
 };
 
 #include "renderstate.hpp"

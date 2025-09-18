@@ -1,3 +1,4 @@
+// begin file src/raygpu.cpp
 /*
  * MIT License
  * 
@@ -2803,3 +2804,5 @@ RGAPI uint32_t getNextShaderID_shc(){
     }
     return nextShaderID_shc++;
 }
+
+// end file src/raygpu.cpp
