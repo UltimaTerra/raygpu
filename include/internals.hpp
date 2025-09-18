@@ -761,6 +761,9 @@ typedef struct EntryPointSet{
 EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
+InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
+StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
+EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
 extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, const std::vector<AttributeAndResidence>& attribs);
 inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
     uint32_t maxslot = 0;

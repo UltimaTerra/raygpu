@@ -274,7 +274,7 @@ typedef enum uniform_type { uniform_type_undefined, uniform_buffer, storage_buff
 
 typedef enum access_type { readonly, readwrite, writeonly } access_type;
 
-typedef enum format_or_sample_type { we_dont_know, sample_f32, sample_u32, format_r32float, format_r32uint, format_rgba8unorm, format_rgba32float } format_or_sample_type;
+typedef enum format_or_sample_type { we_dont_know, sample_f32, sample_u32, sample_i32, format_r32float, format_r32uint, format_rgba8unorm, format_rgba32float } format_or_sample_type;
 
 typedef struct ResourceTypeDescriptor{
     uniform_type type;
