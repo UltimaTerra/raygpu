@@ -1,4 +1,8 @@
 # RayGPU
+
+[![Window/Linux/MacOS build](https://github.com/manuel5975p/raygpu/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/manuel5975p/raygpu/actions/workflows/cmake-multi-platform.yml)
+
+
 A fast and simple [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) or [Vulkan](https://www.vulkan.org/) based graphics library for **C and C++**, inspired by and based on [raylib](https://github.com/raysan5/raylib/). Primarily targeting WebGPU for browsers and desktop through [Dawn](https://dawn.googlesource.com/dawn), it also supports a direct and lightweight Vulkan backend.
 
 - [Getting Started](#getting-started)
