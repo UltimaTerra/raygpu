@@ -24,6 +24,7 @@
  */
 
 #include "config.h"
+#include "wgvk.h"
 #include <macros_and_constants.h>
 #include <c_fs_utils.h>
 #include <cstddef>
@@ -769,13 +770,17 @@ RGAPI void BeginDrawing(){
     }
     
     {
-        g_renderstate.renderExtentX = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
-        g_renderstate.width = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.width;
-        g_renderstate.renderExtentY = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
-        g_renderstate.height = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget.texture.height;
-        GetNewTexture(&g_renderstate.createdSubwindows[g_renderstate.window]->surface);
-        RenderTexture_stack_push(&g_renderstate.renderTargetStack, g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget);
-        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[g_renderstate.window]->surface.renderTarget;
+        FullSurface* surface = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface;
+        RenderTexture sRTex = surface->renderTarget;
+        Texture colorTarget = sRTex.texture;
+        g_renderstate.renderExtentX = colorTarget.width;
+        g_renderstate.width = colorTarget.width;
+        g_renderstate.renderExtentY = colorTarget.height;
+        g_renderstate.height = colorTarget.height;
+
+        GetNewTexture(surface);
+        RenderTexture_stack_push(&g_renderstate.renderTargetStack, CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface.renderTarget);
+        g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface.renderTarget;
     }
     BeginRenderpassEx(&g_renderstate.renderpass);
     //SetUniformBuffer(0, g_renderstate.defaultScreenMatrix);
@@ -882,7 +887,7 @@ RGAPI void EndDrawing(){
     
     std::copy(g_renderstate.smallBufferRecyclingBin.begin(), g_renderstate.smallBufferRecyclingBin.end(), std::back_inserter(g_renderstate.smallBufferPool));
     g_renderstate.smallBufferRecyclingBin.clear();
-    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window);
+    window_input_state* ipstate = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state;
     
     memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
 
@@ -890,10 +895,10 @@ RGAPI void EndDrawing(){
     ipstate->scrollPreviousFrame = ipstate->scrollThisFrame;
     ipstate->scrollThisFrame = CLITERAL(Vector2){0, 0};
     memcpy(ipstate->mouseButtonDownPrevious, ipstate->mouseButtonDown, MOUSEBTN_MAX);
-    for(size_t i = 0;i < g_renderstate.input_map.current_capacity;i++){
-        CreatedWindowMap_kv_pair* iter = g_renderstate.input_map.table + i;
+    for(size_t i = 0;i < g_renderstate.createdSubwindows.current_capacity;i++){
+        CreatedWindowMap_kv_pair* iter = g_renderstate.createdSubwindows.table + i;
         if(iter->key != PHM_EMPTY_SLOT_KEY && iter->key != PHM_DELETED_SLOT_KEY){
-            window_input_state* ipstate_ = &iter->value;
+            window_input_state* ipstate_ = &iter->value.input_state;
             memset(ipstate_->charQueue, 0, CHARQ_MAX * sizeof(int));
             ipstate_->gestureAngleThisFrame = 0;
             ipstate_->gestureZoomThisFrame = 1;
@@ -1341,13 +1346,13 @@ RGAPI void TakeScreenshot(const char* filename){
 
 RGAPI bool IsKeyDown(int key){
     void* ah = GetActiveWindowHandle();
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydown[key];
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.keydown[key];
 }
 RGAPI bool IsKeyPressed(int key){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydown[key] && !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydownPrevious[key];
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.keydown[key] && !CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.keydownPrevious[key];
 }
 RGAPI int GetCharPressed(void) {
-    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle());
+    window_input_state* ipstate = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state;
     if (ipstate->charQueueCount == 0){
         return 0;
     }
@@ -1364,38 +1369,38 @@ RGAPI int GetMouseY(cwoid){
 }
 
 float GetGesturePinchZoom(cwoid){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->gestureZoomThisFrame;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.gestureZoomThisFrame;
 }
 float GetGesturePinchAngle(cwoid){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->gestureAngleThisFrame;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.gestureAngleThisFrame;
 }
 Vector2 GetMousePosition(cwoid){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mousePos;
 }
 Vector2 GetMouseDelta(cwoid){
     Vector2 ret = {
-        .x = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.x - CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.x,
-        .y = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.y - CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.y
+        .x = CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mousePos.x - CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mousePos.x,
+        .y = CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mousePos.y - CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mousePos.y
     };
     return ret;
 }
 float GetMouseWheelMove(void){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->scrollPreviousFrame.y;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.scrollPreviousFrame.y;
 }
 Vector2 GetMouseWheelMoveV(void){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->scrollPreviousFrame;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.scrollPreviousFrame;
 }
 bool IsMouseButtonPressed(int button){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button] && !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDownPrevious[button];
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mouseButtonDown[button] && !CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mouseButtonDownPrevious[button];
 }
 bool IsMouseButtonDown(int button){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button];
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mouseButtonDown[button];
 }
 bool IsMouseButtonReleased(int button){
-    return !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button] && CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDownPrevious[button];
+    return !CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mouseButtonDown[button] && CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.mouseButtonDownPrevious[button];
 }
 bool IsCursorOnScreen(cwoid){
-    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->cursorInWindow;
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.cursorInWindow;
 }
 
 uint64_t NanoTime(cwoid){
@@ -1487,6 +1492,7 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     auto& src = sources.sources[sources.sourceCount++];
     src.data = shaderSource;
     src.sizeInBytes = std::strlen(shaderSource);
+    src.stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     StringToUniformMap* bindings = getBindings(sources);
     InOutAttributeInfo attribs = getAttributes(sources);
     
@@ -1517,11 +1523,9 @@ Shader LoadShaderSingleSource(const char* shaderSource){
         }
     }
     
-    std::sort(values, values + bindings->current_size, [](const ResourceTypeDescriptor& x, const ResourceTypeDescriptor& y){
-        return x.location < y.location;
-    });
-
-    Shader ret = LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, insertIndex, GetDefaultSettings());
+    quickSort_ResourceTypeDescriptor(values, values + bindings->current_size);
+    DescribedShaderModule module = LoadShaderModuleWGSL(sources);
+    Shader ret = LoadPipelineFromModule(module, allAttribsInOneBuffer, attributeCount, values, insertIndex, GetDefaultSettings());
     RL_FREE(values);
     StringToUniformMap_free(bindings);
     RL_FREE(bindings);
@@ -2189,7 +2193,7 @@ void EndTextureMode(){
     }
 }
 RGAPI void BeginWindowMode(SubWindow sw){
-    SubWindow swref = g_renderstate.createdSubwindows.at(sw->handle);
+    SubWindow swref = CreatedWindowMap_get(&g_renderstate.createdSubwindows, sw->handle);
     g_renderstate.activeSubWindow = sw;
     GetNewTexture(&swref->surface);
     BeginTextureMode(swref->surface.renderTarget);
@@ -2208,7 +2212,7 @@ RGAPI void EndWindowMode(){
     }
 
     PresentSurface(&g_renderstate.activeSubWindow->surface);
-    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle());
+    window_input_state* ipstate = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state;
     
     memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
     ipstate->mousePosPrevious = ipstate->mousePos;

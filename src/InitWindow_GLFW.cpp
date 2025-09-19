@@ -48,20 +48,17 @@ void ResizeCallback(GLFWwindow* window, int width, int height){
         return;
     }
     else {
-        ResizeSurface(&g_renderstate.createdSubwindows[window]->surface, width, height);
-        //wgpuSurfaceConfigure(g_renderstate.createdSubwindows[window].surface, (WGPUSurfaceConfiguration*)&config);
-        //TRACELOG(LOG_WARNING, "configured: %llu with extents %u x %u", g_renderstate.createdSubwindows[window].surface, width, height);
-        //g_renderstate.surface = wgpu::Surface(g_renderstate.createdSubwindows[window].surface);
+        ResizeSurface(&CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface, width, height);
         if((void*)window == (void*)g_renderstate.window){
-            g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[window]->surface.renderTarget;
+            g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface.renderTarget;
         }
         Matrix newcamera = ScreenMatrix(width, height);
         g_renderstate.minimized = false;
     }
 }
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.x += xoffset;
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.y += yoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.x += xoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.y += yoffset;
 }
 
 
@@ -88,7 +85,7 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
 #endif
 
 void cpcallback(GLFWwindow* window, double x, double y){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->mousePos = Vector2{float(x), float(y)};
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mousePos = Vector2{float(x), float(y)};
 }
 
 #ifdef __EMSCRIPTEN__
@@ -99,10 +96,10 @@ EM_BOOL EmscriptenMouseCallback(int eventType, const EmscriptenMouseEvent *mouse
 #endif
 void clickcallback(GLFWwindow* window, int button, int action, int mods){
     if(action == GLFW_PRESS){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 1;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mouseButtonDown[button] = 1;
     }
     else if(action == GLFW_RELEASE){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 0;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mouseButtonDown[button] = 0;
     }
 }
 #ifdef __EMSCRIPTEN__
@@ -124,15 +121,15 @@ EM_BOOL EmscriptenMouseupClickCallback(int eventType, const EmscriptenMouseEvent
 
 //#ifndef __EMSCRIPTEN__
 void CursorEnterCallback(GLFWwindow* window, int entered){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->cursorInWindow = entered;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.cursorInWindow = entered;
 }
 //#endif
 extern const std::unordered_map<std::string, int> emscriptenToGLFWKeyMap;
 void glfwKeyCallback (GLFWwindow* window, int key, int scancode, int action, int mods){
     if(action == GLFW_PRESS){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 1;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.keydown[key] = 1;
     }else if(action == GLFW_RELEASE){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 0;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.keydown[key] = 0;
     }
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
         EndGIFRecording();
@@ -376,10 +373,10 @@ void ToggleFullscreen_GLFW(){
         glfwSetWindowMonitor(
             g_renderstate.window,
             NULL,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.x,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.y,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.width,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.height, GLFW_DONT_CARE);
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.x,
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.y,
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.width,
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.height, GLFW_DONT_CARE);
     }
     else{
         //We need to enter fullscreen
@@ -390,7 +387,7 @@ void ToggleFullscreen_GLFW(){
             glfwGetWindowPos(g_renderstate.window, &xpos, &ypos);
         #endif
         glfwGetWindowSize(g_renderstate.window, &xs, &ys);
-        CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         int monitorCount = 0;
         int monitorIndex = GetCurrentMonitor_GLFW(g_renderstate.window);
         GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
@@ -409,7 +406,7 @@ WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
     glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, nullptr, &retp->surface);
     float xscale, yscale;
     glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
-    g_renderstate.createdSubwindows.at(windowHandle)->scaleFactor = xscale;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, windowHandle)->scaleFactor = xscale;
     return retp;
     #elif defined(__EMSCRIPTEN__)
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector{};
@@ -477,8 +474,12 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
         glfwGetWindowPos((GLFWwindow*)window, &wposx, &wposy);
     #endif
-    CreatedWindowMap_put(&g_renderstate.input_map, window, CLITERAL(window_input_state){0});
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->windowPosition = CLITERAL(Rectangle){
+    ret->handle = window;
+    CreatedWindowMap_put(&g_renderstate.createdSubwindows, window, *ret);
+    ret = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
+
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state = CLITERAL(window_input_state){0};
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.windowPosition = CLITERAL(Rectangle){
         (float)wposx,
         (float)wposy,
         (float)GetScreenWidth(),
@@ -487,8 +488,8 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     ret->handle = (void*)window;
     //ret.surface = GetSurface();
     //ret.surface.renderTarget = g_renderstate.mainWindowRenderTarget;
-    g_renderstate.createdSubwindows[window] = ret;
-    *CreatedWindowMap_get(&g_renderstate.input_map,ret->handle) = CLITERAL(window_input_state){0};
+    
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows,ret->handle)->input_state = CLITERAL(window_input_state){0};
     setupGLFWCallbacks((GLFWwindow*)ret->handle);
     return ret;
 }
@@ -499,8 +500,9 @@ SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
     ret->handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
-    g_renderstate.createdSubwindows[ret->handle] = ret;
-    *CreatedWindowMap_get(&g_renderstate.input_map,ret->handle) = CLITERAL(window_input_state){0};
+    CreatedWindowMap_put(&g_renderstate.createdSubwindows, ret->handle, *ret);
+    ret = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows,ret->handle)->input_state = CLITERAL(window_input_state){0};
     setupGLFWCallbacks((GLFWwindow*)ret->handle);
     #endif
     return ret;
@@ -509,7 +511,7 @@ extern "C" bool WindowShouldClose_GLFW(GLFWwindow* win){
     return glfwWindowShouldClose(win);
 }
 extern "C" void CloseSubWindow_GLFW(SubWindow subWindow){
-    g_renderstate.createdSubwindows.erase(subWindow->handle);
+    CreatedWindowMap_erase(&g_renderstate.createdSubwindows, subWindow->handle);
     glfwWindowShouldClose((GLFWwindow*)subWindow->handle);
     glfwSetWindowShouldClose((GLFWwindow*)subWindow->handle, GLFW_TRUE);
 }

@@ -70,8 +70,8 @@ RGAPI WGPUSurface CreateSurfaceForWindow_SDL3(void* windowHandle){
     TRACELOG(LOG_INFO, "[SDL_Window] Pixel size: %d, %d", px, py);
     TRACELOG(LOG_INFO, "[SDL_Window] Render size: %d, %d", rx, ry);
     double scaleFactor = (double)px / rx;
-    g_renderstate.createdSubwindows.find(windowHandle)->second->scaleFactor = scaleFactor;
-    TRACELOG(LOG_INFO, "%f", g_renderstate.createdSubwindows.find(windowHandle)->second->scaleFactor);
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, windowHandle)->scaleFactor = scaleFactor;
+    
     return surface;
 }
 
@@ -81,8 +81,8 @@ RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
     ret->handle = SDL_CreateWindow(title, width, height, 0);
     SDL_SetWindowResizable((SDL_Window*)ret->handle, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
     
-    g_renderstate.createdSubwindows[ret->handle] = ret;
-    CreatedWindowMap_get(&g_renderstate.input_map, ret->handle);
+    CreatedWindowMap_put(&g_renderstate.createdSubwindows, ret->handle, *ret);
+    ret = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
     return ret;
 }
 
@@ -119,11 +119,11 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     
     ret->handle = window;
 
-    g_renderstate.createdSubwindows[ret->handle] = ret;
+    CreatedWindowMap_put(&g_renderstate.createdSubwindows, ret->handle, *ret);
+    ret = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
     g_renderstate.window = (GLFWwindow*)ret->handle;
-    g_renderstate.mainWindow = g_renderstate.createdSubwindows[ret->handle];
+    g_renderstate.mainWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
     SDL_StartTextInput((SDL_Window*)ret->handle);
-    CreatedWindowMap_put(&g_renderstate.input_map, ret->handle, CLITERAL(window_input_state){0});
     return ret;
 }
 
@@ -319,9 +319,9 @@ int GetMonitorHeight_SDL3(cwoid){
 void ResizeCallback(SDL_Window* window, int width, int height){
 
     //TRACELOG(LOG_INFO, "SDL3's ResizeCallback called with %d x %d", width, height);
-    ResizeSurface(&g_renderstate.createdSubwindows[window]->surface, width, height);
+    ResizeSurface(&CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface, width, height);
     if((void*)window == (void*)g_renderstate.window){
-        g_renderstate.mainWindowRenderTarget = g_renderstate.createdSubwindows[window]->surface.renderTarget;
+        g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface.renderTarget;
     }
     Matrix newcamera = ScreenMatrix(width, height);
 }
@@ -335,47 +335,38 @@ static KeyboardKey ConvertScancodeToKey(SDL_Scancode sdlScancode){
 }
 
 void PenAxisCallback(SDL_Window* window, SDL_PenID penID, SDL_PenAxis axis, float value){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->penStates[penID].value.axes[axis] = value;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.penStates[penID].value.axes[axis] = value;
 }
 void PenMotionCallback(SDL_Window* window, SDL_PenID penID, float x, float y){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->penStates[penID].value.position = Vector2{x,y };
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.penStates[penID].value.position = Vector2{x,y };
 }
 void FingerMotionCallback(SDL_Window* window, SDL_FingerID finger, float x, float y){
     
-    std::cout << std::format("Finger {}: {},{}", finger, x, y) << std::endl;
+    //std::cout << std::format("Finger {}: {},{}", finger, x, y) << std::endl;
 }
 void MouseButtonCallback(SDL_Window* window, int button, int action){
     if(action == 1){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 1;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mouseButtonDown[button] = 1;
     }
     else if(action == 0){
-        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 0;
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mouseButtonDown[button] = 0;
     }
 }
 void MousePositionCallback(SDL_Window* window, double x, double y){
-    double scale = g_renderstate.createdSubwindows.at(window)->scaleFactor;
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->mousePos = CLITERAL(Vector2){(float)(x * scale), (float)(y * scale)};
+    double scale = CreatedWindowMap_get(&g_renderstate.createdSubwindows,window)->scaleFactor;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mousePos = CLITERAL(Vector2){(float)(x * scale), (float)(y * scale)};
 }
 
 void ScrollCallback(SDL_Window* window, double xoffset, double yoffset){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.x += (float)xoffset;
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.y += (float)yoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.x += (float)xoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.y += (float)yoffset;
 }
 
 void KeyUpCallback (SDL_Window* window, int key, int scancode, int mods){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 0;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.keydown[key] = 0;
 }
 void KeyDownCallback (SDL_Window* window, int key, int scancode, int mods){
-    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 1;
-    //if(action == GLFW_PRESS){
-    //    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 1;
-    //}else if(action == GLFW_RELEASE){
-    //    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 0;
-    //}
-    //if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
-    //    EndGIFRecording();
-    //    glfwSetWindowShouldClose(window, true);
-    //}
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.keydown[key] = 1;
 }
 RGAPI void PollEvents_SDL3() {
     SDL_Event event = {0};
@@ -474,8 +465,8 @@ void ToggleFullscreen_SDL3(cwoid){
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, 0);
         SDL_SetWindowSize(
             (SDL_Window*)g_renderstate.window,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.width,
-            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.height
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.width,
+            (int)CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition.height
         );
     }
     else{
@@ -485,7 +476,7 @@ void ToggleFullscreen_SDL3(cwoid){
         SDL_GetWindowPosition((SDL_Window*)g_renderstate.window, &xpos, &ypos);
         #endif
         SDL_GetWindowSize((SDL_Window*)g_renderstate.window, &xs, &ys);
-        CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         SDL_SetWindowSize((SDL_Window*)g_renderstate.window, GetMonitorWidth_SDL3(), GetMonitorHeight_SDL3());
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, SDL_WINDOW_FULLSCREEN);
     }

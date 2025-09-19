@@ -207,7 +207,7 @@ extern "C" Texture2D texShapes;
 
 extern "C" DescribedPipeline* LoadPipelineForVAO_Vk(const char* vsSource, const char* fsSource, const VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
 
-RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
+RGAPI void* InitWindow(int width, int height, const char* title){
     #if FORCE_HEADLESS == 1
     g_renderstate.windowFlags |= FLAG_HEADLESS;
     #endif
@@ -254,7 +254,6 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         #ifdef MAIN_WINDOW_GLFW
         SubWindow createdWindow = InitWindow_GLFW((int)width, (int)height, title);
         #elif defined(MAIN_WINDOW_SDL3)
-        // Initialize_SDL3();
         SubWindow createdWindow = InitWindow_SDL3(width, height, title);
         #elif defined(MAIN_WINDOW_RGFW)
         SubWindow createdWindow = InitWindow_RGFW(width, height, title);
@@ -264,22 +263,19 @@ RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title){
         #endif
         
         WGPUSurface wSurface = (WGPUSurface)CreateSurfaceForWindow(createdWindow);
-        createdWindow = g_renderstate.createdSubwindows.at(createdWindow->handle);
+        CreatedWindowMap_put(&g_renderstate.createdSubwindows, createdWindow->handle, *createdWindow);
+        createdWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle);
         createdWindow->surface = CompleteSurface(wSurface, (int)(width * createdWindow->scaleFactor), (int)(height * createdWindow->scaleFactor));
         
-        g_renderstate.createdSubwindows[createdWindow->handle] = createdWindow;
-
+        
         g_renderstate.window = (GLFWwindow*)createdWindow->handle;
-        auto it = g_renderstate.createdSubwindows.find(g_renderstate.window);
-        if(it == g_renderstate.createdSubwindows.end()){
-            TRACELOG(LOG_FATAL, "Window creation error");
-        }
-        g_renderstate.mainWindow = it->second;
+
+        g_renderstate.mainWindow = createdWindow;
         #endif
     }else{
         g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
-        g_renderstate.createdSubwindows[nullptr] = callocnew(RGWindowImpl);
-        g_renderstate.createdSubwindows[nullptr]->surface = CreateHeadlessSurface(width, height, g_renderstate.frameBufferFormat);
+        CreatedWindowMap_put(&g_renderstate.createdSubwindows, NULL, CLITERAL(RGWindowImpl){0});
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, NULL)->surface = CreateHeadlessSurface(width, height, g_renderstate.frameBufferFormat);
     }
     
 
@@ -476,11 +472,11 @@ static inline void CharQueue_Push(window_input_state* s, int codePoint) {
     }
 }
 
-extern "C" void CharCallback(void* window, unsigned int codePoint) {
-    CharQueue_Push(CreatedWindowMap_get(&g_renderstate.input_map, window), (int)codePoint);
+void CharCallback(void* window, unsigned int codePoint) {
+    CharQueue_Push(&CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state, (int)codePoint);
 }
 
-extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
+SubWindow OpenSubWindow(int width, int height, const char* title){
     SubWindow createdWindow = NULL;
     #ifdef MAIN_WINDOW_GLFW
     createdWindow = OpenSubWindow_GLFW(width, height, title);
@@ -493,7 +489,7 @@ extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
     void* wgpu_or_wgpu_surface = CreateSurfaceForWindow(createdWindow);
     #if SUPPORT_WGPU_BACKEND == 1 || SUPPORT_VULKAN_BACKEND == 1
     WGPUSurface wSurface = (WGPUSurface)wgpu_or_wgpu_surface;
-    g_renderstate.createdSubwindows[createdWindow->handle]->surface = CompleteSurface(wSurface, width, height);
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle)->surface = CompleteSurface(wSurface, width, height);
     #else
     WGPUSurface vSurface = (WGPUSurface)wgpu_or_wgpu_surface;
     WGPUSurfaceConfiguration config{};
@@ -520,7 +516,7 @@ extern "C" SubWindow OpenSubWindow(int width, int height, const char* title){
     g_renderstate.createdSubwindows[createdWindow.handle].surface = fsurface;
     #endif
     
-    return g_renderstate.createdSubwindows[createdWindow->handle];
+    return CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle);
 }
 extern "C" void ToggleFullscreenImpl(){
     #ifdef MAIN_WINDOW_GLFW
@@ -544,7 +540,7 @@ Vector2 GetTouchPosition(int index){
     #endif
 }
 int GetTouchPointCount(cwoid){
-    return static_cast<int>(CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.activeSubWindow->handle)->touchPointsCount);
+    return static_cast<int>(CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.activeSubWindow->handle)->input_state.touchPointsCount);
 }
 int GetMonitorWidth(cwoid){
     #ifdef MAIN_WINDOW_GLFW

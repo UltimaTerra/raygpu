@@ -948,12 +948,55 @@ typedef enum windowType {
     windowType_glfw, windowType_rgfw, windowType_sdl2, windowType_sdl3
 }windowType;
 
+typedef struct {
+    float axes[16];
+    Vector2 position;
+} PenInputState;
+
+#define KEYS_MAX 512
+#define MOUSEBTN_MAX 16
+#define TOUCH_MAX 32
+#define CHARQ_MAX 256
+#define PEN_MAX 16
+
+typedef struct {
+    int64_t id;
+    Vector2 pos;
+} TouchPoint;
+
+typedef struct window_input_state{
+    Rectangle windowPosition;
+    uint8_t keydownPrevious[KEYS_MAX];
+    uint8_t keydown[KEYS_MAX];
+    Vector2 scrollThisFrame, scrollPreviousFrame;
+    float gestureZoomThisFrame;
+    float gestureAngleThisFrame;
+    Vector2 mousePosPrevious;
+    Vector2 mousePos;
+    int cursorInWindow;
+    uint8_t mouseButtonDownPrevious[MOUSEBTN_MAX];
+    uint8_t mouseButtonDown[MOUSEBTN_MAX];
+    TouchPoint touchPoints[TOUCH_MAX];
+    size_t touchPointsCount;
+
+    int charQueue[CHARQ_MAX];
+    size_t charQueueHead, charQueueTail, charQueueCount;
+    
+    struct {
+        unsigned int key;
+        PenInputState value;
+        int used;
+    } penStates[PEN_MAX];
+    size_t penStatesCount;
+} window_input_state;
+
 typedef struct RGWindowImpl{
     void* handle;
     FullSurface surface;
     windowType type;
     double width, height;
-    double scaleFactor;  
+    double scaleFactor;
+    window_input_state input_state;
     // width/height in pixels are obtained by width * scaleFactor  
 }RGWindowImpl;
 
@@ -961,7 +1004,7 @@ typedef struct RGWindowImpl* SubWindow;
 typedef struct GLFWwindow GLFWwindow;
 
 EXTERN_C_BEGIN
-    RGAPI void* InitWindow(uint32_t width, uint32_t height, const char* title);
+    RGAPI void* InitWindow(int width, int height, const char* title);
     RGAPI void InitBackend(cwoid);
     RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int /* unused */, int/* unused */);
     RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int/* unused */, int/* unused */);
