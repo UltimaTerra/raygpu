@@ -685,7 +685,7 @@ Shader LoadShaderGLSL(const char* vs, const char* fs){
     // printf("--- Pipeline Vertex Stride ---\n");
     // printf("Calculated Stride for Buffer 0: %u bytes\n", offset);
     // printf("----------------------------\n");
-    Shader ret = LoadPipelineMod(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat, shaderModule.reflectionInfo.uniforms->current_size, GetDefaultSettings());
+    Shader ret = LoadPipelineFromModule(shaderModule, allAttribsInOneBuffer.data(), allAttribsInOneBuffer.size(), flat, shaderModule.reflectionInfo.uniforms->current_size, GetDefaultSettings());
     RL_FREE(flat);
     return ret;
 }

@@ -85,9 +85,267 @@ typedef struct MatrixBufferPair{
 
 DEFINE_ARRAY_STACK(MatrixBufferPair, static inline, 8);
 DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
+#ifndef PHM_INLINE_CAPACITY
+#define PHM_INLINE_CAPACITY 3
+#endif
+
+#ifndef PHM_INITIAL_HEAP_CAPACITY
+#define PHM_INITIAL_HEAP_CAPACITY 8
+#endif
+
+#ifndef PHM_LOAD_FACTOR_NUM
+#define PHM_LOAD_FACTOR_NUM 3
+#endif
+
+#ifndef PHM_LOAD_FACTOR_DEN
+#define PHM_LOAD_FACTOR_DEN 4
+#endif
+
+#ifndef PHM_HASH_MULTIPLIER
+#define PHM_HASH_MULTIPLIER 0x9E3779B97F4A7C15ULL
+#endif
+#ifndef PHM_EMPTY_SLOT_KEY
+#define PHM_EMPTY_SLOT_KEY NULL
+#endif
+#ifndef PHM_DELETED_SLOT_KEY
+#define PHM_DELETED_SLOT_KEY ((void*)0xFFFFFFFFFFFFFFFF)
+#endif
+#define DEFINE_PTR_HASH_MAP_R(SCOPE, Name, ValueType)                                                                              \
+                                                                                                                                 \
+    typedef struct Name##_kv_pair {                                                                                              \
+        void *key;                                                                                                               \
+        ValueType value;                                                                                                         \
+    } Name##_kv_pair;                                                                                                            \
+                                                                                                                                 \
+    typedef struct Name {                                                                                                        \
+        uint64_t current_size;     /* Number of non-NULL keys */                                                                 \
+        uint64_t current_capacity; /* Capacity of the heap-allocated table */                                                    \
+        bool has_null_key;                                                                                                       \
+        ValueType null_value;                                                                                                    \
+        Name##_kv_pair* table; /* Pointer to the hash table data (heap-allocated) */                                             \
+    } Name;                                                                                                                      \
+                                                                                                                                 \
+    static inline uint64_t Name##_hash_key(void *key) {                                                                          \
+        assert(key != NULL);                                                                                                     \
+        return ((uintptr_t)key) * PHM_HASH_MULTIPLIER;                                                                           \
+    }                                                                                                                            \
+                                                                                                                                 \
+    /* Helper to round up to the next power of 2. Result can be 0 if v is 0 or on overflow from UINT64_MAX. */                   \
+    static inline uint64_t Name##_round_up_to_power_of_2(uint64_t v) {                                                           \
+        if (v == 0)                                                                                                              \
+            return 0;                                                                                                            \
+        v--;                                                                                                                     \
+        v |= v >> 1;                                                                                                             \
+        v |= v >> 2;                                                                                                             \
+        v |= v >> 4;                                                                                                             \
+        v |= v >> 8;                                                                                                             \
+        v |= v >> 16;                                                                                                            \
+        v |= v >> 32;                                                                                                            \
+        v++;                                                                                                                     \
+        return v;                                                                                                                \
+    }                                                                                                                            \
+                                                                                                                                 \
+    static void Name##_insert_entry(Name##_kv_pair *table, uint64_t capacity, void *key, ValueType value) {                      \
+        assert(key != NULL && key != PHM_EMPTY_SLOT_KEY && capacity > 0 && (capacity & (capacity - 1)) == 0);                    \
+        uint64_t cap_mask = capacity - 1;                                                                                        \
+        uint64_t index = Name##_hash_key(key) & cap_mask;                                                                        \
+        while (table[index].key != PHM_EMPTY_SLOT_KEY) {                                                                         \
+            index = (index + 1) & cap_mask;                                                                                      \
+        }                                                                                                                        \
+        table[index].key = key;                                                                                                  \
+        table[index].value = value;                                                                                              \
+    }                                                                                                                            \
+                                                                                                                                 \
+    static Name##_kv_pair *Name##_find_slot(Name *map, void *key) {                                                              \
+        assert(key != NULL && key != PHM_EMPTY_SLOT_KEY && map->table != NULL && map->current_capacity > 0);                     \
+        uint64_t cap_mask = map->current_capacity - 1;                                                                           \
+        uint64_t index = Name##_hash_key(key) & cap_mask;                                                                        \
+        while (map->table[index].key != PHM_EMPTY_SLOT_KEY && map->table[index].key != key) {                                    \
+            index = (index + 1) & cap_mask;                                                                                      \
+        }                                                                                                                        \
+        return &map->table[index];                                                                                               \
+    }                                                                                                                            \
+                                                                                                                                 \
+    static void Name##_grow(Name *map); /* Forward declaration */                                                                \
+                                                                                                                                 \
+    SCOPE void Name##_init(Name *map) {                                                                                          \
+        map->current_size = 0;                                                                                                   \
+        map->current_capacity = 0;                                                                                               \
+        map->has_null_key = false;                                                                                               \
+        /* map->null_value is uninitialized, which is fine */                                                                    \
+        map->table = NULL;                                                                                                       \
+    }                                                                                                                            \
+                                                                                                                                 \
+    static void Name##_grow(Name *map) {                                                                                         \
+        uint64_t old_capacity = map->current_capacity;                                                                           \
+        Name##_kv_pair *old_table = map->table;                                                                                  \
+        uint64_t new_capacity;                                                                                                   \
+                                                                                                                                 \
+        if (old_capacity == 0) {                                                                                                 \
+            new_capacity = (PHM_INITIAL_HEAP_CAPACITY > 0) ? PHM_INITIAL_HEAP_CAPACITY : 8; /* Default 8 if initial is 0 */      \
+        } else {                                                                                                                 \
+            if (old_capacity >= (UINT64_MAX / 2))                                                                                \
+                new_capacity = UINT64_MAX; /* Avoid overflow */                                                                  \
+            else                                                                                                                 \
+                new_capacity = old_capacity * 2;                                                                                 \
+        }                                                                                                                        \
+                                                                                                                                 \
+        new_capacity = Name##_round_up_to_power_of_2(new_capacity);                                                              \
+        if (new_capacity == 0 && old_capacity == 0 && ((PHM_INITIAL_HEAP_CAPACITY > 0) ? PHM_INITIAL_HEAP_CAPACITY : 8) > 0) {   \
+            /* This case means round_up_to_power_of_2 resulted in 0 from a non-zero initial desired capacity (e.g. UINT64_MAX)   \
+             */                                                                                                                  \
+            /* If PHM_INITIAL_HEAP_CAPACITY was huge and overflowed round_up. Use max power of 2. */                             \
+            new_capacity = (UINT64_C(1) << 63);                                                                                  \
+        }                                                                                                                        \
+                                                                                                                                 \
+        if (new_capacity == 0 || (new_capacity <= old_capacity && old_capacity > 0)) {                                           \
+            return; /* Cannot grow or no actual increase in capacity */                                                          \
+        }                                                                                                                        \
+                                                                                                                                 \
+        Name##_kv_pair *new_table = (Name##_kv_pair *)calloc(new_capacity, sizeof(Name##_kv_pair));                              \
+        if (!new_table)                                                                                                          \
+            return; /* Allocation failure */                                                                                     \
+                                                                                                                                 \
+        if (old_table && map->current_size > 0) {                                                                                \
+            uint64_t rehashed_count = 0;                                                                                         \
+            for (uint64_t i = 0; i < old_capacity; ++i) {                                                                        \
+                if (old_table[i].key != PHM_EMPTY_SLOT_KEY) {                                                                    \
+                    Name##_insert_entry(new_table, new_capacity, old_table[i].key, old_table[i].value);                          \
+                    rehashed_count++;                                                                                            \
+                    if (rehashed_count == map->current_size)                                                                     \
+                        break;                                                                                                   \
+                }                                                                                                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+        if (old_table)                                                                                                           \
+            free(old_table);                                                                                                     \
+        map->table = new_table;                                                                                                  \
+        map->current_capacity = new_capacity;                                                                                    \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE int Name##_put(Name *map, void *key, ValueType value) {                                                                \
+        if (key == NULL) {                                                                                                       \
+            map->null_value = value;                                                                                             \
+            if (!map->has_null_key) {                                                                                            \
+                map->has_null_key = true;                                                                                        \
+                return 1; /* New NULL key */                                                                                     \
+            }                                                                                                                    \
+            return 0; /* Updated NULL key */                                                                                     \
+        }                                                                                                                        \
+        assert(key != PHM_EMPTY_SLOT_KEY);                                                                                       \
+                                                                                                                                 \
+        if (map->current_capacity == 0 ||                                                                                        \
+            (map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM) {                      \
+            uint64_t old_cap = map->current_capacity;                                                                            \
+            Name##_grow(map);                                                                                                    \
+            if (map->current_capacity == old_cap && old_cap > 0) { /* Grow failed or no increase */                              \
+                /* Re-check if still insufficient */                                                                             \
+                if ((map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM)                \
+                    return 0;                                                                                                    \
+            } else if (map->current_capacity == 0)                                                                               \
+                return 0; /* Grow failed to allocate any capacity */                                                             \
+            else if ((map->current_size + 1) * PHM_LOAD_FACTOR_DEN >= map->current_capacity * PHM_LOAD_FACTOR_NUM)               \
+                return 0;                                                                                                        \
+        }                                                                                                                        \
+        assert(map->current_capacity > 0 && map->table != NULL); /* Must have capacity after grow check */                       \
+                                                                                                                                 \
+        Name##_kv_pair *slot = Name##_find_slot(map, key);                                                                       \
+        if (slot->key == PHM_EMPTY_SLOT_KEY) {                                                                                   \
+            slot->key = key;                                                                                                     \
+            slot->value = value;                                                                                                 \
+            map->current_size++;                                                                                                 \
+            return 1; /* New key */                                                                                              \
+        } else {                                                                                                                 \
+            assert(slot->key == key);                                                                                            \
+            slot->value = value;                                                                                                 \
+            return 0; /* Updated existing key */                                                                                 \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE ValueType *Name##_get(Name *map, void *key) {                                                                          \
+        if (key == NULL)                                                                                                         \
+            return map->has_null_key ? &map->null_value : NULL;                                                                  \
+        assert(key != PHM_EMPTY_SLOT_KEY);                                                                                       \
+        if (map->current_capacity == 0 || map->table == NULL)                                                                    \
+            return NULL;                                                                                                         \
+        Name##_kv_pair *slot = Name##_find_slot(map, key);                                                                       \
+        return (slot->key == key) ? &slot->value : NULL;                                                                         \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_for_each(Name *map, void (*callback)(void *key, ValueType *value, void *user_data), void *user_data) {     \
+        if (map->has_null_key)                                                                                                   \
+            callback(NULL, &map->null_value, user_data);                                                                         \
+        if (map->current_capacity > 0 && map->table != NULL && map->current_size > 0) {                                          \
+            uint64_t count = 0;                                                                                                  \
+            for (uint64_t i = 0; i < map->current_capacity; ++i) {                                                               \
+                if (map->table[i].key != PHM_EMPTY_SLOT_KEY) {                                                                   \
+                    callback(map->table[i].key, &map->table[i].value, user_data);                                                \
+                    if (++count == map->current_size)                                                                            \
+                        break;                                                                                                   \
+                }                                                                                                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_free(Name *map) {                                                                                          \
+        if (map->table != NULL)                                                                                                  \
+            free(map->table);                                                                                                    \
+        Name##_init(map); /* Reset to initial empty state */                                                                     \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_move(Name *dest, Name *source) {                                                                           \
+        if (dest == source)                                                                                                      \
+            return;                                                                                                              \
+        if (dest->table != NULL)                                                                                                 \
+            free(dest->table); /* Free existing dest resources */                                                                \
+        *dest = *source;       /* Copy all members, dest now owns source's table */                                              \
+        Name##_init(source);   /* Reset source to prevent double free */                                                         \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_clear(Name *map) {                                                                                         \
+        map->current_size = 0;                                                                                                   \
+        map->has_null_key = false;                                                                                               \
+        if (map->table != NULL && map->current_capacity > 0) {                                                                   \
+            /* calloc already zeroed memory if PHM_EMPTY_SLOT_KEY is 0. */                                                       \
+            /* If PHM_EMPTY_SLOT_KEY is not 0, or for robustness: */                                                             \
+            for (uint64_t i = 0; i < map->current_capacity; ++i) {                                                               \
+                map->table[i].key = PHM_EMPTY_SLOT_KEY;                                                                          \
+                /* map->table[i].value = (ValueType){0}; // Optional: if values need resetting */                                \
+            }                                                                                                                    \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_copy(Name *dest, const Name *source) {                                                                     \
+        if (dest == source)                                                                                                      \
+            return;                                                                                                              \
+        if (dest->table != NULL)                                                                                                 \
+            free(dest->table);                                                                                                   \
+        Name##_init(dest); /* Initialize dest to a clean empty state */                                                          \
+                                                                                                                                 \
+        dest->has_null_key = source->has_null_key;                                                                               \
+        if (source->has_null_key)                                                                                                \
+            dest->null_value = source->null_value;                                                                               \
+        dest->current_size = source->current_size;                                                                               \
+                                                                                                                                 \
+        if (source->table != NULL && source->current_capacity > 0) {                                                             \
+            dest->table = (Name##_kv_pair *)calloc(source->current_capacity, sizeof(Name##_kv_pair));                            \
+            if (!dest->table) {                                                                                                  \
+                Name##_init(dest);                                                                                               \
+                return;                                                                                                          \
+            } /* Alloc fail, reset dest to safe empty */                                                                         \
+            memcpy(dest->table, source->table, source->current_capacity * sizeof(Name##_kv_pair));                               \
+            dest->current_capacity = source->current_capacity;                                                                   \
+        }                                                                                                                        \
+        /* If source had no table, dest remains in its _init state (table=NULL, capacity=0) */                                   \
+    }
+
+
+
+DEFINE_PTR_HASH_MAP_R(static, CreatedWindowMap, window_input_state)
+
+
 
 struct renderstate {
-
     WGPUPresentMode unthrottled_PresentMode;
     WGPUPresentMode throttled_PresentMode;
 
@@ -118,7 +376,7 @@ struct renderstate {
     DescribedBuffer *identityMatrix;
     DescribedSampler defaultSampler;
 
-    DescribedBuffer *quadindicesCache{};
+    DescribedBuffer *quadindicesCache;
 
     Texture whitePixel;
 
@@ -131,7 +389,7 @@ struct renderstate {
     RenderTexture mainWindowRenderTarget;
     // RenderTexture currentDefaultRenderTarget;
 
-    std::unordered_map<void *, window_input_state> input_map;
+    CreatedWindowMap input_map;
 
     int windowFlags = 0;
     // Frame timing / FPS

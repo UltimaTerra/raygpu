@@ -1752,16 +1752,6 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height) {
     return ret;
 }
 
-Shader LoadShaderForVAOEx(const char *shaderSource,
-                          VertexArray *vao,
-                          const ResourceTypeDescriptor *uniforms,
-                          uint32_t uniformCount,
-                          RenderSettings settings) {
-    Shader pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-    // PreparePipeline(pl, vao);
-    return pl;
-}
-
 DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv) {
     DescribedShaderModule ret zeroinit;
 #ifndef __EMSCRIPTEN__
@@ -1945,12 +1935,11 @@ RGAPI Shader LoadPipelineEx(const char *shaderSource,
                             RenderSettings settings) {
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     DescribedShaderModule mod = LoadShaderModule(sources);
-    return LoadPipelineMod(mod, attribs, attribCount, uniforms, uniformCount, settings);
+    return LoadPipelineFromModule(mod, attribs, attribCount, uniforms, uniformCount, settings);
 }
 RGAPI Shader LoadPipeline(const char *shaderSource) {
     ShaderSources sources = dualStage(shaderSource, sourceTypeWGSL, WGPUShaderStageEnum_Vertex, WGPUShaderStageEnum_Fragment);
     InOutAttributeInfo attribs = getAttributesWGSL(sources);
-
     AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];
     const uint32_t attributeCount = attribs.vertexAttributeCount;
     uint32_t offset = 0;
@@ -1977,15 +1966,14 @@ RGAPI Shader LoadPipeline(const char *shaderSource) {
     std::sort(values, values + bindings->current_size, [](const ResourceTypeDescriptor &x, const ResourceTypeDescriptor &y) {
         return x.location < y.location;
     });
-    Shader ret =
-        LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, bindings->current_size, GetDefaultSettings());
+    Shader ret = LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, bindings->current_size, GetDefaultSettings());
     RL_FREE(values);
     StringToUniformMap_free(bindings);
     RL_FREE(bindings);
     return ret;
 }
 
-RGAPI Shader LoadPipelineMod(DescribedShaderModule mod,
+RGAPI Shader LoadPipelineFromModule(DescribedShaderModule mod,
                              const AttributeAndResidence *attribs,
                              uint32_t attribCount,
                              const ResourceTypeDescriptor *uniforms,
@@ -2001,30 +1989,32 @@ RGAPI Shader LoadPipelineMod(DescribedShaderModule mod,
     ret->shaderModule = mod;
     ret->state.colorAttachmentState.colorAttachmentCount = mod.reflectionInfo.attributes.attachmentCount;
 
-    std::fill(ret->state.colorAttachmentState.attachmentFormats,
-              ret->state.colorAttachmentState.attachmentFormats + ret->state.colorAttachmentState.colorAttachmentCount,
-              PIXELFORMAT_UNCOMPRESSED_B8G8R8A8);
+    for(uint32_t i = 0; i < MAX_COLOR_ATTACHMENTS;i++) ret->state.colorAttachmentState.attachmentFormats[i] = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
 
-    WGPUPipelineLayoutDescriptor pldesc zeroinit;
-    pldesc.bindGroupLayoutCount = 1;
-    WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
-    pldesc.bindGroupLayouts = bgls;
+    const WGPUBindGroupLayout bgls[1] = {ret->bglayout.layout};
+    const WGPUPipelineLayoutDescriptor pldesc = {
+        .bindGroupLayoutCount = 1,
+        .bindGroupLayouts = bgls
+    };
 
     ret->layout.layout = wgpuDeviceCreatePipelineLayout(GetDevice(), &pldesc);
-    std::vector<WGPUBindGroupEntry> bge(uniformCount);
 
-    for (uint32_t i = 0; i < bge.size(); i++) {
+    WGPUBindGroupEntry* bge = (WGPUBindGroupEntry*)RL_CALLOC(uniformCount, sizeof(WGPUBindGroupEntry));
+
+    for (uint32_t i = 0; i < uniformCount; i++) {
         bge[i] = WGPUBindGroupEntry{.binding = uniforms[i].location};
     }
-    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge.data(), bge.size());
+    ret->bindGroup = LoadBindGroup(&ret->bglayout, bge, uniformCount);
+    RL_FREE((void*)bge);
     return retS;
 }
 
 WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage) {
     WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), nullptr);
-    WGPUBufferDescriptor retd{};
-    retd.usage = usage;
-    retd.size = wgpuBufferGetSize(b);
+    const WGPUBufferDescriptor retd{
+        .usage = usage,
+        .size = wgpuBufferGetSize(b),
+    };
     WGPUBuffer ret = wgpuDeviceCreateBuffer((WGPUDevice)GetDevice(), &retd);
     wgpuCommandEncoderCopyBufferToBuffer(enc, b, 0, ret, 0, retd.size);
     WGPUCommandBuffer buffer = wgpuCommandEncoderFinish(enc, nullptr);
@@ -2033,8 +2023,7 @@ WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage) {
 }
 
 DescribedComputePipeline *LoadComputePipeline(const char *shaderCode) {
-    ShaderSources sources =
-        singleStage(shaderCode, detectShaderLanguage(shaderCode, std::strlen(shaderCode)), WGPUShaderStageEnum_Compute);
+    ShaderSources sources = singleStage(shaderCode, detectShaderLanguage(shaderCode, strlen(shaderCode)), WGPUShaderStageEnum_Compute);
 
     StringToUniformMap *bindings = getBindings(sources);
 

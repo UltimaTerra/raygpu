@@ -177,7 +177,7 @@ int main(){
     VertexAttribPointer(vao, quad, 0, WGPUVertexFormat_Float32x2, 0, WGPUVertexStepMode_Vertex);
     VertexAttribPointer(vao, positions, 1, WGPUVertexFormat_Float32x2, 0, WGPUVertexStepMode_Instance);
     #if SUPPORT_GLSL_PARSER == 0
-    rpl = LoadPipeline(wgsl);
+    rpl = LoadShaderSingleSource(wgsl);
     #elif SUPPORT_GLSL_PARSER == 1
     rpl = LoadShaderFromMemory(vertexSource, fragmentSource);
     #endif

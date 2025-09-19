@@ -958,8 +958,6 @@ typedef struct RGWindowImpl{
 }RGWindowImpl;
 
 typedef struct RGWindowImpl* SubWindow;
-
-typedef struct full_renderstate full_renderstate;
 typedef struct GLFWwindow GLFWwindow;
 
 EXTERN_C_BEGIN
@@ -1305,9 +1303,10 @@ EXTERN_C_BEGIN
     RGAPI uint32_t    GetReflectionUniformLocation   (ShaderReflectionInfo reflectionInfo, const char* name );
     RGAPI uint32_t    GetReflectionAttributeLocation (ShaderReflectionInfo reflectionInfo, const char* name );
 
-    RGAPI Shader LoadShader            (const char *vsFileName, const char *fsFileName);
-    RGAPI Shader LoadShaderSingleSource(const char* shaderSource);
-    RGAPI Shader LoadShaderFromMemory  (const char *vsCode    , const char *fsCode    );
+    RGAPI Shader LoadShader               (const char *vsFileName, const char *fsFileName); // Assumes GLSL
+    RGAPI Shader LoadShaderSingleSource   (const char* shaderSource);                       // Assumes WGSL
+    RGAPI Shader LoadShaderFromMemory     (const char *vsCode    , const char *fsCode    ); // Assumes GLSL
+    RGAPI Shader LoadShaderFromMemorySPIRV(ShaderSources sources);                          // Obviously assumes SPIRV
 
 
     RGAPI DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, bool compute);
@@ -1316,13 +1315,7 @@ EXTERN_C_BEGIN
     //RGAPI WGPURaytracingPipeline LoadRTPipeline(const DescribedShaderModule* module);
     RGAPI Shader ClonePipeline(const DescribedPipeline* pl);
     RGAPI Shader ClonePipelineWithSettings(const DescribedPipeline* pl, RenderSettings settings);
-    RGAPI Shader LoadPipeline(const char* shaderSource);
-    RGAPI Shader LoadPipelineEx(const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI Shader LoadPipelineMod(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI Shader LoadPipelineForVAO(const char* shaderSource, VertexArray* vao);
-    RGAPI Shader LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-    RGAPI Shader LoadPipelineGLSL(const char* vs, const char* fs);
-    RGAPI Shader LoadPipelinePro(cwoid);
+    RGAPI Shader LoadPipelineFromModule(DescribedShaderModule mod, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
     RGAPI Shader DefaultPipeline(cwoid);
 
     RGAPI void UnloadBindGroupLayout(DescribedBindGroupLayout* bglayout);
@@ -1397,7 +1390,6 @@ EXTERN_C_BEGIN
     RGAPI void SetShaderStorageBuffer       (Shader shader, uint32_t index, DescribedBuffer* buffer);
     RGAPI void SetShaderUniformBufferData   (Shader shader, uint32_t index, const void* data, size_t size);
     RGAPI void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* data, size_t size);
-
     /**
      * These functions modify the bindgroup of the currently bound pipeline, 
      * i.e. the default pipeline or the one set with BeginPipelineMode
@@ -1408,8 +1400,6 @@ EXTERN_C_BEGIN
     RGAPI void SetStorageBuffer              (uint32_t index, DescribedBuffer* buffer);
     RGAPI void SetUniformBufferData          (uint32_t index, const void* data, size_t size);
     RGAPI void SetStorageBufferData          (uint32_t index, const void* data, size_t size);
-
-
     /**
      * These functions operate directly on a bindgroup
      */
@@ -1421,13 +1411,7 @@ EXTERN_C_BEGIN
     RGAPI void SetBindgroupTextureView       (DescribedBindGroup* bg, uint32_t index, WGPUTextureView texView);
     RGAPI void SetBindgroupTexture           (DescribedBindGroup* bg, uint32_t index, Texture tex);
     RGAPI void SetBindgroupSampler           (DescribedBindGroup* bg, uint32_t index, DescribedSampler sampler);
-
-
-
-    void init_full_renderstate (full_renderstate* state, const char* shaderSource, const AttributeAndResidence* attribs, uint32_t attribCount, const ResourceTypeDescriptor* uniforms, uint32_t uniform_count, WGPUTextureView c, WGPUTextureView d);
-    void updatePipeline        (full_renderstate* state, enum PrimitiveType drawmode);
-    //void setTargetTextures     (full_renderstate* state, WGPUTextureView c, WGPUTextureView colorMultisample, WGPUTextureView d);
-
+    
     /**
         The functions LoadVertexArray, VertexAttribPointer, EnableVertexAttribArray, DisableVertexAttribArray
         aim to replicate the behaviour of OpenGL as closely as possible.

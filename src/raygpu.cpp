@@ -882,7 +882,7 @@ RGAPI void EndDrawing(){
     
     std::copy(g_renderstate.smallBufferRecyclingBin.begin(), g_renderstate.smallBufferRecyclingBin.end(), std::back_inserter(g_renderstate.smallBufferPool));
     g_renderstate.smallBufferRecyclingBin.clear();
-    window_input_state* ipstate = &(g_renderstate.input_map[g_renderstate.window]);
+    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window);
     
     memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
 
@@ -890,11 +890,14 @@ RGAPI void EndDrawing(){
     ipstate->scrollPreviousFrame = ipstate->scrollThisFrame;
     ipstate->scrollThisFrame = CLITERAL(Vector2){0, 0};
     memcpy(ipstate->mouseButtonDownPrevious, ipstate->mouseButtonDown, MOUSEBTN_MAX);
-
-    for(auto& [_, ipstate_] : g_renderstate.input_map){
-        memset(ipstate_.charQueue, 0, CHARQ_MAX * sizeof(int));
-        ipstate_.gestureAngleThisFrame = 0;
-        ipstate_.gestureZoomThisFrame = 1;
+    for(size_t i = 0;i < g_renderstate.input_map.current_capacity;i++){
+        CreatedWindowMap_kv_pair* iter = g_renderstate.input_map.table + i;
+        if(iter->key != PHM_EMPTY_SLOT_KEY && iter->key != PHM_DELETED_SLOT_KEY){
+            window_input_state* ipstate_ = &iter->value;
+            memset(ipstate_->charQueue, 0, CHARQ_MAX * sizeof(int));
+            ipstate_->gestureAngleThisFrame = 0;
+            ipstate_->gestureZoomThisFrame = 1;
+        }
     }
 
     PollEvents();
@@ -1338,13 +1341,13 @@ RGAPI void TakeScreenshot(const char* filename){
 
 RGAPI bool IsKeyDown(int key){
     void* ah = GetActiveWindowHandle();
-    return g_renderstate.input_map[GetActiveWindowHandle()].keydown[key];
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydown[key];
 }
 RGAPI bool IsKeyPressed(int key){
-    return g_renderstate.input_map[GetActiveWindowHandle()].keydown[key] && !g_renderstate.input_map[GetActiveWindowHandle()].keydownPrevious[key];
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydown[key] && !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->keydownPrevious[key];
 }
 RGAPI int GetCharPressed(void) {
-    window_input_state* ipstate = &g_renderstate.input_map[GetActiveWindowHandle()];
+    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle());
     if (ipstate->charQueueCount == 0){
         return 0;
     }
@@ -1361,39 +1364,38 @@ RGAPI int GetMouseY(cwoid){
 }
 
 float GetGesturePinchZoom(cwoid){
-    return g_renderstate.input_map[g_renderstate.window].gestureZoomThisFrame;
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->gestureZoomThisFrame;
 }
 float GetGesturePinchAngle(cwoid){
-     
-    return g_renderstate.input_map[g_renderstate.window].gestureAngleThisFrame;
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->gestureAngleThisFrame;
 }
 Vector2 GetMousePosition(cwoid){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mousePos;
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos;
 }
 Vector2 GetMouseDelta(cwoid){
-    return Vector2{g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mousePos.x - g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mousePos.x,
-                   g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mousePos.y - g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mousePos.y};
+    Vector2 ret = {
+        .x = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.x - CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.x,
+        .y = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.y - CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mousePos.y
+    };
+    return ret;
 }
 float GetMouseWheelMove(void){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].scrollPreviousFrame.y;
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->scrollPreviousFrame.y;
 }
 Vector2 GetMouseWheelMoveV(void){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].scrollPreviousFrame;
-    //return Vector2{
-    //    (float)(g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].globalScrollX - g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].globalScrollYPrevious),
-    //    (float)(g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].globalScrollY - g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].globalScrollYPrevious)};
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->scrollPreviousFrame;
 }
 bool IsMouseButtonPressed(int button){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mouseButtonDown[button] && !g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mouseButtonDownPrevious[button];
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button] && !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDownPrevious[button];
 }
 bool IsMouseButtonDown(int button){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mouseButtonDown[button];
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button];
 }
 bool IsMouseButtonReleased(int button){
-    return !g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mouseButtonDown[button] && g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].mouseButtonDownPrevious[button];
+    return !CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDown[button] && CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->mouseButtonDownPrevious[button];
 }
 bool IsCursorOnScreen(cwoid){
-    return g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()].cursorInWindow;
+    return CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle())->cursorInWindow;
 }
 
 uint64_t NanoTime(cwoid){
@@ -1441,6 +1443,41 @@ Shader LoadShader(const char *vsFileName, const char *fsFileName){
     UnloadFileText(fShaderStr);
 
     return shader;
+}
+
+RGAPI Shader LoadShaderFromMemorySPIRV(ShaderSources sources){
+    DescribedShaderModule module = LoadShaderModuleSPIRV(sources);
+    StringToUniformMap* bindings = getBindingsSPIRV(sources);
+    InOutAttributeInfo attribs = getAttributesSPIRV(sources);
+    AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];
+    const uint32_t attributeCount = attribs.vertexAttributeCount;
+    uint32_t offset = 0;
+    for (uint32_t attribIndex = 0; attribIndex < attribs.vertexAttributeCount; attribIndex++) {
+        const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
+        const uint32_t location = attribs.vertexAttributes[attribIndex].location;
+        allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
+            .attr = {.nextInChain = nullptr, .format = format, .offset = offset, .shaderLocation = location},
+            .bufferSlot = 0,
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .enabled = true};
+        offset += attributeSize(format);
+    }
+    ResourceTypeDescriptor *values = (ResourceTypeDescriptor *)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
+    uint32_t insertIndex = 0;
+    for (uint32_t i = 0; i < bindings->current_capacity; i++) {
+        if (bindings->table[i].key.length != 0) {
+            values[insertIndex++] = bindings->table[i].value;
+        }
+    }
+
+    quickSort_ResourceTypeDescriptor(values, values + bindings->current_size);
+    module.reflectionInfo.uniforms = bindings;
+
+    Shader ret = LoadPipelineFromModule(module, allAttribsInOneBuffer, attribs.vertexAttributeCount, values, bindings->current_size, GetDefaultSettings());
+    RL_FREE(values);
+    //StringToUniformMap_free(bindings);
+    //RL_FREE(bindings);
+    return ret;
 }
 
 Shader LoadShaderSingleSource(const char* shaderSource){
@@ -2171,7 +2208,7 @@ RGAPI void EndWindowMode(){
     }
 
     PresentSurface(&g_renderstate.activeSubWindow->surface);
-    window_input_state* ipstate = &g_renderstate.input_map[(GLFWwindow*)GetActiveWindowHandle()];
+    window_input_state* ipstate = CreatedWindowMap_get(&g_renderstate.input_map, GetActiveWindowHandle());
     
     memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);
     ipstate->mousePosPrevious = ipstate->mousePos;

@@ -82,7 +82,7 @@ RGAPI SubWindow OpenSubWindow_SDL3(int width, int height, const char* title){
     SDL_SetWindowResizable((SDL_Window*)ret->handle, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE));
     
     g_renderstate.createdSubwindows[ret->handle] = ret;
-    g_renderstate.input_map[(SDL_Window*)ret->handle];
+    CreatedWindowMap_get(&g_renderstate.input_map, ret->handle);
     return ret;
 }
 
@@ -123,6 +123,7 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
     g_renderstate.window = (GLFWwindow*)ret->handle;
     g_renderstate.mainWindow = g_renderstate.createdSubwindows[ret->handle];
     SDL_StartTextInput((SDL_Window*)ret->handle);
+    CreatedWindowMap_put(&g_renderstate.input_map, ret->handle, CLITERAL(window_input_state){0});
     return ret;
 }
 
@@ -334,10 +335,10 @@ static KeyboardKey ConvertScancodeToKey(SDL_Scancode sdlScancode){
 }
 
 void PenAxisCallback(SDL_Window* window, SDL_PenID penID, SDL_PenAxis axis, float value){
-    g_renderstate.input_map[window].penStates[penID].value.axes[axis] = value;
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->penStates[penID].value.axes[axis] = value;
 }
 void PenMotionCallback(SDL_Window* window, SDL_PenID penID, float x, float y){
-    g_renderstate.input_map[window].penStates[penID].value.position = Vector2{x,y };
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->penStates[penID].value.position = Vector2{x,y };
 }
 void FingerMotionCallback(SDL_Window* window, SDL_FingerID finger, float x, float y){
     
@@ -345,31 +346,31 @@ void FingerMotionCallback(SDL_Window* window, SDL_FingerID finger, float x, floa
 }
 void MouseButtonCallback(SDL_Window* window, int button, int action){
     if(action == 1){
-        g_renderstate.input_map[window].mouseButtonDown[button] = 1;
+        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 1;
     }
     else if(action == 0){
-        g_renderstate.input_map[window].mouseButtonDown[button] = 0;
+        CreatedWindowMap_get(&g_renderstate.input_map, window)->mouseButtonDown[button] = 0;
     }
 }
 void MousePositionCallback(SDL_Window* window, double x, double y){
     double scale = g_renderstate.createdSubwindows.at(window)->scaleFactor;
-    g_renderstate.input_map[window].mousePos = CLITERAL(Vector2){(float)(x * scale), (float)(y * scale)};
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->mousePos = CLITERAL(Vector2){(float)(x * scale), (float)(y * scale)};
 }
 
 void ScrollCallback(SDL_Window* window, double xoffset, double yoffset){
-    g_renderstate.input_map[window].scrollThisFrame.x += (float)xoffset;
-    g_renderstate.input_map[window].scrollThisFrame.y += (float)yoffset;
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.x += (float)xoffset;
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->scrollThisFrame.y += (float)yoffset;
 }
 
 void KeyUpCallback (SDL_Window* window, int key, int scancode, int mods){
-    g_renderstate.input_map[window].keydown[key] = 0;
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 0;
 }
 void KeyDownCallback (SDL_Window* window, int key, int scancode, int mods){
-    g_renderstate.input_map[window].keydown[key] = 1;
+    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 1;
     //if(action == GLFW_PRESS){
-    //    g_renderstate.input_map[window].keydown[key] = 1;
+    //    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 1;
     //}else if(action == GLFW_RELEASE){
-    //    g_renderstate.input_map[window].keydown[key] = 0;
+    //    CreatedWindowMap_get(&g_renderstate.input_map, window)->keydown[key] = 0;
     //}
     //if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
     //    EndGIFRecording();
@@ -471,7 +472,11 @@ void ToggleFullscreen_SDL3(cwoid){
         //We need to exit fullscreen
         g_renderstate.windowFlags &= ~FLAG_FULLSCREEN_MODE;
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, 0);
-        SDL_SetWindowSize((SDL_Window*)g_renderstate.window, (int)g_renderstate.input_map[g_renderstate.window].windowPosition.width, (int)g_renderstate.input_map[g_renderstate.window].windowPosition.height);
+        SDL_SetWindowSize(
+            (SDL_Window*)g_renderstate.window,
+            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.width,
+            (int)CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition.height
+        );
     }
     else{
         int xpos = 0, ypos = 0;
@@ -480,7 +485,7 @@ void ToggleFullscreen_SDL3(cwoid){
         SDL_GetWindowPosition((SDL_Window*)g_renderstate.window, &xpos, &ypos);
         #endif
         SDL_GetWindowSize((SDL_Window*)g_renderstate.window, &xs, &ys);
-        g_renderstate.input_map[g_renderstate.window].windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
+        CreatedWindowMap_get(&g_renderstate.input_map, g_renderstate.window)->windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
         SDL_SetWindowSize((SDL_Window*)g_renderstate.window, GetMonitorWidth_SDL3(), GetMonitorHeight_SDL3());
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, SDL_WINDOW_FULLSCREEN);
     }

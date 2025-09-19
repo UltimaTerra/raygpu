@@ -219,6 +219,59 @@ static inline size_t hashVertexBufferLayoutSet(const VertexBufferLayoutSet* set)
     return xsstate.x64;
 }
 
+#define DEFINE_QUICKSORT_FUNCTION(type, compare_expr)                                      \
+static inline int quicksort_less_##type(const type* left, const type* right) {             \
+    return (compare_expr);                                                                 \
+}                                                                                          \
+static void quickSort_##type(type* begin, type* end) {                                     \
+    if (!begin || !end || begin >= end) return;                                            \
+    enum { QS_THRESH = 8, STACK_MAX = 64 };                                                \
+    type* stack[STACK_MAX * 2];                                                            \
+    int top = 0;                                                                           \
+    stack[top++] = begin;                                                                  \
+    stack[top++] = end;                                                                    \
+    while (top) {                                                                          \
+        type* hi = stack[--top];                                                           \
+        type* lo = stack[--top];                                                           \
+        ptrdiff_t n = hi - lo;                                                             \
+        if (n <= 1) continue;                                                              \
+        if (n <= QS_THRESH) {                                                              \
+            for (type* p = lo + 1; p < hi; ++p) {                                          \
+                type key = *p;                                                             \
+                type* q = p;                                                               \
+                while (q > lo && quicksort_less_##type(&key, q - 1)) {                     \
+                    *q = *(q - 1);                                                         \
+                    --q;                                                                   \
+                }                                                                          \
+                *q = key;                                                                  \
+            }                                                                              \
+            continue;                                                                      \
+        }                                                                                  \
+        type pivot = lo[n >> 1];                                                           \
+        type* i = lo;                                                                      \
+        type* j = hi - 1;                                                                  \
+        for (;;) {                                                                         \
+            while (quicksort_less_##type(i, &pivot)) ++i;                                  \
+            while (quicksort_less_##type(&pivot, j)) --j;                                  \
+            if (i > j) break;                                                              \
+            { type tmp = *i; *i = *j; *j = tmp; }                                          \
+            ++i;                                                                           \
+            --j;                                                                           \
+            if (i > j) break;                                                              \
+        }                                                                                  \
+        ptrdiff_t left_n  = (j + 1) - lo;                                                  \
+        ptrdiff_t right_n = hi - i;                                                        \
+        if (left_n > right_n) {                                                            \
+            if (left_n  > 1) { stack[top++] = lo; stack[top++] = j + 1; }                  \
+            if (right_n > 1) { stack[top++] = i;  stack[top++] = hi;   }                   \
+        } else {                                                                           \
+            if (right_n > 1) { stack[top++] = i;  stack[top++] = hi;   }                   \
+            if (left_n  > 1) { stack[top++] = lo; stack[top++] = j + 1; }                  \
+        }                                                                                  \
+    }                                                                                      \
+}
+
+DEFINE_QUICKSORT_FUNCTION(ResourceTypeDescriptor, left->location < right->location)
 
 //static inline bool vblayoutVectorCompare(const VertexBufferLayoutSet& a, const VertexBufferLayoutSet& b){
 //    
