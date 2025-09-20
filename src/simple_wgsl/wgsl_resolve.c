@@ -1,3 +1,5 @@
+/* wgsl_resolve.c */
+
 #include "wgsl_resolve.h"
 #include <ctype.h>
 #include <stdlib.h>
@@ -59,10 +61,15 @@ static int str_eq(const char* a, const char* b) { return a && b && strcmp(a, b) 
 static void vec_grow(void** ptr, int* cap, size_t elsz) {
     if (*cap == 0) {
         *cap = 8;
-        *ptr = NODE_MALLOC((*cap) * elsz);
+        void* p = NODE_MALLOC((*cap) * elsz);
+        if (!p) { *cap = 0; return; }
+        *ptr = p;
     } else {
-        *cap *= 2;
-        *ptr = NODE_REALLOC(*ptr, (*cap) * elsz);
+        int new_cap = (*cap) * 2;
+        void* p = NODE_REALLOC(*ptr, (size_t)new_cap * elsz);
+        if (!p) return; /* keep old buffer and cap to avoid UB */
+        *cap = new_cap;
+        *ptr = p;
     }
 }
 
@@ -70,6 +77,7 @@ static void vec_grow(void** ptr, int* cap, size_t elsz) {
 static void scope_push(WgslResolver* r) {
     if (r->scope_count >= r->scope_cap)
         vec_grow((void**)&r->scopes, &r->scope_cap, sizeof(Scope));
+    if (r->scope_count >= r->scope_cap) return; /* allocation failed */
     r->scopes[r->scope_count].items = NULL;
     r->scopes[r->scope_count].count = 0;
     r->scopes[r->scope_count].cap = 0;
@@ -83,9 +91,11 @@ static void scope_pop(WgslResolver* r) {
     r->scope_count--;
 }
 static void scope_put(WgslResolver* r, const char* name, int id) {
+    if (r->scope_count <= 0) return;
     Scope* s = &r->scopes[r->scope_count - 1];
     if (s->count >= s->cap)
         vec_grow((void**)&s->items, &s->cap, sizeof(NameId));
+    if (s->count >= s->cap) return; /* allocation failed */
     s->items[s->count].name = name;
     s->items[s->count].id = id;
     s->count++;
@@ -104,6 +114,7 @@ static int scope_get(const WgslResolver* r, const char* name) {
 static void add_symbol(WgslResolver* r, WgslSymbolInfo s) {
     if (r->sym_count >= r->sym_cap)
         vec_grow((void**)&r->symbols, &r->sym_cap, sizeof(WgslSymbolInfo));
+    if (r->sym_count >= r->sym_cap) return; /* allocation failed */
     r->symbols[r->sym_count++] = s;
 }
 static int next_id(const WgslResolver* r) { return r->sym_count + 1; } /* 1-based IDs */
@@ -112,6 +123,7 @@ static void bind_ident(WgslResolver* r, const WgslAstNode* ident, int id) {
         return;
     if (r->ref_count >= r->ref_cap)
         vec_grow((void**)&r->refmap, &r->ref_cap, sizeof(IdentBind));
+    if (r->ref_count >= r->ref_cap) return; /* allocation failed */
     r->refmap[r->ref_count].ident = ident;
     r->refmap[r->ref_count].id = id;
     r->ref_count++;
@@ -197,6 +209,7 @@ static void add_struct(WgslResolver* r, const char* name, const WgslAstNode* nod
         return;
     if (r->struct_count >= r->struct_cap)
         vec_grow((void**)&r->structs, &r->struct_cap, sizeof(NamedNode));
+    if (r->struct_count >= r->struct_cap) return; /* allocation failed */
     r->structs[r->struct_count].name = name;
     r->structs[r->struct_count].node = node;
     r->struct_count++;
@@ -212,6 +225,7 @@ static void add_function_decl(WgslResolver* r, const char* name, const WgslAstNo
         return;
     if (r->fn_decl_count >= r->fn_decl_cap)
         vec_grow((void**)&r->functions, &r->fn_decl_cap, sizeof(NamedNode));
+    if (r->fn_decl_count >= r->fn_decl_cap) return; /* allocation failed */
     r->functions[r->fn_decl_count].name = name;
     r->functions[r->fn_decl_count].node = node;
     r->fn_decl_count++;
@@ -222,6 +236,7 @@ static FnInfo* ensure_fn_info(WgslResolver* r, const WgslAstNode* fn) {
             return &r->fn_infos[i];
     if (r->fn_info_count >= r->fn_info_cap)
         vec_grow((void**)&r->fn_infos, &r->fn_info_cap, sizeof(FnInfo));
+    if (r->fn_info_count >= r->fn_info_cap) return NULL; /* allocation failed */
     FnInfo* fi = &r->fn_infos[r->fn_info_count++];
     memset(fi, 0, sizeof(*fi));
     fi->fn = fn;
@@ -230,23 +245,25 @@ static FnInfo* ensure_fn_info(WgslResolver* r, const WgslAstNode* fn) {
     return fi;
 }
 static void record_fn_ref(FnInfo* fi, int sym_id) {
-    if (sym_id <= 0)
+    if (!fi || sym_id <= 0)
         return;
     for (int i = 0; i < fi->direct_syms_count; i++)
         if (fi->direct_syms[i] == sym_id)
             return;
     if (fi->direct_syms_count >= fi->direct_syms_cap)
         vec_grow((void**)&fi->direct_syms, &fi->direct_syms_cap, sizeof(int));
+    if (fi->direct_syms_count >= fi->direct_syms_cap) return; /* allocation failed */
     fi->direct_syms[fi->direct_syms_count++] = sym_id;
 }
 static void record_fn_call(FnInfo* fi, const char* name) {
-    if (!name)
+    if (!fi || !name)
         return;
     for (int i = 0; i < fi->calls_count; i++)
         if (str_eq(fi->calls[i], name))
             return;
     if (fi->calls_count >= fi->calls_cap)
         vec_grow((void**)&fi->calls, &fi->calls_cap, sizeof(char*));
+    if (fi->calls_count >= fi->calls_cap) return; /* allocation failed */
     fi->calls[fi->calls_count++] = name;
 }
 
@@ -336,7 +353,6 @@ static int type_info(const WgslResolver* r, const WgslAstNode* t, int* component
 }
 
 /* --- New: rough static size calculator for buffer element types --- */
-/* Returns 1 if size computed and writes to *out_bytes; returns 0 otherwise. */
 static int type_min_size_bytes(const WgslResolver* r, const WgslAstNode* t, int* out_bytes);
 
 static int struct_min_size_bytes(const WgslResolver* r, const WgslAstNode* sd, int* out_bytes) {
@@ -360,7 +376,6 @@ static int type_min_size_bytes(const WgslResolver* r, const WgslAstNode* t, int*
     if (!t || t->type != WGSL_NODE_TYPE)
         return 0;
 
-    /* Scalars and vectors */
     int comps = 0, bytes = 0;
     if (type_info(r, t, &comps, NULL, &bytes)) {
         *out_bytes = bytes;
@@ -371,7 +386,6 @@ static int type_min_size_bytes(const WgslResolver* r, const WgslAstNode* t, int*
     if (!name)
         return 0;
 
-    /* array<T, N> */
     if (str_eq(name, "array")) {
         if (t->type_node.type_arg_count <= 0 || !t->type_node.type_args[0])
             return 0;
@@ -380,7 +394,6 @@ static int type_min_size_bytes(const WgslResolver* r, const WgslAstNode* t, int*
         if (!type_min_size_bytes(r, elem_t, &elem_b))
             return 0;
 
-        /* Try count from expr args if present and literal. */
         int count = -1;
         if (t->type_node.expr_arg_count > 0 && t->type_node.expr_args[0]) {
             const WgslAstNode* n = t->type_node.expr_args[0];
@@ -388,19 +401,16 @@ static int type_min_size_bytes(const WgslResolver* r, const WgslAstNode* t, int*
                 count = parse_int_lexeme(n->literal.lexeme);
         }
         if (count <= 0)
-            return 0; /* runtime-sized or unknown: cannot produce static min size */
+            return 0;
 
-        /* Ignore explicit @stride for now; assume tightly packed. */
         *out_bytes = elem_b * count;
         return 1;
     }
 
-    /* struct reference */
     const WgslAstNode* sd = get_struct(r, name);
     if (sd)
         return struct_min_size_bytes(r, sd, out_bytes);
 
-    /* matrices, textures, samplers, unknown generics: not handled */
     return 0;
 }
 
@@ -466,7 +476,7 @@ static void walk_expr(WgslResolver* r, FnInfo* fi, const WgslAstNode* e) {
 }
 
 static void declare_local(WgslResolver* r, const WgslAstNode* fn, const WgslAstNode* v) {
-    if (!v->var_decl.name)
+    if (!v || !v->var_decl.name)
         return;
     WgslSymbolInfo s;
     memset(&s, 0, sizeof(s));
@@ -523,6 +533,8 @@ static void walk_stmt(WgslResolver* r, const WgslAstNode* fn, FnInfo* fi, const 
 
 /* declarations */
 static void declare_global_from_globalvar(WgslResolver* r, const WgslAstNode* gv) {
+    if (!gv || !gv->global_var.name)
+        return;
     WgslSymbolInfo s;
     memset(&s, 0, sizeof(s));
     s.id = next_id(r);
@@ -541,7 +553,6 @@ static void declare_global_from_globalvar(WgslResolver* r, const WgslAstNode* gv
         s.binding_index = attr_first_arg_int(b);
     }
 
-    /* New: compute minBindingSize for buffer bindings. */
     s.has_min_binding_size = 0;
     s.min_binding_size = 0;
     if (gv->global_var.address_space &&
@@ -570,7 +581,7 @@ static void declare_global_from_vardecl(WgslResolver* r, const WgslAstNode* vd) 
     scope_put(r, s.name, s.id);
 }
 static void declare_param(WgslResolver* r, const WgslAstNode* fn, const WgslAstNode* param) {
-    if (!param->param.name)
+    if (!param || !param->param.name)
         return;
     WgslSymbolInfo s;
     memset(&s, 0, sizeof(s));
@@ -583,16 +594,12 @@ static void declare_param(WgslResolver* r, const WgslAstNode* fn, const WgslAstN
     scope_put(r, s.name, s.id);
 }
 
-
-/* stages */
-static int has_attr(const WgslAstNode* fn, const char* name);
-static WgslStage detect_stage(const WgslAstNode* fn);
-
 /* build */
 WgslResolver* wgsl_resolver_build(const WgslAstNode* program) {
     if (!program || program->type != WGSL_NODE_PROGRAM)
         return NULL;
     WgslResolver* r = (WgslResolver*)NODE_ALLOC(WgslResolver);
+    if (!r) return NULL;
     r->program = program;
     scope_push(r);
 
@@ -625,8 +632,10 @@ WgslResolver* wgsl_resolver_build(const WgslAstNode* program) {
                 declare_param(r, d, prm);
         }
         FnInfo* fi = ensure_fn_info(r, d);
-        fi->stage = detect_stage(d);
-        fi->is_entry = (fi->stage != WGSL_STAGE_UNKNOWN);
+        if (fi) {
+            fi->stage = detect_stage(d);
+            fi->is_entry = (fi->stage != WGSL_STAGE_UNKNOWN);
+        }
         walk_stmt(r, d, fi, d->function.body);
         scope_pop(r);
     }
@@ -657,11 +666,14 @@ void wgsl_resolver_free(WgslResolver* r) {
 /* copies */
 static const WgslSymbolInfo* copy_symbols_subset(const WgslResolver* r, const int* ids, int id_count, int* out_count) {
     if (!r || id_count <= 0) {
-        if (out_count)
-            *out_count = 0;
+        if (out_count) *out_count = 0;
         return NULL;
     }
-    WgslSymbolInfo* arr = (WgslSymbolInfo*)NODE_MALLOC(sizeof(WgslSymbolInfo) * id_count);
+    WgslSymbolInfo* arr = (WgslSymbolInfo*)NODE_MALLOC(sizeof(WgslSymbolInfo) * (size_t)id_count);
+    if (!arr) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
     int k = 0;
     for (int i = 0; i < id_count; i++) {
         int id = ids[i];
@@ -679,7 +691,11 @@ const WgslSymbolInfo* wgsl_resolver_all_symbols(const WgslResolver* r, int* out_
             *out_count = 0;
         return NULL;
     }
-    WgslSymbolInfo* arr = (WgslSymbolInfo*)NODE_MALLOC(sizeof(WgslSymbolInfo) * r->sym_count);
+    WgslSymbolInfo* arr = (WgslSymbolInfo*)NODE_MALLOC(sizeof(WgslSymbolInfo) * (size_t)r->sym_count);
+    if (!arr) {
+        if (out_count) *out_count = 0;
+        return NULL;
+    }
     for (int i = 0; i < r->sym_count; i++)
         arr[i] = r->symbols[i];
     if (out_count)
@@ -697,6 +713,7 @@ const WgslSymbolInfo* wgsl_resolver_globals(const WgslResolver* r, int* out_coun
         if (r->symbols[i].kind == WGSL_SYM_GLOBAL) {
             if (cnt >= cap)
                 vec_grow((void**)&ids, &cap, sizeof(int));
+            if (cnt >= cap) { NODE_FREE(ids); if (out_count) *out_count = 0; return NULL; }
             ids[cnt++] = r->symbols[i].id;
         }
     }
@@ -716,6 +733,7 @@ const WgslSymbolInfo* wgsl_resolver_binding_vars(const WgslResolver* r, int* out
         if (s->kind == WGSL_SYM_GLOBAL && s->has_group && s->has_binding) {
             if (cnt >= cap)
                 vec_grow((void**)&ids, &cap, sizeof(int));
+            if (cnt >= cap) { NODE_FREE(ids); if (out_count) *out_count = 0; return NULL; }
             ids[cnt++] = s->id;
         }
     }
@@ -758,8 +776,10 @@ int wgsl_resolver_vertex_inputs(const WgslResolver* r, const char* vertex_entry_
             WgslNumericType nt = WGSL_NUM_UNKNOWN;
             type_info(r, p->param.type, &comps, &nt, &bytes);
             if (count >= cap) {
-                cap = cap ? cap * 2 : 8;
-                arr = (WgslVertexSlot*)NODE_REALLOC(arr, sizeof(WgslVertexSlot) * cap);
+                int new_cap = cap ? cap * 2 : 8;
+                WgslVertexSlot* tmp = (WgslVertexSlot*)NODE_REALLOC(arr, sizeof(WgslVertexSlot) * (size_t)new_cap);
+                if (!tmp) { NODE_FREE(arr); return 0; }
+                arr = tmp; cap = new_cap;
             }
             arr[count].location = loc;
             arr[count].component_count = comps;
@@ -784,8 +804,10 @@ int wgsl_resolver_vertex_inputs(const WgslResolver* r, const char* vertex_entry_
                     WgslNumericType nt = WGSL_NUM_UNKNOWN;
                     type_info(r, fld->struct_field.type, &comps, &nt, &bytes);
                     if (count >= cap) {
-                        cap = cap ? cap * 2 : 8;
-                        arr = (WgslVertexSlot*)NODE_REALLOC(arr, sizeof(WgslVertexSlot) * cap);
+                        int new_cap = cap ? cap * 2 : 8;
+                        WgslVertexSlot* tmp = (WgslVertexSlot*)NODE_REALLOC(arr, sizeof(WgslVertexSlot) * (size_t)new_cap);
+                        if (!tmp) { NODE_FREE(arr); return 0; }
+                        arr = tmp; cap = new_cap;
                     }
                     arr[count].location = loc;
                     arr[count].component_count = comps;
@@ -816,7 +838,12 @@ const WgslResolverEntrypoint* wgsl_resolver_entrypoints(const WgslResolver* r, i
             *out_count = 0;
         return NULL;
     }
-    WgslResolverEntrypoint* eps = (WgslResolverEntrypoint*)NODE_MALLOC(sizeof(WgslResolverEntrypoint) * n);
+    WgslResolverEntrypoint* eps =
+        (WgslResolverEntrypoint*)NODE_MALLOC(sizeof(WgslResolverEntrypoint) * (size_t)n);
+    if (!eps) {
+        if (out_count) *out_count = 0;
+        return NULL; /* fix: avoid possible NULL dereference */
+    }
     int k = 0;
     for (int i = 0; i < r->fn_info_count; i++)
         if (r->fn_infos[i].is_entry) {
@@ -872,8 +899,10 @@ static const WgslSymbolInfo* entrypoint_syms(const WgslResolver* r, const char* 
         return NULL;
 
     char* keep = (char*)NODE_MALLOC((size_t)(r->sym_count + 1));
+    if (!keep) return NULL;
     memset(keep, 0, (size_t)(r->sym_count + 1));
     char* visited = (char*)NODE_MALLOC((size_t)(r->fn_info_count + 1));
+    if (!visited) { NODE_FREE(keep); return NULL; }
     memset(visited, 0, (size_t)(r->fn_info_count + 1));
     dfs_collect(r, root, visited, keep);
 
@@ -888,6 +917,7 @@ static const WgslSymbolInfo* entrypoint_syms(const WgslResolver* r, const char* 
             continue;
         if (cnt >= cap)
             vec_grow((void**)&ids, &cap, sizeof(int));
+        if (cnt >= cap) { NODE_FREE(keep); NODE_FREE(visited); NODE_FREE(ids); return NULL; }
         ids[cnt++] = id;
     }
     NODE_FREE(keep);
@@ -904,4 +934,3 @@ void wgsl_resolve_free(void* p) {
     if (p)
         NODE_FREE(p);
 }
-

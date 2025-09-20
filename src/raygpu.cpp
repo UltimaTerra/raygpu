@@ -24,7 +24,8 @@
  */
 
 #include "config.h"
-#include "wgvk.h"
+
+#include <webgpu/webgpu.h>
 #include <macros_and_constants.h>
 #include <c_fs_utils.h>
 #include <cstddef>
@@ -342,10 +343,10 @@ RGAPI void drawCurrentBatch(){
     #else
     DescribedBuffer* vbo = nullptr;
     bool allocated_via_pool = false;
-    if(vertexCount < VERTEX_BUFFER_CACHE_SIZE && !g_renderstate.smallBufferPool.empty()){
+    if(vertexCount < VERTEX_BUFFER_CACHE_SIZE && !DescribedBufferVector_empty(&g_renderstate.smallBufferPool)){
         allocated_via_pool = true;
-        vbo = g_renderstate.smallBufferPool.back();
-        g_renderstate.smallBufferPool.pop_back();
+        vbo = g_renderstate.smallBufferPool.data[g_renderstate.smallBufferPool.size - 1];
+        DescribedBufferVector_pop_back(&g_renderstate.smallBufferPool);
         wgpuQueueWriteBuffer(GetQueue(), (WGPUBuffer)vbo->buffer, 0, vboptr_base, vertexCount * sizeof(vertex));
     }
     else{
@@ -410,7 +411,7 @@ RGAPI void drawCurrentBatch(){
         UnloadBuffer(vbo);
     }
     else{
-        g_renderstate.smallBufferRecyclingBin.push_back(vbo);
+        DescribedBufferVector_push_back(&g_renderstate.smallBufferRecyclingBin, vbo);
     }
     vboptr = vboptr_base;
 }
@@ -884,9 +885,13 @@ RGAPI void EndDrawing(){
     else{
         DummySubmitOnQueue();
     }
-    
-    std::copy(g_renderstate.smallBufferRecyclingBin.begin(), g_renderstate.smallBufferRecyclingBin.end(), std::back_inserter(g_renderstate.smallBufferPool));
-    g_renderstate.smallBufferRecyclingBin.clear();
+    DescribedBufferVector* from = &g_renderstate.smallBufferRecyclingBin;
+    DescribedBufferVector* to   = &g_renderstate.smallBufferPool;
+    for(size_t i = 0;i < DescribedBufferVector_size(from);i++){
+        DescribedBufferVector_push_back(to, *DescribedBufferVector_get(from, i));
+    }
+    DescribedBufferVector_clear(from);
+
     window_input_state* ipstate = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state;
     
     memcpy(ipstate->keydownPrevious, ipstate->keydown, KEYS_MAX);

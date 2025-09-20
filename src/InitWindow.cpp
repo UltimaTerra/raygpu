@@ -25,9 +25,9 @@ struct LightBuffer {
 @group(0) @binding(0) var<uniform> Perspective_View: mat4x4f;
 @group(0) @binding(1) var texture0: texture_2d<f32>;
 @group(0) @binding(2) var texSampler: sampler;
-@group(0) @binding(3) var<storage> modelMatrix: array<mat4x4f>;
-@group(0) @binding(4) var<storage> lights: LightBuffer;
-@group(0) @binding(5) var<storage> lights2: LightBuffer;
+@group(0) @binding(3) var<storage, read> modelMatrix: array<mat4x4f>;
+//@group(0) @binding(4) var<storage> lights: LightBuffer;
+//@group(0) @binding(5) var<storage> lights2: LightBuffer;
 
 //Can be omitted
 //@group(0) @binding(3) var<storage> storig: array<vec4f>;
@@ -317,7 +317,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
 
     LoadFontDefault();
     for(size_t i = 0;i < 4;i++){
-        g_renderstate.smallBufferPool.push_back(GenVertexBuffer(nullptr, sizeof(vertex) * VERTEX_BUFFER_CACHE_SIZE));
+        DescribedBufferVector_push_back(&g_renderstate.smallBufferPool, GenVertexBuffer(nullptr, sizeof(vertex) * VERTEX_BUFFER_CACHE_SIZE));
     }
 
     vboptr = (vertex*)std::calloc(10000, sizeof(vertex));
@@ -362,13 +362,14 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     defaultWGSLSource.sources[0].sizeInBytes = std::strlen(shaderSource);
     defaultWGSLSource.sources[0].stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     //g_renderstate.defaultShader = LoadPipeline(shaderSource);
-    g_renderstate.defaultShader = LoadPipelineEx(
-        shaderSource,
-        renderBatchVAO->attributes,
-        renderBatchVAO->attributes_count,
-        uniforms,
-        sizeof(uniforms) / sizeof(ResourceTypeDescriptor),
-        GetDefaultSettings()
+    g_renderstate.defaultShader = LoadShaderSingleSource(
+        shaderSource
+        //,
+        //renderBatchVAO->attributes,
+        //renderBatchVAO->attributes_count,
+        //uniforms,
+        //sizeof(uniforms) / sizeof(ResourceTypeDescriptor),
+        //GetDefaultSettings()
     );
 
     #else
@@ -385,7 +386,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     g_renderstate.activeShader = g_renderstate.defaultShader;
     size_t quadCount = 2000;
     g_renderstate.quadindicesCache = GenBufferEx(nullptr, quadCount * 6 * sizeof(uint32_t), WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);//allocnew(DescribedBuffer);    //WGPUBufferDescriptor vbmdesc{};
-    std::vector<uint32_t> indices(6 * quadCount);
+    uint32_t* indices = (uint32_t*)RL_CALLOC(6 * quadCount, sizeof(uint32_t));
     for(size_t i = 0;i < quadCount;i++){
         indices[i * 6 + 0] = (i * 4 + 0);
         indices[i * 6 + 1] = (i * 4 + 1);
@@ -394,10 +395,10 @@ RGAPI void* InitWindow(int width, int height, const char* title){
         indices[i * 6 + 4] = (i * 4 + 2);
         indices[i * 6 + 5] = (i * 4 + 3);
     }
-    BufferData(g_renderstate.quadindicesCache, indices.data(), 6 * quadCount * sizeof(uint32_t));
-    
+    BufferData(g_renderstate.quadindicesCache, indices, 6 * quadCount * sizeof(uint32_t));
+    RL_FREE(indices);
     Matrix m = ScreenMatrix(width, height);
-    static_assert(sizeof(Matrix) == 64, "non 4 byte floats? or what");
+    //static_assert(sizeof(Matrix) == 64, "non 4 byte floats? or what");
 
     MatrixBufferPair_stack_push(&g_renderstate.matrixStack, MatrixBufferPair{});
     SetTexture(1, g_renderstate.whitePixel);

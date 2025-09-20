@@ -24,6 +24,7 @@
 */
 
 #include "config.h"
+#include "simple_wgsl/wgsl_parser.h"
 #include <raygpu.h>
 #include <internals.hpp>
 
@@ -290,11 +291,22 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
         }
 
         if (!handled) {
-            if (gv.address_space && std::strcmp(gv.address_space, "uniform") == 0) {
+            if (gv.address_space && strcmp(gv.address_space, "uniform") == 0) {
                 desc.type = uniform_buffer;
-            } else if (gv.address_space && std::strcmp(gv.address_space, "storage") == 0) {
+            } else if (gv.address_space && strcmp(gv.address_space, "storage") == 0) {
                 desc.type = storage_buffer;
-                desc.access = readwrite;
+                if(gv.access_modifier && strcmp(gv.access_modifier, "read") == 0){
+                    desc.access = readonly;
+                }
+                else if(gv.access_modifier && strcmp(gv.access_modifier, "write") == 0){
+                    desc.access = writeonly;
+                }
+                else if(gv.access_modifier && strcmp(gv.access_modifier, "readwrite") == 0){
+                    desc.access = readwrite;
+                }
+                else{
+                    desc.access = readonly;
+                }
             } else {
                 continue; // non-bindable
             }

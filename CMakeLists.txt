@@ -407,8 +407,6 @@ endif()
 if(SUPPORT_WGPU_BACKEND)
     list(APPEND RG_SOURCES
         "src/backend_wgpu.cpp"
-        #"src/wgvk_to_wgpu.cpp"
-        "src/pipeline.cpp"
     )
 endif()
 if(SUPPORT_SDL2)
@@ -419,10 +417,10 @@ if(SUPPORT_SDL3)
     list(APPEND RG_SOURCES "src/InitWindow_SDL3.cpp")
     list(APPEND RG_SOURCES "src/sdl3webgpu.c")
     if(APPLE)
-    set_source_files_properties("src/sdl3webgpu.c"
-        PROPERTIES
-        LANGUAGE OBJC
-    )
+        set_source_files_properties("src/sdl3webgpu.c"
+            PROPERTIES
+            LANGUAGE OBJC
+        )
     endif()
 endif()
 if(SUPPORT_RGFW)
@@ -431,8 +429,14 @@ if(SUPPORT_RGFW)
 endif()
 if(SUPPORT_GLFW)
     list(APPEND RG_SOURCES "src/InitWindow_GLFW.cpp")
+    list(APPEND RG_SOURCES "src/glfw3webgpu.c")
     if(SUPPORT_WGPU_BACKEND)
-        list(APPEND RG_SOURCES "src/dawn_glfwrip.cpp")
+        if(APPLE)
+            set_source_files_properties("src/glfw3webgpu.c"
+                PROPERTIES
+                LANGUAGE OBJC
+            )
+        endif()
     endif()
 endif()
 if(SUPPORT_RGFW)
@@ -441,8 +445,8 @@ endif()
 if (NOT EMSCRIPTEN)
     list(APPEND RG_SOURCES "src/glsl_support.cpp")
 endif()
-if(DAWN_ENABLE_METAL AND SUPPORT_GLFW AND SUPPORT_WGPU_BACKEND)
-    list(APPEND RG_SOURCES "src/utils_metal.mm")
+
+if(DAWN_ENABLE_METAL AND SUPPORT_WGPU_BACKEND)
     set(RAYGPU_USE_METAL ON)
 endif()
 
@@ -585,8 +589,8 @@ else()
     if(SUPPORT_GLSL_PARSER)
         list(APPEND raygpu_linked_deps glslang)
     endif()
-    list(APPEND raygpu_linked_deps spirv-reflect-static)
 endif()
+list(APPEND raygpu_linked_deps spirv-reflect-static)
 
 target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
 

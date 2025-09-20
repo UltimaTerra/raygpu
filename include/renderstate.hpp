@@ -1,11 +1,7 @@
 // begin file include/renderstate.hpp
-#include <array>
-#include <deque>
-#include <map>
-#include <mutex>
+#include <stdlib.h>
+#include <macros_and_constants.h>
 #include <raygpu.h>
-#include <set>
-#include <vector>
 #if SUPPORT_WGPU_BACKEND == 1
 #include <webgpu/webgpu.h>
 #else
@@ -21,19 +17,15 @@ typedef struct {                                                                
 } T##_stack;                                                                    \
 LINKAGE void T##_stack_init(T##_stack *s) { s->current_pos = 0; }               \
 LINKAGE void T##_stack_push(T##_stack *s, T v) {                                \
-    rassert(s->current_pos < (N), "Out of bounds access");                      \
     s->data[s->current_pos++] = v;                                              \
 }                                                                               \
 LINKAGE T T##_stack_pop(T##_stack *s) {                                         \
-    rassert(s->current_pos > 0, "Out of bounds access");                        \
     return s->data[--s->current_pos];                                           \
 }                                                                               \
 LINKAGE T *T##_stack_peek(T##_stack *s) {                                       \
-    rassert(s->current_pos > 0, "Out of bounds access");                        \
     return &s->data[s->current_pos - 1];                                        \
 }                                                                               \
 LINKAGE const T *T##_stack_cpeek(const T##_stack *s) {                          \
-    rassert(s->current_pos > 0, "Out of bounds access");                        \
     return &s->data[s->current_pos - 1];                                        \
 }                                                                               \
 LINKAGE size_t T##_stack_size(const T##_stack *s) { return s->current_pos; }    \
@@ -74,31 +66,132 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
 #define PHM_DELETED_SLOT_KEY ((void*)0xFFFFFFFFFFFFFFFFULL)
 #endif
 
-#include <assert.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
+#define DEFINE_VECTOR_IW(SCOPE, Type, Name)                                                                                         \
+                                                                                                                                 \
+    typedef struct {                                                                                                             \
+        Type *data;                                                                                                              \
+        size_t size;                                                                                                             \
+        size_t capacity;                                                                                                         \
+    } Name;                                                                                                                      \
+                                                                                                                                 \
+    SCOPE void Name##_init(Name *v) {                                                                                            \
+        v->data = NULL;                                                                                                          \
+        v->size = 0;                                                                                                             \
+        v->capacity = 0;                                                                                                         \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE bool Name##_empty(Name *v) { return v->size == 0; }                                                                    \
+                                                                                                                                 \
+    SCOPE void Name##_initWithSize(Name *v, size_t initialSize) {                                                                \
+        if (initialSize == 0) {                                                                                                  \
+            Name##_init(v);                                                                                                      \
+        } else {                                                                                                                 \
+            v->data = (Type *)calloc(initialSize, sizeof(Type));                                                                 \
+            if (!v->data) {                                                                                                      \
+                Name##_init(v);                                                                                                  \
+                return;                                                                                                          \
+            }                                                                                                                    \
+            v->size = initialSize;                                                                                               \
+            v->capacity = initialSize;                                                                                           \
+        }                                                                                                                        \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_free(Name *v) {                                                                                            \
+        if (v->data != NULL) {                                                                                                   \
+            free((void*)v->data);                                                                                                       \
+        }                                                                                                                        \
+        Name##_init(v);                                                                                                          \
+    }                                                                                                                            \
+    SCOPE void Name##_clear(Name *v) { v->size = 0; }                                                                            \
+    SCOPE int Name##_reserve(Name *v, size_t new_capacity) {                                                                     \
+        if (new_capacity <= v->capacity) {                                                                                       \
+            return 0;                                                                                                            \
+        }                                                                                                                        \
+        Type *new_data = (Type *)realloc((void*)v->data, new_capacity * sizeof(Type));                                           \
+        if (!new_data && new_capacity > 0) {                                                                                     \
+            return -1;                                                                                                           \
+        }                                                                                                                        \
+        v->data = new_data;                                                                                                      \
+        v->capacity = new_capacity;                                                                                              \
+        return 0;                                                                                                                \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE int Name##_push_back(Name *v, Type value) {                                                                            \
+        if (v->size >= v->capacity) {                                                                                            \
+            size_t new_capacity;                                                                                                 \
+            if (v->capacity == 0) {                                                                                              \
+                new_capacity = 8;                                                                                                \
+            } else {                                                                                                             \
+                new_capacity = v->capacity * 2;                                                                                  \
+            }                                                                                                                    \
+            if (new_capacity < v->capacity) {                                                                                    \
+                return -1;                                                                                                       \
+            }                                                                                                                    \
+            if (Name##_reserve(v, new_capacity) != 0) {                                                                          \
+                return -1;                                                                                                       \
+            }                                                                                                                    \
+        }                                                                                                                        \
+        v->data[v->size++] = value;                                                                                              \
+        return 0;                                                                                                                \
+    }                                                                                                                            \
+    SCOPE void Name##_pop_back(Name *v) { --v->size; }                                                                           \
+    SCOPE Type *Name##_get(Name *v, size_t index) {                                                                              \
+        if (index >= v->size) {                                                                                                  \
+            return NULL;                                                                                                         \
+        }                                                                                                                        \
+        return &v->data[index];                                                                                                  \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE size_t Name##_size(const Name *v) { return v->size; }                                                                  \
+                                                                                                                                 \
+    SCOPE void Name##_move(Name *dest, Name *source) {                                                                           \
+        if (dest == source) {                                                                                                    \
+            return;                                                                                                              \
+        }                                                                                                                        \
+        dest->data = source->data;                                                                                               \
+        dest->size = source->size;                                                                                               \
+        dest->capacity = source->capacity;                                                                                       \
+        Name##_init(source);                                                                                                     \
+    }                                                                                                                            \
+                                                                                                                                 \
+    SCOPE void Name##_copy(Name *dest, const Name *source) {                                                                     \
+        Name##_free(dest);                                                                                                       \
+                                                                                                                                 \
+        if (source->size == 0) {                                                                                                 \
+            return;                                                                                                              \
+        }                                                                                                                        \
+                                                                                                                                 \
+        size_t capacity_to_allocate = source->capacity;                                                                          \
+        if (capacity_to_allocate < source->size) {                                                                               \
+            capacity_to_allocate = source->size;                                                                                 \
+        }                                                                                                                        \
+                                                                                                                                 \
+        dest->data = (Type*)malloc(capacity_to_allocate * sizeof(Type));                                                        \
+        if (!dest->data) {                                                                                                       \
+            return;                                                                                                              \
+        }                                                                                                                        \
+        memcpy((void*)dest->data, (void*)source->data, source->size * sizeof(Type));                                             \
+        dest->size = source->size;                                                                                               \
+        dest->capacity = capacity_to_allocate;                                                                                   \
+    }
 
-#define DEFINE_PTR_HASH_MAP_R(SCOPE, Name, ValueType)                                                                             \
-                                                                                                                                    \
+
+
+#define DEFINE_PTR_HASH_MAP_R(SCOPE, Name, ValueType)                                                                              \
     typedef struct Name##_kv_pair {                                                                                                \
         void   *key;                                                                                                               \
         ValueType value;                                                                                                           \
     } Name##_kv_pair;                                                                                                              \
-                                                                                                                                    \
     typedef struct Name {                                                                                                          \
-        uint64_t        current_size;      /* number of non-empty, non-deleted keys (excludes NULL-key slot) */                    \
-        uint64_t        current_capacity;  /* heap table capacity, power of two, 0 when unallocated */                              \
-        bool            has_null_key;                                                                                               \
-        ValueType       null_value;                                                                                                 \
-        Name##_kv_pair *table;            /* heap array of slots, length current_capacity */                                       \
+        uint64_t        current_size;                                                                                              \
+        uint64_t        current_capacity;                                                                                          \
+        bool            has_null_key;                                                                                              \
+        ValueType       null_value;                                                                                                \
+        Name##_kv_pair *table;                                                                                                     \
     } Name;                                                                                                                        \
-                                                                                                                                    \
     static inline uint64_t Name##_hash_key(void *key) {                                                                            \
-        assert(key != NULL);                                                                                                       \
         return ((uintptr_t)key) * (uint64_t)PHM_HASH_MULTIPLIER;                                                                   \
     }                                                                                                                              \
-                                                                                                                                    \
     /* next power of two, returns 0 on v==0 */                                                                                     \
     static inline uint64_t Name##_round_up_to_power_of_2(uint64_t v) {                                                             \
         if (v == 0) return 0;                                                                                                      \
@@ -107,10 +200,7 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
         v++;                                                                                                                       \
         return v;                                                                                                                  \
     }                                                                                                                              \
-                                                                                                                                    \
-    /* internal: probe to find existing key or first empty; does NOT stop on deleted */                                            \
     static inline uint64_t Name##_find_index_for_get(const Name *map, void *key) {                                                 \
-        assert(key != NULL && key != PHM_EMPTY_SLOT_KEY && map->table != NULL && map->current_capacity > 0);                      \
         uint64_t mask = map->current_capacity - 1;                                                                                 \
         uint64_t i = Name##_hash_key(key) & mask;                                                                                  \
         for (;;) {                                                                                                                 \
@@ -123,7 +213,6 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
                                                                                                                                     \
     /* internal: probe to find slot to insert/update. prefers first tombstone if seen */                                           \
     static inline uint64_t Name##_find_index_for_put(const Name *map, void *key) {                                                 \
-        assert(key != NULL && key != PHM_EMPTY_SLOT_KEY && map->table != NULL && map->current_capacity > 0);                      \
         uint64_t mask = map->current_capacity - 1;                                                                                 \
         uint64_t i = Name##_hash_key(key) & mask;                                                                                  \
         uint64_t first_tomb = UINT64_MAX;                                                                                          \
@@ -137,7 +226,7 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
             i = (i + 1) & mask;                                                                                                    \
         }                                                                                                                          \
     }                                                                                                                              \
-                                                                                                                                    \
+                                                                                                                                   \
     static void Name##_rehash_into(Name##_kv_pair *dst, uint64_t dst_cap, const Name##_kv_pair *src, uint64_t src_cap) {           \
         uint64_t mask = dst_cap - 1;                                                                                               \
         for (uint64_t i = 0; i < src_cap; ++i) {                                                                                   \
@@ -149,12 +238,12 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
             dst[j].value = src[i].value;                                                                                           \
         }                                                                                                                          \
     }                                                                                                                              \
-                                                                                                                                    \
+                                                                                                                                   \
     static void Name##_grow(Name *map) {                                                                                           \
-        uint64_t new_cap = (map->current_capacity == 0) ? PHM_INITIAL_HEAP_CAPACITY : (map->current_capacity << 1);               \
+        uint64_t new_cap = (map->current_capacity == 0) ? PHM_INITIAL_HEAP_CAPACITY : (map->current_capacity << 1);                \
         if (new_cap < PHM_INITIAL_HEAP_CAPACITY) new_cap = PHM_INITIAL_HEAP_CAPACITY;                                              \
         new_cap = Name##_round_up_to_power_of_2(new_cap);                                                                          \
-        if (new_cap == 0) new_cap = PHM_INITIAL_HEAP_CAPACITY;                                                                      \
+        if (new_cap == 0) new_cap = PHM_INITIAL_HEAP_CAPACITY;                                                                     \
         Name##_kv_pair *new_tab = (Name##_kv_pair*)calloc(new_cap, sizeof(Name##_kv_pair));                                        \
         if (!new_tab) abort();                                                                                                     \
         /* calloc zeroes keys to NULL which is PHM_EMPTY_SLOT_KEY */                                                               \
@@ -165,14 +254,14 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
         map->table = new_tab;                                                                                                      \
         map->current_capacity = new_cap;                                                                                           \
     }                                                                                                                              \
-                                                                                                                                    \
+                                                                                                                                   \
     static inline bool Name##_should_grow(const Name *map, uint64_t add) {                                                         \
         /* trigger when (size + add) / capacity > NUM/DEN. capacity==0 always grows. */                                            \
         if (map->current_capacity == 0) return true;                                                                               \
         uint64_t future = map->current_size + add;                                                                                 \
         return (future * (uint64_t)PHM_LOAD_FACTOR_DEN) > (map->current_capacity * (uint64_t)PHM_LOAD_FACTOR_NUM);                 \
     }                                                                                                                              \
-                                                                                                                                    \
+                                                                                                                                   \
     SCOPE void Name##_init(Name *map) {                                                                                            \
         map->current_size = 0;                                                                                                     \
         map->current_capacity = 0;                                                                                                 \
@@ -180,7 +269,7 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
         /* map->null_value left uninitialized until set */                                                                         \
         map->table = NULL;                                                                                                         \
     }                                                                                                                              \
-                                                                                                                                    \
+                                                                                                                                   \
     SCOPE int Name##_put(Name *map, void *key, ValueType value) {                                                                  \
         if (key == NULL) {                                                                                                         \
             int inserted = map->has_null_key ? 0 : 1;                                                                              \
@@ -239,8 +328,8 @@ DEFINE_ARRAY_STACK(RenderTexture, static inline, 8);
 
 
 
-DEFINE_PTR_HASH_MAP_R(static, CreatedWindowMap, RGWindowImpl)
-
+DEFINE_PTR_HASH_MAP_R(static inline, CreatedWindowMap, RGWindowImpl)
+DEFINE_VECTOR_IW(static inline, DescribedBuffer*, DescribedBufferVector)
 
 
 struct renderstate {
@@ -262,14 +351,11 @@ struct renderstate {
     DescribedRenderpass *activeRenderpass;
     DescribedComputepass *activeComputepass;
 
-    uint32_t renderExtentX; // Dimensions of the current viewport
-    uint32_t renderExtentY; // Required for camera function
+    uint32_t renderExtentX;
+    uint32_t renderExtentY;
 
-    std::vector<DescribedBuffer *> smallBufferPool;
-    std::vector<DescribedBuffer *> smallBufferRecyclingBin;
-
-    // std::unordered_map<uint64_t, WGPUBindGroup> bindGroupPool;
-    // std::unordered_map<uint64_t, WGPUBindGroup> bindGroupRecyclingBin;
+    DescribedBufferVector smallBufferPool;
+    DescribedBufferVector smallBufferRecyclingBin;
 
     DescribedBuffer *identityMatrix;
     DescribedSampler defaultSampler;
@@ -285,7 +371,6 @@ struct renderstate {
     bool minimized;
 
     RenderTexture mainWindowRenderTarget;
-    // RenderTexture currentDefaultRenderTarget;
 
 
     int windowFlags = 0;
@@ -296,7 +381,6 @@ struct renderstate {
 
     int64_t last_timestamps[64] = {0};
 
-    std::mutex drawmutex;
     GIFRecordState *grst;
 
     SubWindow mainWindow{};

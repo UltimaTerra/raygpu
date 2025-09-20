@@ -21,11 +21,6 @@
 #include <stdio.h>
 #include <macros_and_constants.h>
 #include <mathutils.h>
-#ifdef __cplusplus
-#include <vector>
-#include <cassert>
-#include <unordered_map>
-#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 #include <emscripten/emscripten.h>

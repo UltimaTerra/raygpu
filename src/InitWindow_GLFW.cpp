@@ -1,4 +1,5 @@
 // begin file src/InitWindow_GLFW.cpp
+#include "webgpu/webgpu_glfw.h"
 #include <raygpu.h>
 #define GLFW_INCLUDE_NONE
 #if SUPPORT_VULKAN_BACKEND == 1
@@ -8,12 +9,12 @@
 #if SUPPORT_WGPU_BACKEND == 1
     #include "wgpustate.inc"
 #endif
-
 #include <internals.hpp>
-#include "GLFW/glfw3.h"
-#if SUPPORT_WGPU_BACKEND == 1
-#include "webgpu/webgpu_glfw.h"
-#endif
+#include <GLFW/glfw3.h>
+#include "glfw3webgpu.h"
+
+int emscripten_to_glfw_key(const char* emsc);
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 #include <emscripten/emscripten.h>
@@ -57,10 +58,9 @@ void ResizeCallback(GLFWwindow* window, int width, int height){
     }
 }
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset){
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.x += xoffset;
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.y += yoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.x += (float)xoffset;
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.scrollThisFrame.y += (float)yoffset;
 }
-
 
 #ifdef __EMSCRIPTEN__
 
@@ -71,8 +71,8 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
     float scaleY = calculateScrollScale(wheelEvent->deltaMode);
     
     // Optionally clamp the delta values to prevent excessive scrolling
-    double deltaX = std::clamp(wheelEvent->deltaX * scaleX, -100.0, 100.0) / 100.0f;
-    double deltaY = std::clamp(wheelEvent->deltaY * scaleY, -100.0, 100.0) / 100.0f;
+    double deltaX = std_clamp_f64(wheelEvent->deltaX * scaleX, -100.0, 100.0) / 100.0f;
+    double deltaY = std_clamp_f64(wheelEvent->deltaY * scaleY, -100.0, 100.0) / 100.0f;
     
     
     // Invoke the original scroll callback with scaled deltas
@@ -124,7 +124,7 @@ void CursorEnterCallback(GLFWwindow* window, int entered){
     CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.cursorInWindow = entered;
 }
 //#endif
-extern const std::unordered_map<std::string, int> emscriptenToGLFWKeyMap;
+
 void glfwKeyCallback (GLFWwindow* window, int key, int scancode, int action, int mods){
     if(action == GLFW_PRESS){
         CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.keydown[key] = 1;
@@ -147,15 +147,9 @@ EM_BOOL EmscriptenKeydownCallback(int eventType, const EmscriptenKeyboardEvent *
         modifier |= GLFW_MOD_SHIFT;
     if(keyEvent->altKey)
         modifier |= GLFW_MOD_ALT;
-    auto it = emscriptenToGLFWKeyMap.find(keyEvent->code);
-    if(it == emscriptenToGLFWKeyMap.end()){
-        char codeCertainlyNullTerminated[33];
-        memcpy(codeCertainlyNullTerminated, keyEvent->code, 32);
-        codeCertainlyNullTerminated[32] = '\0';
-        TRACELOG(LOG_WARNING, "Discarding EmscriptenKeyboardEvent with code = %s", codeCertainlyNullTerminated);
-    }
-    else{
-        glfwKeyCallback(g_renderstate.window, it->second, it->second, GLFW_PRESS, modifier);
+    int key = emscripten_to_glfw_key(keyEvent->code);
+    if(key != GLFW_KEY_UNKNOWN){
+        glfwKeyCallback(g_renderstate.window, key, key, GLFW_PRESS, modifier);
     }
     return 0;
 }
@@ -168,27 +162,21 @@ EM_BOOL EmscriptenKeyupCallback(int eventType, const EmscriptenKeyboardEvent *ke
         modifier |= GLFW_MOD_SHIFT;
     if(keyEvent->altKey)
         modifier |= GLFW_MOD_ALT;
-    auto it = emscriptenToGLFWKeyMap.find(keyEvent->code);
-    if(it == emscriptenToGLFWKeyMap.end()){
-        char codeCertainlyNullTerminated[33];
-        memcpy(codeCertainlyNullTerminated, keyEvent->code, 32);
-        codeCertainlyNullTerminated[32] = '\0';
-        TRACELOG(LOG_WARNING, "Discarding EmscriptenKeyboardEvent with code = %s", codeCertainlyNullTerminated);
-    }
-    else{
-        glfwKeyCallback(g_renderstate.window, it->second, it->second, GLFW_RELEASE, modifier);
+    int key = emscripten_to_glfw_key(keyEvent->code);
+    if(key != GLFW_KEY_UNKNOWN){
+        glfwKeyCallback(g_renderstate.window, key, key, GLFW_RELEASE, modifier);
     }
     return 1;
 }
 #endif// __EMSCRIPTEN__
-
+static void CharCallback_glfw_tp(GLFWwindow* w, unsigned int cp){
+    CharCallback((void*)w, cp);
+}
 void setupGLFWCallbacks(GLFWwindow* window){
     glfwSetWindowSizeCallback(window, ResizeCallback);
     glfwSetKeyCallback(window, glfwKeyCallback);
     glfwSetCursorPosCallback(window, cpcallback);
-    glfwSetCharCallback(window, [](auto... x){
-        CharCallback(x...);
-    });
+    glfwSetCharCallback(window, CharCallback_glfw_tp);
     glfwSetCursorEnterCallback(window, CursorEnterCallback);
     glfwSetScrollCallback(window, ScrollCallback);
     glfwSetMouseButtonCallback(window, clickcallback);
@@ -422,9 +410,8 @@ WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
     #else
     float xscale, yscale;
     glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
-    g_renderstate.createdSubwindows.at(windowHandle).scaleFactor = xscale;
-    wgpu::Surface rs = wgpu::glfw::CreateSurfaceForWindow((WGPUInstance)GetInstance(), (GLFWwindow*)windowHandle);
-    WGPUSurface wsurfaceHandle = rs.MoveToCHandle();
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, windowHandle)->scaleFactor = xscale;
+    WGPUSurface wsurfaceHandle = glfwCreateWindowWGPUSurface((WGPUInstance)GetInstance(), (GLFWwindow*)windowHandle);
     return wsurfaceHandle;
     #endif
 }
@@ -445,7 +432,7 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     GLFWmonitor* mon = nullptr;
 
     glfwSetErrorCallback([](int code, const char* message) {
-        std::cerr << "GLFW error: " << code << " - " << message;
+        fprintf(stderr, "GLFW error: %d - %s", code, message);
     });
 
 
@@ -516,126 +503,88 @@ extern "C" void CloseSubWindow_GLFW(SubWindow subWindow){
     glfwSetWindowShouldClose((GLFWwindow*)subWindow->handle, GLFW_TRUE);
 }
 
-const std::unordered_map<std::string, int> emscriptenToGLFWKeyMap = {
-    // Alphabet Keys
-    {"KeyA", GLFW_KEY_A},
-    {"KeyB", GLFW_KEY_B},
-    {"KeyC", GLFW_KEY_C},
-    {"KeyD", GLFW_KEY_D},
-    {"KeyE", GLFW_KEY_E},
-    {"KeyF", GLFW_KEY_F},
-    {"KeyG", GLFW_KEY_G},
-    {"KeyH", GLFW_KEY_H},
-    {"KeyI", GLFW_KEY_I},
-    {"KeyJ", GLFW_KEY_J},
-    {"KeyK", GLFW_KEY_K},
-    {"KeyL", GLFW_KEY_L},
-    {"KeyM", GLFW_KEY_M},
-    {"KeyN", GLFW_KEY_N},
-    {"KeyO", GLFW_KEY_O},
-    {"KeyP", GLFW_KEY_P},
-    {"KeyQ", GLFW_KEY_Q},
-    {"KeyR", GLFW_KEY_R},
-    {"KeyS", GLFW_KEY_S},
-    {"KeyT", GLFW_KEY_T},
-    {"KeyU", GLFW_KEY_U},
-    {"KeyV", GLFW_KEY_V},
-    {"KeyW", GLFW_KEY_W},
-    {"KeyX", GLFW_KEY_X},
-    {"KeyY", GLFW_KEY_Y},
-    {"KeyZ", GLFW_KEY_Z},
+int emscripten_to_glfw_key(const char *key_name) {
+    if (!key_name) return GLFW_KEY_UNKNOWN;
 
-    // Number Keys
-    {"Digit0", GLFW_KEY_0},
-    {"Digit1", GLFW_KEY_1},
-    {"Digit2", GLFW_KEY_2},
-    {"Digit3", GLFW_KEY_3},
-    {"Digit4", GLFW_KEY_4},
-    {"Digit5", GLFW_KEY_5},
-    {"Digit6", GLFW_KEY_6},
-    {"Digit7", GLFW_KEY_7},
-    {"Digit8", GLFW_KEY_8},
-    {"Digit9", GLFW_KEY_9},
+    // Alphabet: "KeyA".."KeyZ"
+    if (strncmp(key_name, "Key", 3) == 0 && key_name[3] >= 'A' && key_name[3] <= 'Z' && key_name[4] == '\0') {
+        return GLFW_KEY_A + (key_name[3] - 'A');
+    }
 
-    // Function Keys
-    {"F1", GLFW_KEY_F1},
-    {"F2", GLFW_KEY_F2},
-    {"F3", GLFW_KEY_F3},
-    {"F4", GLFW_KEY_F4},
-    {"F5", GLFW_KEY_F5},
-    {"F6", GLFW_KEY_F6},
-    {"F7", GLFW_KEY_F7},
-    {"F8", GLFW_KEY_F8},
-    {"F9", GLFW_KEY_F9},
-    {"F10", GLFW_KEY_F10},
-    {"F11", GLFW_KEY_F11},
-    {"F12", GLFW_KEY_F12},
+    // Digits: "Digit0".."Digit9"
+    if (strncmp(key_name, "Digit", 5) == 0 && key_name[5] >= '0' && key_name[5] <= '9' && key_name[6] == '\0') {
+        return GLFW_KEY_0 + (key_name[5] - '0');
+    }
 
-    // Arrow Keys
-    {"ArrowUp", GLFW_KEY_UP},
-    {"ArrowDown", GLFW_KEY_DOWN},
-    {"ArrowLeft", GLFW_KEY_LEFT},
-    {"ArrowRight", GLFW_KEY_RIGHT},
+    // Function keys: "F1".."F12"
+    if (key_name[0] == 'F' && key_name[1] >= '1' && key_name[1] <= '9') {
+        int fn = 0;
+        if (sscanf(key_name + 1, "%d", &fn) == 1 && fn >= 1 && fn <= 12) {
+            return GLFW_KEY_F1 + (fn - 1);
+        }
+    }
 
-    // Control Keys
-    {"Enter", GLFW_KEY_ENTER},
-    {"Escape", GLFW_KEY_ESCAPE},
-    {"Space", GLFW_KEY_SPACE},
-    {"Tab", GLFW_KEY_TAB},
-    {"ShiftLeft", GLFW_KEY_LEFT_SHIFT},
-    {"ShiftRight", GLFW_KEY_RIGHT_SHIFT},
-    {"ControlLeft", GLFW_KEY_LEFT_CONTROL},
-    {"ControlRight", GLFW_KEY_RIGHT_CONTROL},
-    {"AltLeft", GLFW_KEY_LEFT_ALT},
-    {"AltRight", GLFW_KEY_RIGHT_ALT},
-    {"CapsLock", GLFW_KEY_CAPS_LOCK},
-    {"Backspace", GLFW_KEY_BACKSPACE},
-    {"Delete", GLFW_KEY_DELETE},
-    {"Insert", GLFW_KEY_INSERT},
-    {"Home", GLFW_KEY_HOME},
-    {"End", GLFW_KEY_END},
-    {"PageUp", GLFW_KEY_PAGE_UP},
-    {"PageDown", GLFW_KEY_PAGE_DOWN},
+    // Arrows
+    if (strcmp(key_name, "ArrowUp") == 0) return GLFW_KEY_UP;
+    if (strcmp(key_name, "ArrowDown") == 0) return GLFW_KEY_DOWN;
+    if (strcmp(key_name, "ArrowLeft") == 0) return GLFW_KEY_LEFT;
+    if (strcmp(key_name, "ArrowRight") == 0) return GLFW_KEY_RIGHT;
 
-    // Numpad Keys
-    {"Numpad0", GLFW_KEY_KP_0},
-    {"Numpad1", GLFW_KEY_KP_1},
-    {"Numpad2", GLFW_KEY_KP_2},
-    {"Numpad3", GLFW_KEY_KP_3},
-    {"Numpad4", GLFW_KEY_KP_4},
-    {"Numpad5", GLFW_KEY_KP_5},
-    {"Numpad6", GLFW_KEY_KP_6},
-    {"Numpad7", GLFW_KEY_KP_7},
-    {"Numpad8", GLFW_KEY_KP_8},
-    {"Numpad9", GLFW_KEY_KP_9},
-    {"NumpadDecimal", GLFW_KEY_KP_DECIMAL},
-    {"NumpadDivide", GLFW_KEY_KP_DIVIDE},
-    {"NumpadMultiply", GLFW_KEY_KP_MULTIPLY},
-    {"NumpadSubtract", GLFW_KEY_KP_SUBTRACT},
-    {"NumpadAdd", GLFW_KEY_KP_ADD},
-    {"NumpadEnter", GLFW_KEY_KP_ENTER},
-    {"NumpadEqual", GLFW_KEY_KP_EQUAL},
+    // Numpad
+    if (strncmp(key_name, "Numpad", 6) == 0) {
+        const char *suffix = key_name + 6;
+        if (suffix[0] >= '0' && suffix[0] <= '9' && suffix[1] == '\0') {
+            return GLFW_KEY_KP_0 + (suffix[0] - '0');
+        }
+        if (strcmp(suffix, "Decimal") == 0) return GLFW_KEY_KP_DECIMAL;
+        if (strcmp(suffix, "Divide") == 0) return GLFW_KEY_KP_DIVIDE;
+        if (strcmp(suffix, "Multiply") == 0) return GLFW_KEY_KP_MULTIPLY;
+        if (strcmp(suffix, "Subtract") == 0) return GLFW_KEY_KP_SUBTRACT;
+        if (strcmp(suffix, "Add") == 0) return GLFW_KEY_KP_ADD;
+        if (strcmp(suffix, "Enter") == 0) return GLFW_KEY_KP_ENTER;
+        if (strcmp(suffix, "Equal") == 0) return GLFW_KEY_KP_EQUAL;
+    }
 
-    // Punctuation and Symbols
-    {"Backquote", GLFW_KEY_GRAVE_ACCENT},
-    {"Minus", GLFW_KEY_MINUS},
-    {"Equal", GLFW_KEY_EQUAL},
-    {"BracketLeft", GLFW_KEY_LEFT_BRACKET},
-    {"BracketRight", GLFW_KEY_RIGHT_BRACKET},
-    {"Backslash", GLFW_KEY_BACKSLASH},
-    {"Semicolon", GLFW_KEY_SEMICOLON},
-    {"Quote", GLFW_KEY_APOSTROPHE},
-    {"Comma", GLFW_KEY_COMMA},
-    {"Period", GLFW_KEY_PERIOD},
-    {"Slash", GLFW_KEY_SLASH},
+    // Control keys & symbols
+    if (strcmp(key_name, "Enter") == 0) return GLFW_KEY_ENTER;
+    if (strcmp(key_name, "Escape") == 0) return GLFW_KEY_ESCAPE;
+    if (strcmp(key_name, "Space") == 0) return GLFW_KEY_SPACE;
+    if (strcmp(key_name, "Tab") == 0) return GLFW_KEY_TAB;
+    if (strcmp(key_name, "ShiftLeft") == 0) return GLFW_KEY_LEFT_SHIFT;
+    if (strcmp(key_name, "ShiftRight") == 0) return GLFW_KEY_RIGHT_SHIFT;
+    if (strcmp(key_name, "ControlLeft") == 0) return GLFW_KEY_LEFT_CONTROL;
+    if (strcmp(key_name, "ControlRight") == 0) return GLFW_KEY_RIGHT_CONTROL;
+    if (strcmp(key_name, "AltLeft") == 0) return GLFW_KEY_LEFT_ALT;
+    if (strcmp(key_name, "AltRight") == 0) return GLFW_KEY_RIGHT_ALT;
+    if (strcmp(key_name, "CapsLock") == 0) return GLFW_KEY_CAPS_LOCK;
+    if (strcmp(key_name, "Backspace") == 0) return GLFW_KEY_BACKSPACE;
+    if (strcmp(key_name, "Delete") == 0) return GLFW_KEY_DELETE;
+    if (strcmp(key_name, "Insert") == 0) return GLFW_KEY_INSERT;
+    if (strcmp(key_name, "Home") == 0) return GLFW_KEY_HOME;
+    if (strcmp(key_name, "End") == 0) return GLFW_KEY_END;
+    if (strcmp(key_name, "PageUp") == 0) return GLFW_KEY_PAGE_UP;
+    if (strcmp(key_name, "PageDown") == 0) return GLFW_KEY_PAGE_DOWN;
 
-    // Additional Keys (Add more as needed)
-    {"PrintScreen", GLFW_KEY_PRINT_SCREEN},
-    {"ScrollLock", GLFW_KEY_SCROLL_LOCK},
-    {"Pause", GLFW_KEY_PAUSE},
-    {"ContextMenu", GLFW_KEY_MENU},
-    {"IntlBackslash", GLFW_KEY_UNKNOWN}, // Example of an unmapped key
-    // ... add other keys as necessary
-};
+    if (strcmp(key_name, "Backquote") == 0) return GLFW_KEY_GRAVE_ACCENT;
+    if (strcmp(key_name, "Minus") == 0) return GLFW_KEY_MINUS;
+    if (strcmp(key_name, "Equal") == 0) return GLFW_KEY_EQUAL;
+    if (strcmp(key_name, "BracketLeft") == 0) return GLFW_KEY_LEFT_BRACKET;
+    if (strcmp(key_name, "BracketRight") == 0) return GLFW_KEY_RIGHT_BRACKET;
+    if (strcmp(key_name, "Backslash") == 0) return GLFW_KEY_BACKSLASH;
+    if (strcmp(key_name, "Semicolon") == 0) return GLFW_KEY_SEMICOLON;
+    if (strcmp(key_name, "Quote") == 0) return GLFW_KEY_APOSTROPHE;
+    if (strcmp(key_name, "Comma") == 0) return GLFW_KEY_COMMA;
+    if (strcmp(key_name, "Period") == 0) return GLFW_KEY_PERIOD;
+    if (strcmp(key_name, "Slash") == 0) return GLFW_KEY_SLASH;
+
+    if (strcmp(key_name, "PrintScreen") == 0) return GLFW_KEY_PRINT_SCREEN;
+    if (strcmp(key_name, "ScrollLock") == 0) return GLFW_KEY_SCROLL_LOCK;
+    if (strcmp(key_name, "Pause") == 0) return GLFW_KEY_PAUSE;
+    if (strcmp(key_name, "ContextMenu") == 0) return GLFW_KEY_MENU;
+
+    if (strcmp(key_name, "IntlBackslash") == 0) return GLFW_KEY_UNKNOWN;
+
+    return GLFW_KEY_UNKNOWN;
+}
 
 // end file src/InitWindow_GLFW.cpp

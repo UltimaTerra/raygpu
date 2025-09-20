@@ -10,9 +10,7 @@
 #include <wgpustate.inc>
 // #include "enum_translation.h"
 
-#ifndef __EMSCRIPTEN__
 #include <spirv_reflect.h>
-#endif
 
 wgpustate g_wgpustate{};
 
@@ -391,6 +389,7 @@ DescribedBindGroupLayout LoadBindGroupLayout(const ResourceTypeDescriptor *unifo
     for (size_t i = 0; i < uniformCount; i++) {
         blayouts[i].binding = uniforms[i].location;
         const uniform_type type = uniforms[i].type;
+        const ResourceTypeDescriptor typei = uniforms[i];
         switch (type) {
         default:
             rg_unreachable();
@@ -1963,9 +1962,8 @@ RGAPI Shader LoadPipeline(const char *shaderSource) {
         }
     }
 
-    std::sort(values, values + bindings->current_size, [](const ResourceTypeDescriptor &x, const ResourceTypeDescriptor &y) {
-        return x.location < y.location;
-    });
+    quickSort_ResourceTypeDescriptor(values, values + bindings->current_size);
+
     Shader ret = LoadPipelineEx(shaderSource, allAttribsInOneBuffer, attributeCount, values, bindings->current_size, GetDefaultSettings());
     RL_FREE(values);
     StringToUniformMap_free(bindings);
@@ -1973,13 +1971,7 @@ RGAPI Shader LoadPipeline(const char *shaderSource) {
     return ret;
 }
 
-RGAPI Shader LoadPipelineFromModule(DescribedShaderModule mod,
-                             const AttributeAndResidence *attribs,
-                             uint32_t attribCount,
-                             const ResourceTypeDescriptor *uniforms,
-                             uint32_t uniformCount,
-                             RenderSettings settings) {
-
+RGAPI Shader LoadPipelineFromModule(DescribedShaderModule mod, const AttributeAndResidence *attribs, uint32_t attribCount, const ResourceTypeDescriptor *uniforms, uint32_t uniformCount, RenderSettings settings) {
     Shader retS = {.id = getNextShaderID_shc()};
     ShaderImpl *ret = GetShaderImpl(retS);
     ret->state.settings = settings;
@@ -2037,9 +2029,7 @@ DescribedComputePipeline *LoadComputePipeline(const char *shaderCode) {
         udesc[insertIndex++] = entry->value;
     }
 
-    std::sort(udesc, udesc + insertIndex, [](const ResourceTypeDescriptor &x, const ResourceTypeDescriptor &y) {
-        return x.location < y.location;
-    });
+    quickSort_ResourceTypeDescriptor(udesc, udesc + insertIndex);
 
     DescribedComputePipeline *ret = LoadComputePipelineEx(shaderCode, udesc, insertIndex);
     RL_FREE(udesc);
@@ -2301,21 +2291,23 @@ InOutAttributeInfo getAttributesSPIRV(ShaderSources sources) {
 
 static inline WGPUShaderStage spv_stage_to_wgpu_mask(SpvReflectShaderStageFlagBits s) {
     switch (s) {
-    case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:return WGPUShaderStage_Vertex;
-    case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:return WGPUShaderStage_Fragment;
-    case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:return WGPUShaderStage_Compute;
-    case SPV_REFLECT_SHADER_STAGE_GEOMETRY_BIT:return WGPUShaderStage_Geometry;
-    case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:return WGPUShaderStage_TessControl;
-    case SPV_REFLECT_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:return WGPUShaderStage_TessEvaluation;
-    case SPV_REFLECT_SHADER_STAGE_RAYGEN_BIT_KHR:return WGPUShaderStage_RayGen;
-    case SPV_REFLECT_SHADER_STAGE_ANY_HIT_BIT_KHR:return WGPUShaderStage_AnyHit;
-    case SPV_REFLECT_SHADER_STAGE_CLOSEST_HIT_BIT_KHR: return WGPUShaderStage_ClosestHit;
-    case SPV_REFLECT_SHADER_STAGE_MISS_BIT_KHR:return WGPUShaderStage_Miss;
-    case SPV_REFLECT_SHADER_STAGE_INTERSECTION_BIT_KHR:return WGPUShaderStage_Intersect;
-    case SPV_REFLECT_SHADER_STAGE_CALLABLE_BIT_KHR:return WGPUShaderStage_Callable;
-    case SPV_REFLECT_SHADER_STAGE_TASK_BIT_EXT:return WGPUShaderStage_Task;
-    case SPV_REFLECT_SHADER_STAGE_MESH_BIT_EXT:return WGPUShaderStage_Mesh;
-    default:return (WGPUShaderStage)0;
+        case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:return WGPUShaderStage_Vertex;
+        case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:return WGPUShaderStage_Fragment;
+        case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:return WGPUShaderStage_Compute;
+        #if SUPPORT_VULKAN_BACKEND == 1
+        case SPV_REFLECT_SHADER_STAGE_GEOMETRY_BIT:return WGPUShaderStage_Geometry;
+        case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:return WGPUShaderStage_TessControl;
+        case SPV_REFLECT_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:return WGPUShaderStage_TessEvaluation;
+        case SPV_REFLECT_SHADER_STAGE_RAYGEN_BIT_KHR:return WGPUShaderStage_RayGen;
+        case SPV_REFLECT_SHADER_STAGE_ANY_HIT_BIT_KHR:return WGPUShaderStage_AnyHit;
+        case SPV_REFLECT_SHADER_STAGE_CLOSEST_HIT_BIT_KHR: return WGPUShaderStage_ClosestHit;
+        case SPV_REFLECT_SHADER_STAGE_MISS_BIT_KHR:return WGPUShaderStage_Miss;
+        case SPV_REFLECT_SHADER_STAGE_INTERSECTION_BIT_KHR:return WGPUShaderStage_Intersect;
+        case SPV_REFLECT_SHADER_STAGE_CALLABLE_BIT_KHR:return WGPUShaderStage_Callable;
+        case SPV_REFLECT_SHADER_STAGE_TASK_BIT_EXT:return WGPUShaderStage_Task;
+        case SPV_REFLECT_SHADER_STAGE_MESH_BIT_EXT:return WGPUShaderStage_Mesh;
+        #endif
+        default:return (WGPUShaderStage)0;
     }
 }
 
@@ -2525,7 +2517,7 @@ EntryPointSet getEntryPointsSPIRV(const uint32_t *shaderSourceSPIRV, uint32_t wo
         case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:
             idx = WGPUShaderStageEnum_Compute;
             break;
-
+        #if SUPPORT_VULKAN_BACKEND == 1
         case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
             idx = WGPUShaderStageEnum_TessControl;
             break;
@@ -2561,7 +2553,7 @@ EntryPointSet getEntryPointsSPIRV(const uint32_t *shaderSourceSPIRV, uint32_t wo
         case SPV_REFLECT_SHADER_STAGE_MESH_BIT_EXT:
             idx = WGPUShaderStageEnum_Mesh;
             break;
-
+        #endif
         default:
             break;
         }

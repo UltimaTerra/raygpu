@@ -81,6 +81,7 @@ typedef struct GlobalVar {
     int attr_count;
     WgslAstNode **attrs;
     char *address_space;
+    /*NULLABLE*/char *access_modifier;
     char *name;
     WgslAstNode *type;
 } GlobalVar;

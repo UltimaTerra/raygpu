@@ -29,33 +29,32 @@
 #ifndef INTERNALS_HPP_INCLUDED
 #define INTERNALS_HPP_INCLUDED
 #include "config.h"
-#include <cstring>
 #if SUPPORT_VULKAN_BACKEND == 1
     #include <wgvk.h>
 #endif
 #include "raygpu.h"
-#include <memory>
-#include <algorithm>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
 #include <vector>
-#include <cstdlib>
-#include <cstring>
-#include <cstdint>
 
 
-template<typename T>
-struct rl_free_deleter{
-    void operator()(T* t)const noexcept{
-        RL_FREE(t);
-    }
-};
-
-template<typename T, typename... Args>
-std::unique_ptr<T, rl_free_deleter<T>> rl_make_unique(Args&&... args) {
-    void* ptr = RL_MALLOC(sizeof(T));
-    if (!ptr) return std::unique_ptr<T, rl_free_deleter<T>>(nullptr);
-    new (ptr) T(std::forward<Args>(args)...);
-    return std::unique_ptr<T, rl_free_deleter<T>>(reinterpret_cast<T*>(ptr));
-}
+//template<typename T>
+//struct rl_free_deleter{
+//    void operator()(T* t)const noexcept{
+//        RL_FREE(t);
+//    }
+//};
+//
+//template<typename T, typename... Args>
+//std::unique_ptr<T, rl_free_deleter<T>> rl_make_unique(Args&&... args) {
+//    void* ptr = RL_MALLOC(sizeof(T));
+//    if (!ptr) return std::unique_ptr<T, rl_free_deleter<T>>(nullptr);
+//    new (ptr) T(std::forward<Args>(args)...);
+//    return std::unique_ptr<T, rl_free_deleter<T>>(reinterpret_cast<T*>(ptr));
+//}
 
 
 static inline uint32_t bitcount32(uint32_t x){
@@ -817,11 +816,10 @@ DescribedShaderModule LoadShaderModule(ShaderSources source);
 InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
 StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
 EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
-extern "C" RenderPipelineQuartet GetPipelinesForLayout(DescribedPipeline* pl, const std::vector<AttributeAndResidence>& attribs);
 inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
     uint32_t maxslot = 0;
     for(size_t i = 0;i < number_of_attribs;i++){
-        maxslot = std::max(maxslot, attributes[i].bufferSlot);
+        maxslot = std_max_u32(maxslot, attributes[i].bufferSlot);
     }
     const uint32_t number_of_buffers = maxslot + 1;
     return getBufferLayoutRepresentation(attributes, number_of_attribs, number_of_buffers);
@@ -1267,27 +1265,6 @@ RG_DEFINE_GENERIC_HASH_MAP(
     deleteResourceType
 )
 
-typedef struct StringToAttributeMap{
-    std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>> attributes;
-    std::pair<WGPUVertexFormat, uint32_t> operator[](const std::string& v)const noexcept{
-        return attributes.find(v)->second;
-    }
-    uint32_t GetLocation(const std::string& v)const noexcept{
-        auto it = attributes.find(v);
-        if(it == attributes.end())
-            return LOCATION_NOT_FOUND;
-        return it->second.second;
-    }
-    std::pair<WGPUVertexFormat, uint32_t> operator[](const char* v)const noexcept{
-        return attributes.find(v)->second;
-    }
-    uint32_t GetLocation(const char* v)const noexcept{
-        auto it = attributes.find(v);
-        if(it == attributes.end())
-            return LOCATION_NOT_FOUND;
-        return it->second.second;
-    }
-}StringToAttributeMap;
 
 static size_t hashVertexArray(const VertexArray va){
     size_t hashValue = 0;
@@ -1341,7 +1318,8 @@ static size_t hashVertexArray(const VertexArray va){
  * @brief Compiles Vertex and Fragment shaders sources from GLSL (Vulkan rules) to SPIRV
  * Returns _two_ spirv blobs containing the respective modules.
  */
-std::pair<std::vector<uint32_t>, std::vector<uint32_t>> glsl_to_spirv(const char* vs, const char* fs);
+
+ std::pair<std::vector<uint32_t>, std::vector<uint32_t>> glsl_to_spirv(const char* vs, const char* fs);
 std::vector<uint32_t> wgsl_to_spirv(const char* anything);
 std::vector<uint32_t> glsl_to_spirv(const char* cs);
 ShaderSources wgsl_to_spirv(ShaderSources sources);

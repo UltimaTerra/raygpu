@@ -1,3 +1,4 @@
+/* wgsl_resolve.h */
 #ifndef WGSL_RESOLVE_H
 #define WGSL_RESOLVE_H
 
@@ -80,4 +81,3 @@ void wgsl_resolve_free(void *p);
 }
 #endif
 #endif
-

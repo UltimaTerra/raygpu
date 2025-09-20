@@ -158,6 +158,43 @@ do {                                                                            
 
 typedef uint32_t Bool32;
 
+static inline int8_t      std_max_i8 (int8_t      a, int8_t      b) {return a > b ? a : b;}
+static inline int16_t     std_max_i16(int16_t     a, int16_t     b) {return a > b ? a : b;}
+static inline int32_t     std_max_i32(int32_t     a, int32_t     b) {return a > b ? a : b;}
+static inline int64_t     std_max_i64(int64_t     a, int64_t     b) {return a > b ? a : b;}
+static inline uint8_t     std_max_u8 (uint8_t     a, uint8_t     b) {return a > b ? a : b;}
+static inline uint16_t    std_max_u16(uint16_t    a, uint16_t    b) {return a > b ? a : b;}
+static inline uint32_t    std_max_u32(uint32_t    a, uint32_t    b) {return a > b ? a : b;}
+static inline uint64_t    std_max_u64(uint64_t    a, uint64_t    b) {return a > b ? a : b;}
+static inline float       std_max_f32(float       a, float       b) {return a > b ? a : b;}
+static inline double      std_max_f64(double      a, double      b) {return a > b ? a : b;}
+static inline long double std_max_f80(long double a, long double b) {return a > b ? a : b;}
+
+static inline int8_t      std_min_i8 (int8_t      a, int8_t      b) {return a < b ? a : b;}
+static inline int16_t     std_min_i16(int16_t     a, int16_t     b) {return a < b ? a : b;}
+static inline int32_t     std_min_i32(int32_t     a, int32_t     b) {return a < b ? a : b;}
+static inline int64_t     std_min_i64(int64_t     a, int64_t     b) {return a < b ? a : b;}
+static inline uint8_t     std_min_u8 (uint8_t     a, uint8_t     b) {return a < b ? a : b;}
+static inline uint16_t    std_min_u16(uint16_t    a, uint16_t    b) {return a < b ? a : b;}
+static inline uint32_t    std_min_u32(uint32_t    a, uint32_t    b) {return a < b ? a : b;}
+static inline uint64_t    std_min_u64(uint64_t    a, uint64_t    b) {return a < b ? a : b;}
+static inline float       std_min_f32(float       a, float       b) {return a < b ? a : b;}
+static inline double      std_min_f64(double      a, double      b) {return a < b ? a : b;}
+static inline long double std_min_f80(long double a, long double b) {return a < b ? a : b;}
+
+static inline int8_t      std_clamp_i8 (int8_t      x, int8_t      lo, int8_t      hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline int16_t     std_clamp_i16(int16_t     x, int16_t     lo, int16_t     hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline int32_t     std_clamp_i32(int32_t     x, int32_t     lo, int32_t     hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline int64_t     std_clamp_i64(int64_t     x, int64_t     lo, int64_t     hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline uint8_t     std_clamp_u8 (uint8_t     x, uint8_t     lo, uint8_t     hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline uint16_t    std_clamp_u16(uint16_t    x, uint16_t    lo, uint16_t    hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline uint32_t    std_clamp_u32(uint32_t    x, uint32_t    lo, uint32_t    hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline uint64_t    std_clamp_u64(uint64_t    x, uint64_t    lo, uint64_t    hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline float       std_clamp_f32(float       x, float       lo, float       hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline double      std_clamp_f64(double      x, double      lo, double      hi) {return x < lo ? lo : (x > hi ? hi : x);}
+static inline long double std_clamp_f80(long double x, long double lo, long double hi) {return x < lo ? lo : (x > hi ? hi : x);}
+
+
 #endif // MACROS_AND_CONSTANTS
 
 // end file include/macros_and_constants.h
