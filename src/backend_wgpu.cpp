@@ -6,7 +6,6 @@
 #include <webgpu/webgpu.h>
 #endif
 #include <internals.hpp>
-#include <unordered_set>
 #include <wgpustate.inc>
 // #include "enum_translation.h"
 
@@ -1184,19 +1183,30 @@ extern "C" void negotiateSurfaceFormatAndPresentMode(const void *SurfaceHandle) 
         g_renderstate.throttled_PresentMode = capabilities.presentModes[0];
     } else if (capabilities.presentModeCount > 1) {
         g_renderstate.unthrottled_PresentMode = capabilities.presentModes[0];
-        g_renderstate.throttled_PresentMode = capabilities.presentModes[0];
-        std::unordered_set<WGPUPresentMode> pmset(capabilities.presentModes,
-                                                  capabilities.presentModes + capabilities.presentModeCount);
-        if (pmset.find(WGPUPresentMode_Fifo) != pmset.end()) {
+        g_renderstate.throttled_PresentMode   = capabilities.presentModes[0];
+
+        unsigned i;
+        int hasFifo = 0, hasFifoRelaxed = 0, hasMailbox = 0, hasImmediate = 0;
+
+        for (i = 0; i < capabilities.presentModeCount; i++) {
+            switch (capabilities.presentModes[i]) {
+                case WGPUPresentMode_Fifo:        hasFifo = 1; break;
+                case WGPUPresentMode_FifoRelaxed: hasFifoRelaxed = 1; break;
+                case WGPUPresentMode_Mailbox:     hasMailbox = 1; break;
+                case WGPUPresentMode_Immediate:   hasImmediate = 1; break;
+                default: break;
+            }
+        }
+
+        if (hasFifo)
             g_renderstate.throttled_PresentMode = WGPUPresentMode_Fifo;
-        } else if (pmset.find(WGPUPresentMode_FifoRelaxed) != pmset.end()) {
+        else if (hasFifoRelaxed)
             g_renderstate.throttled_PresentMode = WGPUPresentMode_FifoRelaxed;
-        }
-        if (pmset.find(WGPUPresentMode_Mailbox) != pmset.end()) {
+
+        if (hasMailbox)
             g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Mailbox;
-        } else if (pmset.find(WGPUPresentMode_Immediate) != pmset.end()) {
+        else if (hasImmediate)
             g_renderstate.unthrottled_PresentMode = WGPUPresentMode_Immediate;
-        }
     }
 
     {
@@ -1804,13 +1814,23 @@ DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv) {
 }
 
 void UnloadShaderModule(DescribedShaderModule mod) {
-    std::unordered_set<WGPUShaderModule> freed;
+    WGPUShaderModule freed[WGPUShaderStageEnum_EnumCount + 1];
+    int freedCount = 0;
+
     for (size_t i = 0; i < WGPUShaderStageEnum_EnumCount; i++) {
-        if (mod.stages[i].module) {
-            if (!freed.contains((WGPUShaderModule)mod.stages[i].module)) {
-                freed.insert((WGPUShaderModule)mod.stages[i].module);
-                wgpuShaderModuleRelease((WGPUShaderModule)mod.stages[i].module);
+        WGPUShaderModule m = (WGPUShaderModule)mod.stages[i].module;
+        if (!m) continue;
+
+        int alreadyFreed = 0;
+        for (int j = 0; j < freedCount; j++) {
+            if (freed[j] == m) {
+                alreadyFreed = 1;
+                break;
             }
+        }
+        if (!alreadyFreed) {
+            freed[freedCount++] = m;
+            wgpuShaderModuleRelease(m);
         }
     }
 }

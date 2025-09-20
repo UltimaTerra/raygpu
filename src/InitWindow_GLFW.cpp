@@ -1,5 +1,4 @@
 // begin file src/InitWindow_GLFW.cpp
-#include "webgpu/webgpu_glfw.h"
 #include <raygpu.h>
 #define GLFW_INCLUDE_NONE
 #if SUPPORT_VULKAN_BACKEND == 1
