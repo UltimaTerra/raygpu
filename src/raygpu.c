@@ -1,4 +1,4 @@
-// begin file src/raygpu.cpp
+// begin file src/raygpu.c
 /*
  * MIT License
  * 
@@ -24,24 +24,57 @@
  */
 
 #include "config.h"
+#include "wgvk.h"
 
+#include <stdint.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <webgpu/webgpu.h>
 #include <macros_and_constants.h>
 #include <c_fs_utils.h>
-#include <cstddef>
+#include <stddef.h>
 #include <raygpu.h>
-#include <cassert>
-#include <vector>
-#include <cstdlib>
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <cstring>
-#include <cstdarg>
-#include <thread>
-#include <unordered_map>
-#include <deque>
-#include <map>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <math.h>
+
+
+// Some includes required for timing
+#if defined(_WIN32)
+
+    // #include <windows.h> 
+    // #include <synchapi.h>
+    // Instead of including windows.h and friends 🤮, use these forward declarations
+    typedef long LONG;
+    typedef unsigned long DWORD;
+    typedef long long LONGLONG;
+    typedef unsigned long long ULONGLONG;
+    typedef void *HANDLE;
+    typedef union LARGE_INTEGER {
+        struct { DWORD LowPart; LONG HighPart; };
+        LONGLONG QuadPart;
+    } LARGE_INTEGER;
+    __declspec(dllimport) int __stdcall QueryPerformanceCounter(LARGE_INTEGER *lpPerformanceCount);
+    __declspec(dllimport) int __stdcall QueryPerformanceFrequency(LARGE_INTEGER *lpFrequency);
+    __declspec(dllimport) void __stdcall Sleep(DWORD dwMilliseconds);
+    __declspec(dllimport) int __stdcall SwitchToThread(void);
+    __declspec(dllimport) HANDLE __stdcall CreateWaitableTimerW(void *lpTimerAttributes,int bManualReset,const wchar_t *lpTimerName);
+    __declspec(dllimport) int __stdcall SetWaitableTimer(HANDLE hTimer,const LARGE_INTEGER *pDueTime,long lPeriod,void *pfnCompletionRoutine,void *lpArg,int fResume);
+    __declspec(dllimport) int __stdcall WaitForSingleObject(HANDLE hHandle,DWORD dwMilliseconds);
+    __declspec(dllimport) int __stdcall CloseHandle(HANDLE hObject);
+    
+#elif defined(__APPLE__)
+    #include <TargetConditionals.h>
+    #include <AvailabilityMacros.h>
+    #include <time.h>
+    #include <mach/mach_time.h>
+#else
+    #include <time.h>
+    #include <errno.h>
+#endif
+
+
 
 #include <external/stb_image_write.h>
 #include <external/stb_image.h>
@@ -49,14 +82,14 @@
 #include <external/sdefl.h>
 #include <internals.hpp>
 #include <external/msf_gif.h>
-extern "C" void ToggleFullscreenImpl(cwoid);
+void ToggleFullscreenImpl(cwoid);
 #ifdef __EMSCRIPTEN__
 #endif  // __EMSCRIPTEN__
 #include <renderstate.hpp>
 
 //#include <enum_translation.h>
 
-renderstate g_renderstate{};
+renderstate g_renderstate = {0};
 
 #define swap_uint32(val) (((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) << 16) | ((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) >> 16))
 
@@ -66,7 +99,7 @@ ShaderSourceType detectShaderLanguageSingle(const void* data, size_t sizeInBytes
     }
 
     if(sizeInBytes >= 4){
-        const uint32_t* u32ptr = reinterpret_cast<const uint32_t*>(data);
+        const uint32_t* u32ptr = (const uint32_t*)(data);
         if(*u32ptr == 0x07230203 || *u32ptr == swap_uint32(0x07230203)){
             return sourceTypeSPIRV;
         }
@@ -90,7 +123,7 @@ ShaderSourceType detectShaderLanguageSingle(const void* data, size_t sizeInBytes
 
 void detectShaderLanguage(ShaderSources* sourcesPointer){
     for(uint32_t i = 0;i < sourcesPointer->sourceCount;i++){
-        ShaderSourceType srctype = (sourcesPointer->sources[i].data == nullptr) ? sourceTypeUnknown : detectShaderLanguageSingle(sourcesPointer->sources[i].data, sourcesPointer->sources[i].sizeInBytes);
+        ShaderSourceType srctype = (sourcesPointer->sources[i].data == NULL) ? sourceTypeUnknown : detectShaderLanguageSingle(sourcesPointer->sources[i].data, sourcesPointer->sources[i].sizeInBytes);
         if(srctype != sourceTypeUnknown){
             sourcesPointer->language = srctype;
             return;
@@ -240,7 +273,6 @@ void rlVertex3f(float x, float y, float z){
 #endif
 RGAPI VertexArray* LoadVertexArray(){
     VertexArray* ret = callocnew(VertexArray);
-    new (ret) VertexArray;
     return ret;
 }
 RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, WGPUVertexFormat format, uint32_t offset, WGPUVertexStepMode stepmode){
@@ -335,13 +367,12 @@ RGAPI Texture GetMultisampleColorTarget(){
 
 RGAPI void drawCurrentBatch(){
     size_t vertexCount = vboptr - vboptr_base;
-    //std::cout << "vcoun = " << vertexCount << "\n";
     if(vertexCount == 0)return;
     #if SUPPORT_VULKAN_BACKEND == 8
     DescribedBuffer* vbo = UpdateVulkanRenderbatch();
     constexpr bool allocated_via_pool = false;
     #else
-    DescribedBuffer* vbo = nullptr;
+    DescribedBuffer* vbo = NULL;
     bool allocated_via_pool = false;
     if(vertexCount < VERTEX_BUFFER_CACHE_SIZE && !DescribedBufferVector_empty(&g_renderstate.smallBufferPool)){
         allocated_via_pool = true;
@@ -385,7 +416,7 @@ RGAPI void drawCurrentBatch(){
         case RL_QUADS:{
             const size_t quadCount = vertexCount / 4;
             if(g_renderstate.quadindicesCache->size < 6 * quadCount * sizeof(uint32_t)){
-                std::vector<uint32_t> indices(6 * quadCount);
+                uint32_t* indices = (uint32_t*)RL_CALLOC(6 * quadCount, sizeof(uint32_t));
                 for(size_t i = 0;i < quadCount;i++){
                     indices[i * 6 + 0] = (i * 4 + 0);
                     indices[i * 6 + 1] = (i * 4 + 1);
@@ -394,7 +425,8 @@ RGAPI void drawCurrentBatch(){
                     indices[i * 6 + 4] = (i * 4 + 2);
                     indices[i * 6 + 5] = (i * 4 + 3);
                 }
-                BufferData(g_renderstate.quadindicesCache, indices.data(), 6 * quadCount * sizeof(uint32_t));
+                BufferData(g_renderstate.quadindicesCache, indices, 6 * quadCount * sizeof(uint32_t));
+                RL_FREE(indices);
             }
             const DescribedBuffer* ibuf = g_renderstate.quadindicesCache;
             BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
@@ -442,8 +474,8 @@ void SetMatrix(Matrix m) {
 }
 
 
-void adaptRenderPass(DescribedRenderpass* drp, const ModifiablePipelineState& settings){
-    drp->settings = settings.settings;
+void adaptRenderPass(DescribedRenderpass* drp, const ModifiablePipelineState* settings){
+    drp->settings = settings->settings;
 }
 
 void FillReflectionInfo(DescribedShaderModule* module){
@@ -455,9 +487,9 @@ DescribedShaderModule LoadShaderModule(ShaderSources sources){
     DescribedShaderModule ret zeroinit;
     
     
-    if(sources.language == ShaderSourceType::sourceTypeUnknown){
+    if(sources.language == sourceTypeUnknown){
         detectShaderLanguage(&sources);
-        rassert(sources.language != ShaderSourceType::sourceTypeUnknown, "Shader source must be detectable: GLSL requires #version, wgsl @binding or @location token");
+        rassert(sources.language != sourceTypeUnknown, "Shader source must be detectable: GLSL requires #version, wgsl @binding or @location token");
     }
     
     switch (sources.language){
@@ -494,17 +526,17 @@ DescribedShaderModule LoadShaderModule(ShaderSources sources){
  * @return true 
  * @return false 
  */
-static inline bool RenderSettingsCompatible(const ModifiablePipelineState& state, RenderSettings settings2){
-    return state.settings.sampleCount == settings2.sampleCount &&
-           state.settings.depthTest == settings2.depthTest;
+static inline bool RenderSettingsCompatible(const ModifiablePipelineState* state, RenderSettings settings2){
+    return state->settings.sampleCount == settings2.sampleCount &&
+           state->settings.depthTest == settings2.depthTest;
 }
 
 RGAPI void BeginShaderMode(Shader shader){
     drawCurrentBatch();
     ShaderImpl* impl = GetShaderImpl(shader);
-    if(!RenderSettingsCompatible(impl->state, g_renderstate.renderpass.settings)){
+    if(!RenderSettingsCompatible(&impl->state, g_renderstate.renderpass.settings)){
         EndRenderpass();
-        adaptRenderPass(&g_renderstate.renderpass, impl->state);
+        adaptRenderPass(&g_renderstate.renderpass, &impl->state);
         BeginRenderpass();
     }
     g_renderstate.activeShader = shader;
@@ -517,9 +549,9 @@ RGAPI void BeginShaderMode(Shader shader){
 RGAPI void EndShaderMode(){
     drawCurrentBatch();
     ShaderImpl* defaultShaderImpl = GetShaderImpl(g_renderstate.defaultShader);
-    if(!RenderSettingsCompatible(defaultShaderImpl->state, g_renderstate.renderpass.settings)){
+    if(!RenderSettingsCompatible(&defaultShaderImpl->state, g_renderstate.renderpass.settings)){
         EndRenderpass();
-        adaptRenderPass(&g_renderstate.renderpass, defaultShaderImpl->state);
+        adaptRenderPass(&g_renderstate.renderpass, &defaultShaderImpl->state);
         BeginRenderpass();
     }
     g_renderstate.activeShader = g_renderstate.defaultShader;
@@ -532,20 +564,20 @@ RGAPI void DisableDepthTest(cwoid){
 }
 RGAPI void BeginBlendMode(rlBlendMode blendMode) {
     // Get a reference to the blend state part of the current settings
-    auto& blendState = g_renderstate.currentSettings.blendState;
+    WGPUBlendState* blendState = &g_renderstate.currentSettings.blendState;
     
     // Default common operation
-    blendState.color.operation = (WGPUBlendOperation_Add);
-    blendState.alpha.operation = (WGPUBlendOperation_Add);
+    blendState->color.operation = (WGPUBlendOperation_Add);
+    blendState->alpha.operation = (WGPUBlendOperation_Add);
 
     switch (blendMode) {
         case BLEND_ALPHA:
             // Alpha blend: SrcColor * SrcAlpha + DstColor * (1 - SrcAlpha)
             // Alpha blend: SrcAlpha * 1 + DstAlpha * (1 - SrcAlpha)
-            blendState.color.srcFactor = (WGPUBlendFactor_SrcAlpha);
-            blendState.color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState.alpha.srcFactor = (WGPUBlendFactor_One); // Often One or SrcAlpha
-            blendState.alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->color.srcFactor = (WGPUBlendFactor_SrcAlpha);
+            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (WGPUBlendFactor_One); // Often One or SrcAlpha
+            blendState->alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
             // Operation is already BlendOperation_Add
             break;
 
@@ -555,10 +587,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // This matches glBlendFunc(GL_SRC_ALPHA, GL_ONE) and glBlendEquation(GL_FUNC_ADD)
             // Often, additive alpha is just (One, One) or preserves dest alpha (Zero, One)
             // Let's assume (SrcAlpha, One) for color and (One, One) for alpha for brightness.
-            blendState.color.srcFactor = (WGPUBlendFactor_SrcAlpha);
-            blendState.color.dstFactor = (WGPUBlendFactor_One);
-            blendState.alpha.srcFactor = (WGPUBlendFactor_One); // Could be SrcAlpha or Zero depending on desired alpha result
-            blendState.alpha.dstFactor = (WGPUBlendFactor_One); // Could be One or Zero
+            blendState->color.srcFactor = (WGPUBlendFactor_SrcAlpha);
+            blendState->color.dstFactor = (WGPUBlendFactor_One);
+            blendState->alpha.srcFactor = (WGPUBlendFactor_One); // Could be SrcAlpha or Zero depending on desired alpha result
+            blendState->alpha.dstFactor = (WGPUBlendFactor_One); // Could be One or Zero
             // Operation is already BlendOperation_Add
             break;
 
@@ -568,10 +600,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Matches glBlendFuncSeparate(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE) commonly used for multiply
             // The original code used glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA) which would affect alpha too.
             // Let's implement the common separate logic for better results.
-            blendState.color.srcFactor = (WGPUBlendFactor_Dst);
-            blendState.color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState.alpha.srcFactor = (WGPUBlendFactor_Zero); // Keeps destination alpha
-            blendState.alpha.dstFactor = (WGPUBlendFactor_One);
+            blendState->color.srcFactor = (WGPUBlendFactor_Dst);
+            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (WGPUBlendFactor_Zero); // Keeps destination alpha
+            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
             // Operation is already BlendOperation_Add
             break;
 
@@ -579,10 +611,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Add colors blend: SrcColor * 1 + DstColor * 1
             // Alpha blend: SrcAlpha * 1 + DstAlpha * 1
             // Matches glBlendFunc(GL_ONE, GL_ONE) and glBlendEquation(GL_FUNC_ADD)
-            blendState.color.srcFactor = (WGPUBlendFactor_One);
-            blendState.color.dstFactor = (WGPUBlendFactor_One);
-            blendState.alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState.alpha.dstFactor = (WGPUBlendFactor_One);
+            blendState->color.srcFactor = (WGPUBlendFactor_One);
+            blendState->color.dstFactor = (WGPUBlendFactor_One);
+            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
+            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
             // Operation is already BlendOperation_Add
             break;
 
@@ -593,22 +625,22 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Alpha blend: DstAlpha * 1 - SrcAlpha * 1 (or Add alpha?)
             // Matches glBlendFunc(GL_ONE, GL_ONE) and glBlendEquation(GL_FUNC_SUBTRACT)
             // Applying SUBTRACT operation to both color and alpha based on glBlendEquation.
-            blendState.color.srcFactor = (WGPUBlendFactor_One);
-            blendState.color.dstFactor = (WGPUBlendFactor_One);
-            blendState.color.operation = (WGPUBlendOperation_Subtract); // Or ReverseSubtract depending on desired outcome
-            blendState.alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState.alpha.dstFactor = (WGPUBlendFactor_One);
-            blendState.alpha.operation = (WGPUBlendOperation_Subtract); // Apply to alpha too, mimicking glBlendEquation
+            blendState->color.srcFactor = (WGPUBlendFactor_One);
+            blendState->color.dstFactor = (WGPUBlendFactor_One);
+            blendState->color.operation = (WGPUBlendOperation_Subtract); // Or ReverseSubtract depending on desired outcome
+            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
+            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
+            blendState->alpha.operation = (WGPUBlendOperation_Subtract); // Apply to alpha too, mimicking glBlendEquation
             break;
 
         case BLEND_ALPHA_PREMULTIPLY:
             // Premultiplied alpha blend: SrcColor * 1 + DstColor * (1 - SrcAlpha)
             // Alpha blend: SrcAlpha * 1 + DstAlpha * (1 - SrcAlpha)
             // Matches glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA) and glBlendEquation(GL_FUNC_ADD)
-            blendState.color.srcFactor = (WGPUBlendFactor_One);
-            blendState.color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState.alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState.alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->color.srcFactor = (WGPUBlendFactor_One);
+            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
+            blendState->alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
             // Operation is already BlendOperation_Add
             break;
 
@@ -645,7 +677,7 @@ RGAPI void EndMode2D(){
 }
 RGAPI void BeginMode3D(Camera3D camera){
     drawCurrentBatch();
-    Matrix mat = GetCameraMatrix3D(camera, float(g_renderstate.renderExtentX) / g_renderstate.renderExtentY);
+    Matrix mat = GetCameraMatrix3D(camera, (float)(g_renderstate.renderExtentX) / g_renderstate.renderExtentY);
     //g_renderstate.activeScreenMatrix = mat;
     PushMatrix();
     SetMatrix(mat);
@@ -681,16 +713,16 @@ RGAPI void EndRenderpass(cwoid){
     else{
         rg_trap();
     }
-    g_renderstate.activeRenderpass = nullptr;
+    g_renderstate.activeRenderpass = NULL;
 }
 RGAPI void ClearBackground(Color clearColor){
-    bool rpActive = GetActiveRenderPass() != nullptr;
+    bool rpActive = GetActiveRenderPass() != NULL;
     DescribedRenderpass* backup = GetActiveRenderPass();
     if(rpActive){
         EndRenderpassEx(g_renderstate.activeRenderpass);
     }
     
-    g_renderstate.clearPass.colorClear = WGPUColor{
+    g_renderstate.clearPass.colorClear = CLITERAL(WGPUColor){
         clearColor.r / 255.0,
         clearColor.g / 255.0,
         clearColor.b / 255.0,
@@ -766,7 +798,7 @@ RGAPI void BeginDrawing(){
         #ifdef __EMSCRIPTEN__
         emscripten_sleep(100);
         #else
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        NanoWait(100ull * 1000000ull);
         #endif
     }
     
@@ -827,7 +859,7 @@ RGAPI void EndDrawing(){
         char offset[1];
         //fwrite(offset, 1, 1, stdout);
         for(size_t i = 0;i < img.height;i++){
-            unsigned char* dptr = static_cast<unsigned char*>(img.data) + i * img.rowStrideInBytes;
+            unsigned char* dptr = (unsigned char*)(img.data) + i * img.rowStrideInBytes;
             //for(uint32_t r = 0;r < img.width;r++){
             //    RGBA8Color c = reinterpret_cast<RGBA8Color*>(dptr)[r];
             //    std::cerr << (int)c.a << "\n";
@@ -857,7 +889,7 @@ RGAPI void EndDrawing(){
             EndComputepass();
             BeginRenderpass();
             int recordingTextX = GetScreenWidth() - MeasureText("Recording", 30);
-            DrawText("Recording", recordingTextX, 5, 30, Color{255,40,40,255});
+            DrawText("Recording", recordingTextX, 5, 30, CLITERAL(Color){255,40,40,255});
             EndRenderpass();
             addScreenshot(g_renderstate.grst, (WGPUTexture)fbCopy.id);
             UnloadTexture(fbCopy);
@@ -866,7 +898,7 @@ RGAPI void EndDrawing(){
         else{
             BeginRenderpass();
             int recordingTextX = GetScreenWidth() - MeasureText("Recording", 30);
-            DrawText("Recording", recordingTextX, 5, 30, Color{255,40,40,255});
+            DrawText("Recording", recordingTextX, 5, 30, CLITERAL(Color){255,40,40,255});
             EndRenderpass();
         }
         
@@ -917,7 +949,7 @@ RGAPI void EndDrawing(){
         ToggleFullscreenImpl();
     }
     
-    uint64_t nanosecondsPerFrame = GetTargetFPS() > 0 ? std::floor(1e9 / GetTargetFPS()) : 0;
+    uint64_t nanosecondsPerFrame = GetTargetFPS() > 0 ? floor(1e9 / GetTargetFPS()) : 0;
     uint64_t beginframe_stmp = g_renderstate.last_timestamps[(g_renderstate.total_frames - 1) % 64];
     ++g_renderstate.total_frames;
     g_renderstate.last_timestamps[g_renderstate.total_frames % 64] = NanoTime();
@@ -976,73 +1008,33 @@ RGAPI uint64_t RoundUpToNextMultipleOf16(uint64_t x) {
 
 // --- Channel conversion helpers --------------------------------------------
 
-template <typename T>
-constexpr T clamp01(T v) {
-    if constexpr (std::is_floating_point_v<T>) {
-        return v < T(0) ? T(0) : (v > T(1) ? T(1) : v);
-    } else {
-        return v; // only used for float inputs
-    }
-}
-
-template <typename FromC, typename ToC>
-static inline ToC convert_channel(FromC x) {
-    if constexpr (std::is_floating_point_v<ToC>) {
-        // -> float
-        if constexpr (std::is_floating_point_v<FromC>) {
-            return static_cast<ToC>(x);
-        } else {
-            using UFrom = std::make_unsigned_t<FromC>;
-            constexpr double maxFrom = static_cast<double>(std::numeric_limits<UFrom>::max());
-            return static_cast<ToC>(static_cast<double>(static_cast<UFrom>(x)) / maxFrom);
-        }
-    } else {
-        // -> integer
-        using UTo = std::make_unsigned_t<ToC>;
-        constexpr double maxTo = static_cast<double>(std::numeric_limits<UTo>::max());
-
-        if constexpr (std::is_floating_point_v<FromC>) {
-            double y = std::round(clamp01(static_cast<double>(x)) * maxTo);
-            if (y < 0.0) y = 0.0;
-            if (y > maxTo) y = maxTo;
-            return static_cast<ToC>(static_cast<UTo>(y));
-        } else {
-            using UFrom = std::make_unsigned_t<FromC>;
-            constexpr double maxFrom = static_cast<double>(std::numeric_limits<UFrom>::max());
-            double y = std::round((static_cast<double>(static_cast<UFrom>(x)) / maxFrom) * maxTo);
-            if (y < 0.0) y = 0.0;
-            if (y > maxTo) y = maxTo;
-            return static_cast<ToC>(static_cast<UTo>(y));
-        }
-    }
-}
-
 
 static inline uint16_t float32_to_float16(float f) {
-    union { uint32_t u; float f; } v { .f = f };
+    union { uint32_t u; float f; } v;
+    v.f = f;
     uint32_t x = v.u;
 
-    uint32_t sign = (x >> 16) & 0x8000u;               // sign in half position
+    uint32_t sign = (x >> 16) & 0x8000u;               // sign at half position
     uint32_t mant = x & 0x007FFFFFu;
-    int32_t  exp  = int32_t((x >> 23) & 0xFF) - 127;   // unbiased
+    int32_t  exp  = (int32_t)((x >> 23) & 0xFFu) - 127; // unbiased
 
     if (((x >> 23) & 0xFFu) == 0xFFu) {
         // Inf/NaN
-        if (mant == 0) return uint16_t(sign | 0x7C00u);     // Inf
+        if (mant == 0) return (uint16_t)(sign | 0x7C00u); // Inf
         // Quiet NaN: set MSB of mantissa; keep some payload
-        return uint16_t(sign | 0x7C00u | (mant >> 13) | 0x200u);
+        return (uint16_t)(sign | 0x7C00u | (mant >> 13) | 0x200u);
     }
 
     if (exp > 15) {
         // Overflow -> Inf
-        return uint16_t(sign | 0x7C00u);
+        return (uint16_t)(sign | 0x7C00u);
     }
 
     if (exp <= -15) {
         // Might be subnormal or underflow to zero
         if (exp < -24) {
             // Too small -> signed zero
-            return uint16_t(sign);
+            return (uint16_t)sign;
         }
         // Subnormal half: implicit leading 1 for float32 mantissa
         mant |= 0x00800000u;
@@ -1053,27 +1045,27 @@ static inline uint16_t float32_to_float16(float f) {
         uint32_t halfMant = mant >> shift;
         // round to nearest even
         halfMant += (rnd & (sticky | (halfMant & 1u)));
-        return uint16_t(sign | halfMant);
+        return (uint16_t)(sign | halfMant);
     }
 
     // Normal case
-    uint32_t halfExp  = uint32_t(exp + 15);
+    uint32_t halfExp  = (uint32_t)(exp + 15);
     // Round to nearest even when dropping 13 bits
     uint32_t halfMant = mant + 0x00001000u; // add round bit (1<<12)
     if (halfMant & 0x00800000u) { // mantissa overflow from rounding
         halfMant = 0;
         ++halfExp;
         if (halfExp >= 31) { // overflow to Inf
-            return uint16_t(sign | 0x7C00u);
+            return (uint16_t)(sign | 0x7C00u);
         }
     }
-    return uint16_t(sign | (halfExp << 10) | (halfMant >> 13));
+    return (uint16_t)(sign | (halfExp << 10) | (halfMant >> 13));
 }
 
 static inline float float16_to_float32(uint16_t h) {
-    uint32_t sign = (h & 0x8000u) << 16;
-    uint32_t exp  = (h >> 10) & 0x1Fu;
-    uint32_t mant =  h & 0x03FFu;
+    uint32_t sign = ((uint32_t)h & 0x8000u) << 16;
+    uint32_t exp  = ((uint32_t)h >> 10) & 0x1Fu;
+    uint32_t mant =  (uint32_t)h & 0x03FFu;
 
     uint32_t out;
     if (exp == 0) {
@@ -1086,13 +1078,13 @@ static inline float float16_to_float32(uint16_t h) {
             uint32_t m = mant;
             while ((m & 0x0400u) == 0) { m <<= 1; --e; }
             m &= 0x03FFu; // drop leading 1
-            uint32_t exp32  = uint32_t(127 - 15 + 1 + e);
+            uint32_t exp32  = (uint32_t)(127 - 15 + 1 + e);
             uint32_t mant32 = m << 13;
             out = sign | (exp32 << 23) | mant32;
         }
     } else if (exp == 31) {
         // Inf/NaN
-        uint32_t mant32 = mant ? (mant << 13) | 0x400000u : 0; // make it quiet NaN
+        uint32_t mant32 = mant ? (mant << 13) | 0x400000u : 0; // make quiet NaN
         out = sign | 0x7F800000u | mant32;
     } else {
         // normal
@@ -1100,215 +1092,353 @@ static inline float float16_to_float32(uint16_t h) {
         uint32_t mant32 = mant << 13;
         out = sign | (exp32 << 23) | mant32;
     }
-    union { uint32_t u; float f; } v { .u = out };
+    union { uint32_t u; float f; } v;
+    v.u = out;
     return v.f;
 }
 
+// ---- Per-channel helpers -----------------------------------------------------
 
-// --- 4-channel pixel converter ---------------------------------------------
-
-template<typename From, typename To>
-inline To convert4(const From& fr) {
-    To ret{};
-    ret.r = convert_channel<decltype(fr.r), decltype(ret.r)>(fr.r);
-    ret.g = convert_channel<decltype(fr.g), decltype(ret.g)>(fr.g);
-    ret.b = convert_channel<decltype(fr.b), decltype(ret.b)>(fr.b);
-    ret.a = convert_channel<decltype(fr.a), decltype(ret.a)>(fr.a);
-    return ret;
+static inline uint8_t f_to_u8(float f) {
+    float c = roundf((float)std_clamp_f32(f, 0.0f, 1.0f) * 255.0f);
+    if (c < 0.0f) c = 0.0f;
+    if (c > 255.0f) c = 255.0f;
+    return (uint8_t)c;
 }
 
-// ---- Specializations for RGBA16FColor --------------------------------------
-// float32 <-> half16 (no clamping)
-template<>
-inline RGBA16FColor convert4<RGBA32FColor, RGBA16FColor>(const RGBA32FColor& fr) {
-    RGBA16FColor ret{};
-    ret.r = float32_to_float16(fr.r);
-    ret.g = float32_to_float16(fr.g);
-    ret.b = float32_to_float16(fr.b);
-    ret.a = float32_to_float16(fr.a);
-    return ret;
-}
-template<>
-inline RGBA32FColor convert4<RGBA16FColor, RGBA32FColor>(const RGBA16FColor& fr) {
-    RGBA32FColor ret{};
-    ret.r = float16_to_float32(fr.r);
-    ret.g = float16_to_float32(fr.g);
-    ret.b = float16_to_float32(fr.b);
-    ret.a = float16_to_float32(fr.a);
-    return ret;
+static inline float u8_to_f(uint8_t u) {
+    return (float)u * (1.0f / 255.0f);
 }
 
-// 8-bit UNORM <-> half16  (map int<->[0,1] then pack/unpack)
-template<>
-inline RGBA16FColor convert4<RGBA8Color, RGBA16FColor>(const RGBA8Color& fr) {
-    RGBA16FColor ret{};
-    ret.r = float32_to_float16(static_cast<float>(fr.r) / 255.0f);
-    ret.g = float32_to_float16(static_cast<float>(fr.g) / 255.0f);
-    ret.b = float32_to_float16(static_cast<float>(fr.b) / 255.0f);
-    ret.a = float32_to_float16(static_cast<float>(fr.a) / 255.0f);
-    return ret;
-}
-template<>
-inline RGBA16FColor convert4<BGRA8Color, RGBA16FColor>(const BGRA8Color& fr) {
-    RGBA16FColor ret{};
-    // NOTE: field names in BGRA8Color already expose r,g,b,a logically.
-    ret.r = float32_to_float16(static_cast<float>(fr.r) / 255.0f);
-    ret.g = float32_to_float16(static_cast<float>(fr.g) / 255.0f);
-    ret.b = float32_to_float16(static_cast<float>(fr.b) / 255.0f);
-    ret.a = float32_to_float16(static_cast<float>(fr.a) / 255.0f);
-    return ret;
-}
-template<>
-inline RGBA8Color convert4<RGBA16FColor, RGBA8Color>(const RGBA16FColor& fr) {
-    RGBA8Color ret{};
-    auto q = [](uint16_t h)->uint8_t {
-        float f = float16_to_float32(h);
-        float c = std::round(std::fmax(0.0f, std::fmin(1.0f, f)) * 255.0f);
-        return static_cast<uint8_t>(c);
-    };
-    ret.r = q(fr.r); ret.g = q(fr.g); ret.b = q(fr.b); ret.a = q(fr.a);
-    return ret;
-}
-template<>
-inline BGRA8Color convert4<RGBA16FColor, BGRA8Color>(const RGBA16FColor& fr) {
-    BGRA8Color ret{};
-    auto q = [](uint16_t h)->uint8_t {
-        float f = float16_to_float32(h);
-        float c = std::round(std::fmax(0.0f, std::fmin(1.0f, f)) * 255.0f);
-        return static_cast<uint8_t>(c);
-    };
-    ret.r = q(fr.r); ret.g = q(fr.g); ret.b = q(fr.b); ret.a = q(fr.a);
-    return ret;
+static inline uint16_t f_to_f16(float f) {
+    return float32_to_float16(f);
 }
 
-// --- Range & image converters -----------------------------------------------
+static inline float f16_to_f(uint16_t h) {
+    return float16_to_float32(h);
+}
 
-template<typename From, typename To>
-void FormatRange(const From* source, To* dest, size_t count){
-    const From* fr = reinterpret_cast<const From*>(source);
-    To* top = reinterpret_cast<To*>(dest);
+// ---- Pixel converters (4-channel) -------------------------------------------
 
-    for(size_t i = 0; i < count; ++i){
-        top[i] = convert4<From, To>(fr[i]);
+// RGBA8 -> BGRA8
+static inline void conv_rgba8_to_bgra8(const RGBA8Color* s, BGRA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].b = s[i].b;
+        d[i].g = s[i].g;
+        d[i].r = s[i].r;
+        d[i].a = s[i].a;
+    }
+}
+// BGRA8 -> RGBA8
+static inline void conv_bgra8_to_rgba8(const BGRA8Color* s, RGBA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = s[i].r;
+        d[i].g = s[i].g;
+        d[i].b = s[i].b;
+        d[i].a = s[i].a;
     }
 }
 
-template<typename From, typename To>
-void FormatImage_Impl(const Image& source, Image& dest){
-    for(uint32_t i = 0; i < source.height; ++i){
-        const From* dataptr = reinterpret_cast<const From*>(
-            static_cast<const uint8_t*>(source.data) + source.rowStrideInBytes * i
-        );
-        To* destptr = reinterpret_cast<To*>(
-            static_cast<uint8_t*>(dest.data) + dest.rowStrideInBytes * i
-        );
-        FormatRange<From, To>(dataptr, destptr, source.width);
+// RGBA8 -> RGBA32F
+static inline void conv_rgba8_to_rgba32f(const RGBA8Color* s, RGBA32FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = u8_to_f(s[i].r);
+        d[i].g = u8_to_f(s[i].g);
+        d[i].b = u8_to_f(s[i].b);
+        d[i].a = u8_to_f(s[i].a);
+    }
+}
+// BGRA8 -> RGBA32F
+static inline void conv_bgra8_to_rgba32f(const BGRA8Color* s, RGBA32FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = u8_to_f(s[i].r);
+        d[i].g = u8_to_f(s[i].g);
+        d[i].b = u8_to_f(s[i].b);
+        d[i].a = u8_to_f(s[i].a);
+    }
+}
+// RGBA32F -> RGBA8
+static inline void conv_rgba32f_to_rgba8(const RGBA32FColor* s, RGBA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = f_to_u8(s[i].r);
+        d[i].g = f_to_u8(s[i].g);
+        d[i].b = f_to_u8(s[i].b);
+        d[i].a = f_to_u8(s[i].a);
+    }
+}
+// RGBA32F -> BGRA8
+static inline void conv_rgba32f_to_bgra8(const RGBA32FColor* s, BGRA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].b = f_to_u8(s[i].b);
+        d[i].g = f_to_u8(s[i].g);
+        d[i].r = f_to_u8(s[i].r);
+        d[i].a = f_to_u8(s[i].a);
     }
 }
 
-static inline void CopyImageRows(const Image& src, Image& dst) {
-    const uint8_t* s = static_cast<const uint8_t*>(src.data);
-    uint8_t* d = static_cast<uint8_t*>(dst.data);
-    const uint64_t rowBytes = std::min<uint64_t>(src.rowStrideInBytes, dst.rowStrideInBytes);
-    for (uint32_t i = 0; i < src.height; ++i) {
-        std::memcpy(d + dst.rowStrideInBytes * i, s + src.rowStrideInBytes * i, rowBytes);
+// RGBA8 -> RGBA16F
+static inline void conv_rgba8_to_rgba16f(const RGBA8Color* s, RGBA16FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = f_to_f16(u8_to_f(s[i].r));
+        d[i].g = f_to_f16(u8_to_f(s[i].g));
+        d[i].b = f_to_f16(u8_to_f(s[i].b));
+        d[i].a = f_to_f16(u8_to_f(s[i].a));
+    }
+}
+// BGRA8 -> RGBA16F
+static inline void conv_bgra8_to_rgba16f(const BGRA8Color* s, RGBA16FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = f_to_f16(u8_to_f(s[i].r));
+        d[i].g = f_to_f16(u8_to_f(s[i].g));
+        d[i].b = f_to_f16(u8_to_f(s[i].b));
+        d[i].a = f_to_f16(u8_to_f(s[i].a));
     }
 }
 
+// RGBA16F -> RGBA32F
+static inline void conv_rgba16f_to_rgba32f(const RGBA16FColor* s, RGBA32FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = f16_to_f(s[i].r);
+        d[i].g = f16_to_f(s[i].g);
+        d[i].b = f16_to_f(s[i].b);
+        d[i].a = f16_to_f(s[i].a);
+    }
+}
+// RGBA32F -> RGBA16F
+static inline void conv_rgba32f_to_rgba16f(const RGBA32FColor* s, RGBA16FColor* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        d[i].r = f_to_f16(s[i].r);
+        d[i].g = f_to_f16(s[i].g);
+        d[i].b = f_to_f16(s[i].b);
+        d[i].a = f_to_f16(s[i].a);
+    }
+}
 
-// --- Format matrix -----------------------------------------------------------
-// Assumes the following pixel structs exist (field names matter, layout maps
-// memory order):
-//   struct RGBA8Color   { uint8_t  r,g,b,a; };
-//   struct BGRA8Color   { uint8_t  b,g,r,a; };
-//   struct RGBA32FColor { float    r,g,b,a; };
+// RGBA16F -> RGBA8
+static inline void conv_rgba16f_to_rgba8(const RGBA16FColor* s, RGBA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        float r = f16_to_f(s[i].r);
+        float g = f16_to_f(s[i].g);
+        float b = f16_to_f(s[i].b);
+        float a = f16_to_f(s[i].a);
+        d[i].r = f_to_u8(r);
+        d[i].g = f_to_u8(g);
+        d[i].b = f_to_u8(b);
+        d[i].a = f_to_u8(a);
+    }
+}
+// RGBA16F -> BGRA8
+static inline void conv_rgba16f_to_bgra8(const RGBA16FColor* s, BGRA8Color* d, size_t n){
+    for (size_t i = 0; i < n; ++i) {
+        float r = f16_to_f(s[i].r);
+        float g = f16_to_f(s[i].g);
+        float b = f16_to_f(s[i].b);
+        float a = f16_to_f(s[i].a);
+        d[i].r = f_to_u8(r);
+        d[i].g = f_to_u8(g);
+        d[i].b = f_to_u8(b);
+        d[i].a = f_to_u8(a);
+    }
+}
 
-RGAPI void ImageFormat(Image* img, PixelFormat newFormat){
+// ---- Row copy ---------------------------------------------------------------
+static inline void CopyImageRows(const Image* src, Image* dst) {
+    const uint8_t* s = (const uint8_t*)src->data;
+    uint8_t* d = (uint8_t*)dst->data;
+    uint64_t rowBytes = src->rowStrideInBytes < dst->rowStrideInBytes
+                      ? src->rowStrideInBytes : dst->rowStrideInBytes;
+    for (uint32_t i = 0; i < src->height; ++i) {
+        memcpy(d + dst->rowStrideInBytes * i, s + src->rowStrideInBytes * i, (size_t)rowBytes);
+    }
+}
+
+// ---- Range wrappers for row processing --------------------------------------
+#define RANGE_CONV(srcType, dstType, fn) \
+    static inline void range_##fn(const srcType* s, dstType* d, size_t count){ fn(s, d, count); }
+
+// Generate wrappers (names only used locally)
+RANGE_CONV(RGBA8Color,  BGRA8Color,  conv_rgba8_to_bgra8)
+RANGE_CONV(BGRA8Color,  RGBA8Color,  conv_bgra8_to_rgba8)
+RANGE_CONV(RGBA8Color,  RGBA32FColor,conv_rgba8_to_rgba32f)
+RANGE_CONV(BGRA8Color,  RGBA32FColor,conv_bgra8_to_rgba32f)
+RANGE_CONV(RGBA32FColor,RGBA8Color,  conv_rgba32f_to_rgba8)
+RANGE_CONV(RGBA32FColor,BGRA8Color,  conv_rgba32f_to_bgra8)
+RANGE_CONV(RGBA8Color,  RGBA16FColor,conv_rgba8_to_rgba16f)
+RANGE_CONV(BGRA8Color,  RGBA16FColor,conv_bgra8_to_rgba16f)
+RANGE_CONV(RGBA16FColor,RGBA32FColor,conv_rgba16f_to_rgba32f)
+RANGE_CONV(RGBA32FColor,RGBA16FColor,conv_rgba32f_to_rgba16f)
+RANGE_CONV(RGBA16FColor,RGBA8Color,  conv_rgba16f_to_rgba8)
+RANGE_CONV(RGBA16FColor,BGRA8Color,  conv_rgba16f_to_bgra8)
+
+#undef RANGE_CONV
+
+// ---- Image row-wise converters ----------------------------------------------
+static void FormatImage_Impl_RGBA8_to_BGRA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA8Color* s = (const RGBA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        BGRA8Color* d = (BGRA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba8_to_bgra8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_BGRA8_to_RGBA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const BGRA8Color* s = (const BGRA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA8Color* d = (RGBA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_bgra8_to_rgba8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA8_to_RGBA32F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA8Color* s = (const RGBA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA32FColor* d = (RGBA32FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba8_to_rgba32f(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_BGRA8_to_RGBA32F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const BGRA8Color* s = (const BGRA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA32FColor* d = (RGBA32FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_bgra8_to_rgba32f(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA32F_to_RGBA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA32FColor* s = (const RGBA32FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA8Color* d = (RGBA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba32f_to_rgba8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA32F_to_BGRA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA32FColor* s = (const RGBA32FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        BGRA8Color* d = (BGRA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba32f_to_bgra8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA8_to_RGBA16F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA8Color* s = (const RGBA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA16FColor* d = (RGBA16FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba8_to_rgba16f(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_BGRA8_to_RGBA16F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const BGRA8Color* s = (const BGRA8Color*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA16FColor* d = (RGBA16FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_bgra8_to_rgba16f(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA16F_to_RGBA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA16FColor* s = (const RGBA16FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA8Color* d = (RGBA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba16f_to_rgba8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA16F_to_BGRA8 (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA16FColor* s = (const RGBA16FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        BGRA8Color* d = (BGRA8Color*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba16f_to_bgra8(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA16F_to_RGBA32F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA16FColor* s = (const RGBA16FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA32FColor* d = (RGBA32FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba16f_to_rgba32f(s,d,src->width);
+    }
+}
+static void FormatImage_Impl_RGBA32F_to_RGBA16F (const Image* src, Image* dst){
+    for (uint32_t y=0; y<src->height; ++y){
+        const RGBA32FColor* s = (const RGBA32FColor*)((const uint8_t*)src->data + src->rowStrideInBytes*y);
+        RGBA16FColor* d = (RGBA16FColor*)((uint8_t*)dst->data + dst->rowStrideInBytes*y);
+        conv_rgba32f_to_rgba16f(s,d,src->width);
+    }
+}
+
+// ---- Public API --------------------------------------------------------------
+void ImageFormat(Image* img, PixelFormat newFormat){
     if (!img) return;
     if (img->format == newFormat) return;
 
-    const uint32_t psize = GetPixelSizeInBytes(newFormat);
+    uint32_t psize = GetPixelSizeInBytes(newFormat);
+    if (!psize) return;
 
-    Image newimg{};
+    Image newimg;
     newimg.format = newFormat;
-    newimg.width = img->width;
+    newimg.width  = img->width;
     newimg.height = img->height;
     newimg.mipmaps = img->mipmaps;
-    newimg.rowStrideInBytes = static_cast<uint64_t>(newimg.width) * psize;
-    newimg.data = RL_CALLOC(static_cast<uint64_t>(img->width) * img->height, psize);
+    newimg.rowStrideInBytes = (uint64_t)newimg.width * (uint64_t)psize;
+    newimg.data = RL_CALLOC((uint64_t)img->width * (uint64_t)img->height, psize);
     if (!newimg.data) return;
 
-    auto do_convert = [&](auto fromTag, auto toTag) {
-        using FromT = decltype(fromTag);
-        using ToT   = decltype(toTag);
-        FormatImage_Impl<FromT, ToT>(*img, newimg);
-    };
+    int converted = 1;
 
-    bool converted = true;
-    
     switch (img->format) {
         // ----------------- RGBA8 -> *
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8: {
+        case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
             switch (newFormat) {
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
-                    CopyImageRows(*img, newimg); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
-                    do_convert(RGBA8Color{},  BGRA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
-                    do_convert(RGBA8Color{},  RGBA32FColor{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
-                    do_convert(RGBA8Color{},  RGBA16FColor{}); break;
-                default: converted = false; break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    CopyImageRows(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    FormatImage_Impl_RGBA8_to_BGRA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    FormatImage_Impl_RGBA8_to_RGBA32F(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    FormatImage_Impl_RGBA8_to_RGBA16F(img, &newimg); break;
+                default: converted = 0; break;
             }
-        } break;
+            break;
 
         // ----------------- BGRA8 -> *
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8: {
+        case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
             switch (newFormat) {
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
-                    do_convert(BGRA8Color{},  RGBA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
-                    CopyImageRows(*img, newimg); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
-                    do_convert(BGRA8Color{},  RGBA32FColor{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
-                    do_convert(BGRA8Color{},  RGBA16FColor{}); break;
-                default: converted = false; break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    FormatImage_Impl_BGRA8_to_RGBA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    CopyImageRows(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    FormatImage_Impl_BGRA8_to_RGBA32F(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    FormatImage_Impl_BGRA8_to_RGBA16F(img, &newimg); break;
+                default: converted = 0; break;
             }
-        } break;
+            break;
 
         // ----------------- RGBA32F -> *
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32: {
+        case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
             switch (newFormat) {
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
-                    do_convert(RGBA32FColor{}, RGBA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
-                    do_convert(RGBA32FColor{}, BGRA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
-                    CopyImageRows(*img, newimg); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
-                    do_convert(RGBA32FColor{}, RGBA16FColor{}); break;
-                default: converted = false; break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    FormatImage_Impl_RGBA32F_to_RGBA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    FormatImage_Impl_RGBA32F_to_BGRA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    CopyImageRows(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    FormatImage_Impl_RGBA32F_to_RGBA16F(img, &newimg); break;
+                default: converted = 0; break;
             }
-        } break;
+            break;
 
-        // ----------------- RGBA16 -> *
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16: {
+        // ----------------- RGBA16F -> *
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
             switch (newFormat) {
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
-                    do_convert(RGBA16FColor{}, RGBA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
-                    do_convert(RGBA16FColor{}, BGRA8Color{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
-                    do_convert(RGBA16FColor{}, RGBA32FColor{}); break;
-                case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
-                    CopyImageRows(*img, newimg); break;
-                default: converted = false; break;
+                case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+                    FormatImage_Impl_RGBA16F_to_RGBA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+                    FormatImage_Impl_RGBA16F_to_BGRA8(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+                    FormatImage_Impl_RGBA16F_to_RGBA32F(img, &newimg); break;
+                case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+                    CopyImageRows(img, &newimg); break;
+                default: converted = 0; break;
             }
-        } break;
+            break;
 
-        default:
-            converted = false; break;
+        default: converted = 0; break;
     }
 
     if (!converted) {
@@ -1323,9 +1453,8 @@ RGAPI void ImageFormat(Image* img, PixelFormat newFormat){
 }
 
 
-
 RGAPI Color* LoadImageColors(Image img){
-    Image copy = ImageFromImage(img, Rectangle{0,0,(float)img.width, (float)img.height});
+    Image copy = ImageFromImage(img, CLITERAL(Rectangle){0.0f, 0.0f, (float)img.width, (float)img.height});
     ImageFormat(&copy, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     return (RGBA8Color*)copy.data;
 }
@@ -1408,31 +1537,15 @@ bool IsCursorOnScreen(cwoid){
     return CreatedWindowMap_get(&g_renderstate.createdSubwindows, GetActiveWindowHandle())->input_state.cursorInWindow;
 }
 
-uint64_t NanoTime(cwoid){
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-}
-double GetTime(cwoid){
-    uint64_t nano_diff = NanoTime() - g_renderstate.init_timestamp;
 
-    return double(nano_diff) * 1e-9;
-}
-uint32_t GetFPS(cwoid){
-    auto firstzero = std::find(std::begin(g_renderstate.last_timestamps), std::end(g_renderstate.last_timestamps), int64_t(0));
-    auto [minit, maxit] = std::minmax_element(std::begin(g_renderstate.last_timestamps), firstzero);
-    //TRACELOG(LOG_INFO, "%d : %d", int(minit - std::begin(g_renderstate.last_timestamps)), int(maxit - std::begin(g_renderstate.last_timestamps)));
-    double dblv = (firstzero - std::begin(g_renderstate.last_timestamps) - 1.0) * 1.0e9 / (*maxit - *minit);
-    if(std::isnan(dblv) || std::isinf(dblv) || std::abs(dblv) > 1e9){
-        return 0;
-    }
-    return uint32_t(std::round(dblv));
-}
+
 void DrawFPS(int posX, int posY){
-    char fpstext[128] = {0};
-    std::snprintf(fpstext, 128, "%d FPS", GetFPS());
-    double ratio = double(GetFPS()) / GetTargetFPS();
-    ratio = std::max(0.0, std::min(1.0, ratio));
+    char fpstext[256] = {0};
+    snprintf(fpstext, 255, "%d FPS", GetFPS());
+    double ratio = (double)(GetFPS()) / GetTargetFPS();
+    ratio = std_max_f64(0.0, std_min_f64(1.0, ratio));
     uint8_t v8 = ratio * 200;
-    DrawText(fpstext, posX, posY, 40, Color{uint8_t(255 - uint8_t(ratio * ratio * 255)), v8, 20, 255});
+    DrawText(fpstext, posX, posY, 40, CLITERAL(Color){(uint8_t)(255 - (uint8_t)(ratio * ratio * 255)), v8, 20, 255});
 }
 
 
@@ -1466,7 +1579,7 @@ RGAPI Shader LoadShaderFromMemorySPIRV(ShaderSources sources){
         const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
-            .attr = {.nextInChain = nullptr, .format = format, .offset = offset, .shaderLocation = location},
+            .attr = {.nextInChain = NULL, .format = format, .offset = offset, .shaderLocation = location},
             .bufferSlot = 0,
             .stepMode = WGPUVertexStepMode_Vertex,
             .enabled = true};
@@ -1509,7 +1622,7 @@ Shader LoadShaderSingleSource(const char* shaderSource){
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
             .attr = WGPUVertexAttribute{
-                .nextInChain = nullptr,
+                .nextInChain = NULL,
                 .format = format,
                 .offset = offset,
                 .shaderLocation = location
@@ -1540,7 +1653,7 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     #endif
 }
 
-extern "C" FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format){
+FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format){
     FullSurface ret zeroinit;
     ret.headless = 1;
     ret.surfaceConfig.device = GetDevice();
@@ -1584,7 +1697,7 @@ RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
 //    //Returns LOCATION_NOT_FOUND if not found
 //    return pl->shaderModule.reflectionInfo.uniforms->GetLocation(uniformName);
 //}
-extern "C" uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* uniformName){
+uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* uniformName){
     ShaderImpl* impl = GetShaderImplByID(shaderID);
     BindingIdentifier identifier = {
         .length = (uint32_t)strlen(uniformName)
@@ -1594,7 +1707,7 @@ extern "C" uint32_t rlGetLocationUniform(const uint32_t shaderID, const char* un
     const ResourceTypeDescriptor* desc = StringToUniformMap_get(impl->shaderModule.reflectionInfo.uniforms, identifier);
     return desc ? desc->location : LOCATION_NOT_FOUND;
 }
-extern "C" uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName){
+uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName){
     ShaderImpl* impl = GetShaderImplByID(shaderID);
     return getReflectionAttributeLocation(&impl->shaderModule.reflectionInfo.attributes, attributeName);
     //return GetAttributeLocation(reinterpret_cast<const DescribedPipeline*>(renderorcomputepipeline), attributeName);
@@ -1629,29 +1742,26 @@ Shader LoadShaderFromMemory(const char *vsCode, const char *fsCode){
         for (int i = 0; i < RL_MAX_SHADER_LOCATIONS; i++) shader.locs[i] = -1;
 
         // Get handles to GLSL input attribute locations
-        shader.locs[SHADER_LOC_VERTEX_POSITION]   = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION);
-        shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD);
-        shader.locs[SHADER_LOC_VERTEX_TEXCOORD02] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2);
-        shader.locs[SHADER_LOC_VERTEX_NORMAL] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL);
-        shader.locs[SHADER_LOC_VERTEX_TANGENT] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT);
-        shader.locs[SHADER_LOC_VERTEX_COLOR] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR);
-        shader.locs[SHADER_LOC_VERTEX_BONEIDS] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS);
-        shader.locs[SHADER_LOC_VERTEX_BONEWEIGHTS] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS);
-        //shader.locs[SHADER_LOC_VERTEX_INSTANCE_TX] = rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_INSTANCE_TX);
+        shader.locs[SHADER_LOC_VERTEX_POSITION]   = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION);
+        shader.locs[SHADER_LOC_VERTEX_TEXCOORD01] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD);
+        shader.locs[SHADER_LOC_VERTEX_TEXCOORD02] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2);
+        shader.locs[SHADER_LOC_VERTEX_NORMAL] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL);
+        shader.locs[SHADER_LOC_VERTEX_TANGENT] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT);
+        shader.locs[SHADER_LOC_VERTEX_COLOR] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR);
+        shader.locs[SHADER_LOC_VERTEX_BONEIDS] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEIDS);
+        shader.locs[SHADER_LOC_VERTEX_BONEWEIGHTS] = (int)rlGetLocationAttrib(shader.id, RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS);
 
-        // Get handles to GLSL uniform locations (vertex shader)
-        shader.locs[SHADER_LOC_MATRIX_MVP]        = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MVP));
-        shader.locs[SHADER_LOC_MATRIX_VIEW]       = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW));
-        shader.locs[SHADER_LOC_MATRIX_PROJECTION] = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION));
-        shader.locs[SHADER_LOC_MATRIX_MODEL]      = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL));
-        shader.locs[SHADER_LOC_MATRIX_NORMAL]     = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL));
-        shader.locs[SHADER_LOC_BONE_MATRICES]     = static_cast<int>(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES));
+        shader.locs[SHADER_LOC_MATRIX_MVP]        = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MVP));
+        shader.locs[SHADER_LOC_MATRIX_VIEW]       = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW));
+        shader.locs[SHADER_LOC_MATRIX_PROJECTION] = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION));
+        shader.locs[SHADER_LOC_MATRIX_MODEL]      = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL));
+        shader.locs[SHADER_LOC_MATRIX_NORMAL]     = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL));
+        shader.locs[SHADER_LOC_BONE_MATRICES]     = (int)(rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_BONE_MATRICES));
 
-        // Get handles to GLSL uniform locations (fragment shader)
-        shader.locs[SHADER_LOC_COLOR_DIFFUSE] = rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR);
-        shader.locs[SHADER_LOC_MAP_DIFFUSE] = rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);  // SHADER_LOC_MAP_ALBEDO
-        shader.locs[SHADER_LOC_MAP_SPECULAR] = rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1); // SHADER_LOC_MAP_METALNESS
-        shader.locs[SHADER_LOC_MAP_NORMAL] = rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2);
+        shader.locs[SHADER_LOC_COLOR_DIFFUSE] = (int)rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR);
+        shader.locs[SHADER_LOC_MAP_DIFFUSE]   = (int)rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0);  // SHADER_LOC_MAP_ALBEDO
+        shader.locs[SHADER_LOC_MAP_SPECULAR]  = (int)rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1); // SHADER_LOC_MAP_METALNESS
+        shader.locs[SHADER_LOC_MAP_NORMAL]    = (int)rlGetLocationUniform(shader.id, RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2);
     }
     #else // If glsl isn't supported, 
     TRACELOG(LOG_ERROR, "GLSL parsing not supported");
@@ -1659,7 +1769,7 @@ Shader LoadShaderFromMemory(const char *vsCode, const char *fsCode){
     
     return shader;
 }
-extern "C" Texture3D LoadTexture3DEx(uint32_t width, uint32_t height, uint32_t depth, PixelFormat format){
+Texture3D LoadTexture3DEx(uint32_t width, uint32_t height, uint32_t depth, PixelFormat format){
     return LoadTexture3DPro(width, height, depth, format, WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding, 1);
 }
 
@@ -1667,27 +1777,25 @@ extern "C" Texture3D LoadTexture3DEx(uint32_t width, uint32_t height, uint32_t d
 WGPUBindGroup UpdateAndGetNativeBindGroup(DescribedBindGroup* bg){
     if(bg->needsUpdate){
         UpdateBindGroup(bg);
-        //bg->bindGroup = wgpuDeviceCreateBindGroup((WGPUDevice)GetDevice(), &(bg->desc));
         bg->needsUpdate = false;
     }
     return bg->bindGroup;
 }
 
 const char* copyString(const char* str){
-    size_t len = std::strlen(str) + 1;
-    char* ret = (char*)std::calloc(len, 1);
-    std::memcpy(ret, str, len);
+    size_t len = strlen(str) + 1;
+    char* ret = (char*)RL_CALLOC(len, 1);
+    memcpy(ret, str, len);
     return ret;
 }
 
-extern "C" void PrepareShader(Shader shader, VertexArray* va){
+void PrepareShader(Shader shader, VertexArray* va){
     ShaderImpl* impl = GetShaderImpl(shader);
     impl->state.vertexAttributes = va->attributes;
     impl->state.vertexAttributeCount = va->attributes_count;
-    //pipeline->activePipeline = PipelineHashMap_getOrCreate(&pipeline->pipelineCache, pipeline->state, pipeline->shaderModule, pipeline->bglayout, pipeline->layout);
 }
 
-constexpr char mipmapComputerSource[] = R"(
+const char mipmapComputerSource[] = R"(
 @group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
 @group(0) @binding(1) var nextMipLevel: texture_storage_2d<rgba8unorm, write>;
 
@@ -1707,25 +1815,19 @@ fn compute_main(@builtin(global_invocation_id) id: vec3<u32>) {
 
 DescribedBindGroupLayout LoadBindGroupLayoutMod(const DescribedShaderModule* shaderModule){
     ResourceTypeDescriptor* flat = (ResourceTypeDescriptor*)RL_CALLOC(shaderModule->reflectionInfo.uniforms->current_size, sizeof(ResourceTypeDescriptor));
-    
     uint32_t insertIndex = 0;
     for(size_t i = 0;i <  shaderModule->reflectionInfo.uniforms->current_capacity;i++){
         if(shaderModule->reflectionInfo.uniforms->table[i].key.length > 0){
             flat[insertIndex++] = shaderModule->reflectionInfo.uniforms->table[i].value;
         }
     }
-
-    std::sort(flat, flat + shaderModule->reflectionInfo.uniforms->current_size, [](const ResourceTypeDescriptor& a, const ResourceTypeDescriptor& b){
-        return a.location < b.location;
-    });
-    
+    quickSort_ResourceTypeDescriptor(flat, flat + shaderModule->reflectionInfo.uniforms->current_size);
     DescribedBindGroupLayout ret =  LoadBindGroupLayout(flat, shaderModule->reflectionInfo.uniforms->current_size, false);
-
     RL_FREE(flat);
     return ret;
 }
 
-extern "C" Texture LoadTextureEx(uint32_t width, uint32_t height, PixelFormat format, bool to_be_used_as_rendertarget){
+Texture LoadTextureEx(uint32_t width, uint32_t height, PixelFormat format, bool to_be_used_as_rendertarget){
     return LoadTexturePro(width, height, format, (WGPUTextureUsage_RenderAttachment * to_be_used_as_rendertarget) | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 1, 1);
 }
 
@@ -1743,9 +1845,9 @@ Texture LoadDepthTexture(uint32_t width, uint32_t height){
     return LoadTextureEx(width, height, PIXELFORMAT_DEPTH_32_FLOAT, true);
 }
 RenderTexture LoadRenderTextureEx(uint32_t width, uint32_t height, PixelFormat colorFormat, uint32_t sampleCount, uint32_t attachmentCount){
-    RenderTexture ret{
+    RenderTexture ret = {
         .texture = LoadTextureEx(width, height, colorFormat, true),
-        .colorMultisample = Texture{}, 
+        .colorMultisample = {0}, 
         .depth = LoadTexturePro(width, height, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1)
     };
     if(sampleCount > 1){
@@ -1790,7 +1892,7 @@ void SetStorageBufferData         (uint32_t index, const void* data, size_t size
 }
 
 void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
-    WGPUBindGroupEntry entry{};
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.buffer = buffer->buffer;
     entry.size = buffer->size;
@@ -1798,37 +1900,37 @@ void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, Describe
 }
 
 void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
-    WGPUBindGroupEntry entry{};
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.buffer = buffer->buffer;
     entry.size = buffer->size;
     UpdateBindGroupEntry(bg, index, entry);
 }
 
-extern "C" void SetBindgroupTexture3D(DescribedBindGroup* bg, uint32_t index, Texture3D tex){
-    WGPUBindGroupEntry entry{};
+void SetBindgroupTexture3D(DescribedBindGroup* bg, uint32_t index, Texture3D tex){
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.textureView = tex.view;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
-extern "C" void SetBindgroupTextureView(DescribedBindGroup* bg, uint32_t index, WGPUTextureView texView){
-    WGPUBindGroupEntry entry{};
+void SetBindgroupTextureView(DescribedBindGroup* bg, uint32_t index, WGPUTextureView texView){
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.textureView = texView;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
-extern "C" void SetBindgroupTexture(DescribedBindGroup* bg, uint32_t index, Texture tex){
-    WGPUBindGroupEntry entry{};
+void SetBindgroupTexture(DescribedBindGroup* bg, uint32_t index, Texture tex){
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.textureView = tex.view;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
 
-extern "C" void SetBindgroupSampler(DescribedBindGroup* bg, uint32_t index, DescribedSampler sampler){
-    WGPUBindGroupEntry entry{};
+void SetBindgroupSampler(DescribedBindGroup* bg, uint32_t index, DescribedSampler sampler){
+    WGPUBindGroupEntry entry = {0};
     entry.binding = index;
     entry.sampler = sampler.sampler;
     UpdateBindGroupEntry(bg, index, entry);
@@ -1861,7 +1963,7 @@ void SetShaderStorageBufferData   (Shader shader, uint32_t index, const void* da
     SetBindgroupStorageBufferData(&sh->bindGroup, index, data, size);
 }
 
-inline uint64_t bgEntryHash(const ResourceDescriptor& bge){
+static inline uint64_t bgEntryHash(const ResourceDescriptor bge){
     const uint32_t rotation = (bge.binding * 7) & 63;
     uint64_t value = ROT_BYTES((uint64_t)bge.buffer, rotation);
     value ^= ROT_BYTES((uint64_t)bge.textureView, rotation);
@@ -1871,7 +1973,7 @@ inline uint64_t bgEntryHash(const ResourceDescriptor& bge){
     return value;
 }
 
-inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
+static inline uint64_t bgEntryHashBGE(const WGPUBindGroupEntry bge){
     const uint32_t rotation = (bge.binding * 7) & 63;
     uint64_t value = ROT_BYTES((uint64_t)bge.buffer, rotation);
     value ^= ROT_BYTES((uint64_t)bge.textureView, rotation);
@@ -1881,12 +1983,12 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry& bge){
     return value;
 }
 
-extern "C" DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const WGPUBindGroupEntry* entries, size_t entryCount){
+DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const WGPUBindGroupEntry* entries, size_t entryCount){
     DescribedBindGroup ret zeroinit;
     if(entryCount > 0){
 
         ret.entries = (WGPUBindGroupEntry*)RL_CALLOC(entryCount, sizeof(ResourceDescriptor));
-        std::memcpy(ret.entries, entries, entryCount * sizeof(ResourceDescriptor));
+        memcpy(ret.entries, entries, entryCount * sizeof(ResourceDescriptor));
     }
     ret.entryCount = entryCount;
     ret.layout = bglayout;
@@ -1896,27 +1998,11 @@ extern "C" DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bgla
 
 
     for(uint32_t i = 0;i < ret.entryCount;i++){
-        ret.descriptorHash ^= bgEntryHash(ret.entries[i]);
+        ret.descriptorHash ^= bgEntryHashBGE(ret.entries[i]);
     }
     //ret.bindGroup = wgpuDeviceCreateBindGroup((WGPUDevice)GetDevice(), &ret.desc);
     return ret;
 }
-
-inline bool operator==(const RenderSettings& a, const RenderSettings& b){
-    return a.depthTest == b.depthTest &&
-           a.faceCull == b.faceCull &&
-           a.depthCompare == b.depthCompare &&
-           a.frontFace == b.frontFace;
-}
-
-void UnloadRenderpass(DescribedRenderpass rp){
-    //if(rp.rca)free(rp.rca); //Should not happen
-    //rp.rca = nullptr;
-
-    //if(rp.dsa)free(rp.dsa);
-    //rp.dsa = nullptr;
-}
-
 
 DescribedSampler LoadSampler(TextureWrap amode, TextureFilter fmode){
     return LoadSamplerEx(amode, fmode, fmode, 1.0f);
@@ -1927,89 +2013,138 @@ WGPUTexture GetActiveColorTarget(){
     return RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.id;
 }
 
-extern "C" char* LoadFileText(const char *fileName) {
-    std::ifstream file(fileName, std::ios::ate);
-    if (!file.is_open()) {
-        return nullptr;
+char* LoadFileText(const char *fileName) {
+    FILE *file = fopen(fileName, "rb");
+    if (file == NULL) {
+        return NULL;
     }
 
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    char* buffer = (char*)RL_MALLOC(size + 1);
-    if (!buffer) {
-        return nullptr;
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return NULL;
     }
 
-    if (!file.read(static_cast<char*>(buffer), size)) {
-        RL_FREE(buffer);
-        return nullptr;
+    long size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        return NULL;
     }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    char *buffer = (char*)RL_MALLOC((size_t)size + 1);
+    if (buffer == NULL) {
+        fclose(file);
+        return NULL;
+    }
+
+    size_t readCount = fread(buffer, 1, (size_t)size, file);
+    fclose(file);
+
+    if (readCount != (size_t)size) {
+        free(buffer);
+        return NULL;
+    }
+
     buffer[size] = '\0';
     return buffer;
 }
-extern "C" void UnloadFileText(char* content){
+void UnloadFileText(char* content){
     RL_FREE((void*)content);
 }
-extern "C" void UnloadFileData(void* content){
+void UnloadFileData(void* content){
     RL_FREE((void*)content);
 }
-extern "C" void* LoadFileData(const char *fileName, size_t *dataSize) {
-    std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
+void* LoadFileData(const char *fileName, size_t *dataSize) {
+    FILE *file = fopen(fileName, "rb");
+    if (file == NULL) {
         *dataSize = 0;
         TRACELOG(LOG_ERROR, "Failed to open file %s", fileName);
-        return nullptr;
+        return NULL;
     }
 
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    void* buffer = RL_MALLOC(size);
-    if (!buffer) {
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
         *dataSize = 0;
         TRACELOG(LOG_ERROR, "Failed to load file %s", fileName);
-        return nullptr;
+        return NULL;
     }
 
-    if (!file.read(static_cast<char*>(buffer), size)) {
+    long size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        *dataSize = 0;
+        TRACELOG(LOG_ERROR, "Failed to load file %s", fileName);
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        *dataSize = 0;
+        TRACELOG(LOG_ERROR, "Failed to load file %s", fileName);
+        return NULL;
+    }
+
+    void *buffer = RL_MALLOC((size_t)size);
+    if (buffer == NULL) {
+        fclose(file);
+        *dataSize = 0;
+        TRACELOG(LOG_ERROR, "Failed to load file %s", fileName);
+        return NULL;
+    }
+
+    size_t readCount = fread(buffer, 1, (size_t)size, file);
+    fclose(file);
+
+    if (readCount != (size_t)size) {
         RL_FREE(buffer);
         *dataSize = 0;
         TRACELOG(LOG_ERROR, "Failed to load file %s", fileName);
-        return nullptr;
+        return NULL;
     }
 
-    *dataSize = static_cast<size_t>(size);
+    *dataSize = (size_t)size;
     return buffer;
 }
-extern "C" Image LoadImage(const char* filename){
-    size_t size;
-    std::string fn_cpp(filename);
-    const char* extbegin = fn_cpp.data() + fn_cpp.rfind('.'); 
+
+Image LoadImage(const char* filename){
+    size_t size = 0;
+    const char* dot = NULL;
+    const char* extbegin;
+
+    if (filename) {
+        dot = strrchr(filename, '.');
+    }
+    extbegin = dot ? dot : "";
+
     void* data = LoadFileData(filename, &size);
 
-    if(size != 0){
-        Image ld =  LoadImageFromMemory(extbegin, data, size);
+    if (data && size) {
+        Image img = LoadImageFromMemory(extbegin, data, size);
         RL_FREE(data);
-        return ld;
+        return img;
     }
-    else{
-        
-    }
-    return Image{};
+
+    if (data) RL_FREE(data);
+
+    // Zero-initialized Image
+    Image zero = (Image){0};
+    return zero;
 }
 
 void UnloadImage(Image img){
-    //TRACELOG(LOG_INFO, "UnloadImage called");
     RL_FREE(img.data);
-    img.data = nullptr;
+    img.data = NULL;
 }
-extern "C" Image LoadImageFromMemory(const char* extension, const void* data, size_t dataSize){
+Image LoadImageFromMemory(const char* extension, const void* data, size_t dataSize){
     Image image zeroinit;
     image.mipmaps = 1;
     uint32_t comp;
-    image.data = stbi_load_from_memory((stbi_uc*)data, static_cast<int>(dataSize), (int*)&image.width, (int*)&image.height, (int*)&comp, 0);
-    image.rowStrideInBytes = comp * image.width;
+    image.data = stbi_load_from_memory((stbi_uc*)data, (int)(dataSize), (int*)&image.width, (int*)&image.height, (int*)&comp, 0);
+    image.rowStrideInBytes = (size_t)comp * image.width;
     if(comp == 4){
         image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     }else if(comp == 3){
@@ -2017,76 +2152,98 @@ extern "C" Image LoadImageFromMemory(const char* extension, const void* data, si
     }
     return image;
 }
-extern "C" Image GenImageColor(Color a, uint32_t width, uint32_t height){
-    Image ret{
-        .data = RL_CALLOC(width * height, sizeof(Color)),
+Image GenImageColor(Color a, uint32_t width, uint32_t height){
+    Image ret = {
+        .data = RL_CALLOC((size_t)width * height, sizeof(Color)),
         .width = width, 
         .height = height,
         .mipmaps = 1,
         .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 
-        .rowStrideInBytes = width * 4,
+        .rowStrideInBytes = (size_t)width * 4,
     };
     for(uint32_t i = 0;i < height;i++){
         for(uint32_t j = 0;j < width;j++){
-            const size_t index = size_t(i) * width + j;
-            static_cast<Color*>(ret.data)[index] = a;
+            const size_t index = (size_t)(i) * width + j;
+            ((Color*)(ret.data))[index] = a;
         }
     }
     return ret;
 }
-extern "C" Image GenImageChecker(Color a, Color b, uint32_t width, uint32_t height, uint32_t checkerCount){
-    Image ret{
-        .data = RL_CALLOC(width * height, sizeof(Color)),
+Image GenImageChecker(Color a, Color b, uint32_t width, uint32_t height, uint32_t checkerCount){
+    Image ret = {
+        .data = RL_CALLOC((size_t)width * height, sizeof(Color)),
         .width = width, 
         .height = height, 
         .mipmaps = 1,
         .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 
-        .rowStrideInBytes = width * 4, 
+        .rowStrideInBytes = (size_t)width * 4, 
     };
     for(uint32_t i = 0;i < height;i++){
         for(uint32_t j = 0;j < width;j++){
-            const size_t index = size_t(i) * width + j;
+            const size_t index = (size_t)(i) * width + j;
             const size_t ic = i * checkerCount / height;
             const size_t jc = j * checkerCount / width;
-            static_cast<Color*>(ret.data)[index] = ((ic ^ jc) & 1) ? a : b;
+            ((Color*)(ret.data))[index] = ((ic ^ jc) & 1) ? a : b;
         }
     }
     return ret;
 }
-void SaveImage(Image _img, const char* filepath){
-    std::string_view fp(filepath, filepath + std::strlen(filepath));
-    //std::cout << img.format << "\n";
-    if(_img.format == GRAYSCALE){
-        if(fp.ends_with(".png")){
-            stbi_write_png(filepath, _img.width, _img.height, 2, _img.data, _img.width * sizeof(uint16_t));
+// C99 rewrite
+#include <string.h>
+#include <stdint.h>
+
+static int ends_with_cstr(const char* s, const char* suf) {
+    size_t ls = s ? strlen(s) : 0;
+    size_t lf = suf ? strlen(suf) : 0;
+    return (ls >= lf) && (memcmp(s + ls - lf, suf, lf) == 0);
+}
+
+void SaveImage(Image img_in, const char* filepath){
+    if (!filepath) {
+        TRACELOG(LOG_ERROR, "SaveImage: null filepath");
+        return;
+    }
+
+    // GRAYSCALE fast-path
+    if (img_in.format == GRAYSCALE) {
+        if (ends_with_cstr(filepath, ".png")) {
+            // 16-bit gray written as 2 bytes per pixel
+            stbi_write_png(filepath,
+                           (int)img_in.width, (int)img_in.height,
+                           2, img_in.data, (int)(img_in.width * sizeof(uint16_t)));
+            return;
+        } else {
+            TRACELOG(LOG_WARNING, "Grayscale can only export to png");
             return;
         }
-        else{
-            TRACELOG(LOG_WARNING, "Grayscale can only export to png");
-        }
     }
-    Image img = ImageFromImage(_img, CLITERAL(Rectangle){0,0,(float)_img.width, (float)_img.height});
-    ImageFormat(&img, PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    //size_t stride = std::ceil(img.rowStrideInBytes);
-    //if(stride == 0){
-    //    stride = img.width * sizeof(Color);
-    //}
-    if(fp.ends_with(".png")){
-        stbi_write_png(filepath, (int)img.width, (int)img.height, 4, img.data, (int)img.rowStrideInBytes);
+
+    // Copy to RGBA8
+    Image img = ImageFromImage(img_in, (Rectangle){0,0,(float)img_in.width,(float)img_in.height});
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+
+    if (ends_with_cstr(filepath, ".png")) {
+        stbi_write_png(filepath,
+                       (int)img.width, (int)img.height,
+                       4, img.data, (int)img.rowStrideInBytes);
     }
-    else if(fp.ends_with(".jpg")){
-        stbi_write_jpg(filepath, (int)img.width, (int)img.height, 4, img.data, 100);
+    else if (ends_with_cstr(filepath, ".jpg")) {
+        stbi_write_jpg(filepath,
+                       (int)img.width, (int)img.height,
+                       4, img.data, 100);
     }
-    else if(fp.ends_with(".bmp")){
-        //if(row)
-        //std::cerr << "Careful with bmp!" << filepath << "\n";
-        stbi_write_bmp(filepath, (int)img.width, (int)img.height, 4, img.data);
+    else if (ends_with_cstr(filepath, ".bmp")) {
+        stbi_write_bmp(filepath,
+                       (int)img.width, (int)img.height,
+                       4, img.data);
     }
-    else{
+    else {
         TRACELOG(LOG_ERROR, "Unrecognized image format in filename %s", filepath);
     }
+
     UnloadImage(img);
 }
+
 void UseTexture(Texture tex){
     Shader activeShader = GetActiveShader();
     ShaderImpl* activeShaderImpl = GetShaderImpl(activeShader);
@@ -2105,26 +2262,26 @@ void UseNoTexture(){
     UseTexture(g_renderstate.whitePixel);
 }
 
-UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
-    
-    const ResourceTypeDescriptor* it = StringToUniformMap_get(shaderModule.reflectionInfo.uniforms, BIfromCString(uniformName));
-    if(it == NULL){
-        TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
-        return UniformAccessor{
-            .index = LOCATION_NOT_FOUND,
-            .bindgroup = nullptr
-        };
-    }
-    uint32_t location = it->location;
-    return UniformAccessor{
-        .index = location, 
-        .bindgroup = &this->bindGroup
-    };
-}
-
-void UniformAccessor::operator=(DescribedBuffer* buf){
-    SetBindgroupStorageBuffer(bindgroup, index, buf);
-}
+// UniformAccessor DescribedComputePipeline::operator[](const char* uniformName){
+//     
+//     const ResourceTypeDescriptor* it = StringToUniformMap_get(shaderModule.reflectionInfo.uniforms, BIfromCString(uniformName));
+//     if(it == NULL){
+//         TRACELOG(LOG_ERROR, "Accessing nonexistent uniform %s", uniformName);
+//         return UniformAccessor{
+//             .index = LOCATION_NOT_FOUND,
+//             .bindgroup = NULL
+//         };
+//     }
+//     uint32_t location = it->location;
+//     return UniformAccessor{
+//         .index = location, 
+//         .bindgroup = &this->bindGroup
+//     };
+// }
+// 
+// void UniformAccessor::operator=(DescribedBuffer* buf){
+//     SetBindgroupStorageBuffer(bindgroup, index, buf);
+// }
 
 //DescribedPipeline* Relayout(DescribedPipeline* pl, VertexArray* vao){
 //    pl->state.vertexAttributes = vao->attributes;
@@ -2235,7 +2392,7 @@ int GetRandomValue(int min, int max){
     return v + min;
 }
 
-extern "C" DescribedBuffer* GenVertexBuffer(const void* data, size_t size){
+DescribedBuffer* GenVertexBuffer(const void* data, size_t size){
     return GenBufferEx(data, size, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex);
 }
 DescribedBuffer* GenIndexBuffer(const void* data, size_t size){
@@ -2250,17 +2407,17 @@ DescribedBuffer* GenStorageBuffer(const void* data, size_t size){
 
 
 
-extern "C" void SetTargetFPS(int fps){
+void SetTargetFPS(int fps){
     g_renderstate.targetFPS = fps;
 }
-extern "C" int GetTargetFPS(){
+int GetTargetFPS(){
     return g_renderstate.targetFPS;
 }
-extern "C" uint64_t GetFrameCount(){
+uint64_t GetFrameCount(){
     return g_renderstate.total_frames;
 }
 //TODO: this is bad
-extern "C" float GetFrameTime(){
+float GetFrameTime(){
     if(g_renderstate.total_frames <= 1){
         return 0.0f;
     }
@@ -2269,29 +2426,140 @@ extern "C" float GetFrameTime(){
     } 
     return 1.0e-9f * (g_renderstate.last_timestamps[g_renderstate.total_frames % 64] - g_renderstate.last_timestamps[(g_renderstate.total_frames - 1) % 64]);
 }
-extern "C" void SetConfigFlags(int /* enum WindowFlag */ flag){
+
+void SetConfigFlags(int /* enum WindowFlag */ flag){
     g_renderstate.windowFlags |= flag;
 }
-void NanoWaitImpl(uint64_t stmp){
-    for(;;){
-        uint64_t now = NanoTime();
-        if(now >= stmp)break;
-        if(stmp - now > 2500000){
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        else if(stmp - now > 150000){
-            std::this_thread::sleep_for(std::chrono::microseconds(50));
-        }else{
-            for(;NanoTime() < stmp;){}
+
+#if defined(_WIN32)
+static uint64_t now_ns(void) {
+    static LARGE_INTEGER freq = {0};
+    LARGE_INTEGER ctr;
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+        if (freq.QuadPart == 0) return 0;
+    }
+    QueryPerformanceCounter(&ctr);
+    return (uint64_t)((ctr.QuadPart * 1000000000ULL) / (uint64_t)freq.QuadPart);
+}
+
+static void sleep_ns(uint64_t ns) {
+    if (ns == 0) return;
+    HANDLE h = CreateWaitableTimerW(NULL, TRUE, NULL);
+    if (!h) {
+        DWORD ms = (DWORD)(ns / 1000000ULL);
+        if (ms) Sleep(ms);
+        SwitchToThread();
+        return;
+    }
+    LARGE_INTEGER due;
+    uint64_t ticks100 = (ns + 99ULL) / 100ULL;
+    if (ticks100 > (uint64_t)0x7FFFFFFFFFFFFFFFULL) ticks100 = 0x7FFFFFFFFFFFFFFFULL;
+    due.QuadPart = -(LONGLONG)ticks100;
+    if (SetWaitableTimer(h, &due, 0, NULL, NULL, FALSE)) {
+        WaitForSingleObject(h, INFINITE);
+    } else {
+        DWORD ms = (DWORD)((ns + 999999ULL) / 1000000ULL);
+        if (ms) Sleep(ms);
+        else SwitchToThread();
+    }
+    CloseHandle(h);
+}
+#elif defined(__APPLE__)
+static uint64_t now_ns(void) {
+    static mach_timebase_info_data_t tb = {0, 0};
+    uint64_t t = mach_absolute_time();
+    if (tb.denom == 0) mach_timebase_info(&tb);
+    return (t * (uint64_t)tb.numer) / (uint64_t)tb.denom;
+}
+
+static void sleep_ns(uint64_t ns) {
+    if (ns == 0) return;
+    struct timespec req, rem;
+    req.tv_sec  = (time_t)(ns / 1000000000ULL);
+    req.tv_nsec = (long)(ns % 1000000000ULL);
+    while (nanosleep(&req, &rem) != 0) {
+        if (errno != EINTR) break;
+        req = rem;
+    }
+}
+#else
+static uint64_t now_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+static void sleep_ns(uint64_t ns) {
+    if (ns == 0) return;
+    struct timespec req, rem;
+    req.tv_sec  = (time_t)(ns / 1000000000ULL);
+    req.tv_nsec = (long)(ns % 1000000000ULL);
+    while (nanosleep(&req, &rem) != 0) {
+        if (errno != EINTR) break;
+        req = rem;
+    }
+}
+#endif
+uint64_t NanoTime(){
+    return now_ns();
+}
+void NanoWaitImpl(uint64_t stmp) {
+    for (;;) {
+        uint64_t now = now_ns();
+        if (now >= stmp) break;
+        uint64_t dt = stmp - now;
+        if (dt > 2500000ULL) {
+            sleep_ns(1000000ULL);
+        } else if (dt > 150000ULL) {
+            sleep_ns(50000ULL);
+        } else {
+            while (now_ns() < stmp) {}
             break;
         }
     }
 }
 
-extern "C" void NanoWait(uint64_t time){
+
+void NanoWait(uint64_t time){
     NanoWaitImpl(NanoTime() + time);
     return;
 }
+
+double GetTime(cwoid){
+    uint64_t nano_diff = NanoTime() - g_renderstate.init_timestamp;
+
+    return (double)(nano_diff) * 1e-9;
+}
+
+uint32_t GetFPS(void) {
+    const int64_t *ts = g_renderstate.last_timestamps;
+    uint32_t n = 0;
+    int64_t mn = 0, mx = 0;
+
+    for (uint32_t i = 0; i < 64; ++i) {
+        if (ts[i] == 0) continue;
+        if (n == 0) { mn = mx = ts[i]; }
+        else {
+            if (ts[i] < mn) mn = ts[i];
+            if (ts[i] > mx) mx = ts[i];
+        }
+        ++n;
+    }
+
+    if (n < 2) return 0;
+    int64_t span = mx - mn;
+    if (span <= 0) return 0;
+
+    double fps = (double)(n - 1) * 1.0e9 / (double)span;
+    if (!isfinite(fps) || fps <= 0.0 || fps > 1.0e9) return 0;
+
+    uint64_t r = lround(fps + 0.5);
+    if (r > 0xFFFFFFFFu) r = 0xFFFFFFFFu;
+    return (uint32_t)r;
+}
+
+
 RenderSettings GetDefaultSettings(){
     RenderSettings ret zeroinit;
     ret.lineWidth = 1;
@@ -2310,7 +2578,7 @@ RenderSettings GetDefaultSettings(){
     
     return ret;
 }
-FILE* tracelogFile = stdout;
+FILE* tracelogFile = NULL;
 int tracelogLevel = LOG_INFO;
 void SetTraceLogFile(FILE* file){
     tracelogFile = file;
@@ -2327,6 +2595,9 @@ Shader DefaultShader(){
     return g_renderstate.defaultShader;
 }
 void TraceLog(int logType, const char *text, ...){
+    if(tracelogFile == NULL){
+        tracelogFile = stdout;
+    }
     // Message has level below current threshold, don't emit
     if(logType < tracelogLevel)return;
 
@@ -2338,7 +2609,7 @@ void TraceLog(int logType, const char *text, ...){
     //    va_end(args);
     //    return;
     //}
-    constexpr size_t MAX_TRACELOG_MSG_LENGTH = 16384;
+    #define MAX_TRACELOG_MSG_LENGTH 16384
     char buffer[MAX_TRACELOG_MSG_LENGTH] = {0};
     int needs_reset = 0;
     switch (logType)
@@ -2379,7 +2650,7 @@ unsigned char *DecompressData(const unsigned char *compData, int compDataSize, i
     unsigned char *data = NULL;
 
     // Decompress data from a valid DEFLATE stream
-    data = (unsigned char *)calloc((20)*1024*1024, 1);
+    data = (unsigned char *)RL_CALLOC((size_t)(20)*1024*1024, 1);
     int length = sinflate(data, 20*1024*1024, compData, compDataSize);
     // WARNING: RL_REALLOC can make (and leave) data copies in memory, be careful with sensitive compressed data!
     // TODO: Use a different approach, create another buffer, copy data manually to it and wipe original buffer memory

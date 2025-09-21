@@ -349,7 +349,7 @@ endif()
 
 set(RG_SOURCES
     "src/InitWindow.c"
-    "src/raygpu.cpp"
+    "src/raygpu.c"
     "src/shader_parse.cpp"
     "src/stb_impl.c"
     "src/sinfl_impl.c"

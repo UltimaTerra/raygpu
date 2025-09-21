@@ -1,4 +1,4 @@
-// begin file src/InitWindow.cpp
+// begin file src/InitWindow.c
 #include "config.h"
 #include <c_fs_utils.h>
 #include <raygpu.h>
@@ -597,4 +597,4 @@ size_t GetPixelSizeInBytes(PixelFormat format) {
 
 
 
-// end file src/InitWindow.cpp
+// end file src/InitWindow.c

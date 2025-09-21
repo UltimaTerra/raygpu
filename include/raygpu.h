@@ -96,13 +96,13 @@ typedef struct BGRA8Color{
     uint8_t b, g, r, a;
 } BGRA8Color;
 
-struct RGBA16FColor { 
+typedef struct RGBA16FColor { 
     uint16_t r, g, b, a;
-};
+}RGBA16FColor;
 
-struct RGBA32FColor{
+typedef struct RGBA32FColor{
     float r, g, b, a;
-};
+}RGBA32FColor;
 
 typedef struct Image{
     void* data;
@@ -1071,7 +1071,7 @@ EXTERN_C_BEGIN
     RGAPI void HideCursor(cwoid);                                      // Hides cursor
     RGAPI bool IsCursorHidden(cwoid);                                  // Check if cursor is not visible
     RGAPI void EnableCursor(cwoid);                                    // Enables cursor (unlock cursor)
-    RGAPI void DisableCursorForGLFWWindow(cwoid);                                   // Disables cursor (lock cursor)
+    RGAPI void DisableCursor(cwoid);                                   // Disables cursor (lock cursor)
     RGAPI bool IsCursorOnScreen(cwoid);                                // Check if cursor is on the screen
     RGAPI void PollEvents(cwoid);
     RGAPI void PollEvents_SDL2(cwoid);
@@ -1345,7 +1345,7 @@ EXTERN_C_BEGIN
     
     RGAPI void rlBegin(PrimitiveType mode);
     RGAPI void rlEnd(cwoid);
-    RGAPI void BeginTextureAndPipelineMode(RenderTexture rtex, DescribedPipeline* pl);
+    RGAPI void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl);
     RGAPI void EndTextureAndPipelineMode(cwoid);
     RGAPI void BeginTextureMode(RenderTexture rtex);
     RGAPI void EndTextureMode(cwoid);

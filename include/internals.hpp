@@ -820,7 +820,7 @@ static inline ShaderSources dualStageDualSource(const char* code1, const char* c
 }
 
 void detectShaderLanguage(ShaderSources* sources);
-ShaderSourceType detectShaderLanguageSingle(const void* sourceptr, size_t size);
+RGAPI ShaderSourceType detectShaderLanguageSingle(const void* sourceptr, size_t size);
 StringToUniformMap* getBindingsGLSL(ShaderSources source);
 typedef struct EntryPointSet{
     char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
@@ -828,9 +828,9 @@ typedef struct EntryPointSet{
 EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
-InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
-StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
-EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
+RGAPI InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
+RGAPI StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
+RGAPI EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
 
 inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
     uint32_t maxslot = 0;
