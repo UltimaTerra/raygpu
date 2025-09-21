@@ -185,14 +185,37 @@ typedef struct RenderSettings{
                faceCull     == rs.faceCull      && 
                sampleCount  == rs.sampleCount   && 
                lineWidth    == rs.lineWidth     && 
-               //blendState   == rs.blendState    && 
+               blendState   == rs.blendState    && 
                frontFace    == rs.frontFace     && 
                depthCompare == rs.depthCompare  &&
         true;
     }
     #endif
 }RenderSettings;
+static inline bool WGPUBlendState_eq(const WGPUBlendState* a, const WGPUBlendState* b){
+    return 
+    
+    a->alpha.dstFactor == b->alpha.dstFactor &&
+    a->alpha.srcFactor == b->alpha.srcFactor &&
+    a->alpha.operation == b->alpha.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    true;
 
+
+}
+static inline bool RenderSettings_eq(const RenderSettings* a, const RenderSettings* b){
+    return
+        a->depthTest    == b->depthTest     && 
+        a->faceCull     == b->faceCull      && 
+        a->sampleCount  == b->sampleCount   && 
+        a->lineWidth    == b->lineWidth     && 
+        WGPUBlendState_eq(&a->blendState, &b->blendState)    && 
+        a->frontFace    == b->frontFace     && 
+        a->depthCompare == b->depthCompare  &&
+    true;
+}
 
 
 
@@ -1048,7 +1071,7 @@ EXTERN_C_BEGIN
     RGAPI void HideCursor(cwoid);                                      // Hides cursor
     RGAPI bool IsCursorHidden(cwoid);                                  // Check if cursor is not visible
     RGAPI void EnableCursor(cwoid);                                    // Enables cursor (unlock cursor)
-    RGAPI void DisableCursor(cwoid);                                   // Disables cursor (lock cursor)
+    RGAPI void DisableCursorForGLFWWindow(cwoid);                                   // Disables cursor (lock cursor)
     RGAPI bool IsCursorOnScreen(cwoid);                                // Check if cursor is on the screen
     RGAPI void PollEvents(cwoid);
     RGAPI void PollEvents_SDL2(cwoid);

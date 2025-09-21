@@ -1,4 +1,5 @@
 // begin file src/InitWindow.cpp
+#include "config.h"
 #include <c_fs_utils.h>
 #include <raygpu.h>
 #include <internals.hpp>
@@ -50,7 +51,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-extern "C" const char vertexSourceGLSL[] = R"(#version 450
+const char vertexSourceGLSL[] = R"(#version 450
 
 // Input attributes.
 layout(location = 0) in vec3 in_position;  // position
@@ -86,7 +87,7 @@ void main() {
 }
 )";
 
-extern "C" const char fragmentSourceGLSL[] = R"(#version 450
+const char fragmentSourceGLSL[] = R"(#version 450
 #extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed
 
 // Inputs from vertex shader.
@@ -189,7 +190,7 @@ void* GetActiveWindowHandle(){
     return g_renderstate.window;
 }
 bool WindowShouldClose(cwoid){
-    if(g_renderstate.window == nullptr){ //headless
+    if(g_renderstate.window == NULL){ //headless
         return false;
     }
     #ifdef MAIN_WINDOW_SDL2
@@ -203,9 +204,9 @@ bool WindowShouldClose(cwoid){
     #endif
 }
 
-extern "C" Texture2D texShapes;
+extern Texture2D texShapes;
 
-extern "C" DescribedPipeline* LoadPipelineForVAO_Vk(const char* vsSource, const char* fsSource, const VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
+DescribedPipeline* LoadPipelineForVAO_Vk(const char* vsSource, const char* fsSource, const VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
 
 RGAPI void* InitWindow(int width, int height, const char* title){
     #if FORCE_HEADLESS == 1
@@ -233,7 +234,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     g_renderstate.width = width;
     g_renderstate.height = height;
     
-    g_renderstate.whitePixel = LoadTextureFromImage(GenImageChecker(Color{255,255,255,255}, Color{255,255,255,255}, 1, 1, 0));
+    g_renderstate.whitePixel = LoadTextureFromImage(GenImageChecker(CLITERAL(Color){255,255,255,255}, CLITERAL(Color){255,255,255,255}, 1, 1, 0));
     texShapes = g_renderstate.whitePixel;
     TraceLog(LOG_INFO, "Loaded whitepixel texture");
 
@@ -281,27 +282,27 @@ RGAPI void* InitWindow(int width, int height, const char* title){
 
 
     const ResourceTypeDescriptor uniforms[4] = {
-        {uniform_buffer , 64, 0, readonly, format_or_sample_type::we_dont_know, WGPUShaderStage(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
-        {texture2d,        0, 1, readonly, sample_f32,                          WGPUShaderStage(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
-        {texture_sampler,  0, 2, readonly, format_or_sample_type::we_dont_know, WGPUShaderStage(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
-        {storage_buffer , 64, 3, readonly, format_or_sample_type::we_dont_know, WGPUShaderStage(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)}
+        {uniform_buffer , 64, 0, readonly, we_dont_know, (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
+        {texture2d,        0, 1, readonly, sample_f32,   (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
+        {texture_sampler,  0, 2, readonly, we_dont_know, (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)},
+        {storage_buffer , 64, 3, readonly, we_dont_know, (WGPUShaderStage)(WGPUShaderStage_Vertex | WGPUShaderStage_Fragment)}
     };
 
     const AttributeAndResidence attrs[4] = {
-        {WGPUVertexAttribute{nullptr, WGPUVertexFormat_Float32x3, 0 * sizeof(float), 0}, 0, WGPUVertexStepMode_Vertex, true},
-        {WGPUVertexAttribute{nullptr, WGPUVertexFormat_Float32x2, 3 * sizeof(float), 1}, 0, WGPUVertexStepMode_Vertex, true},
-        {WGPUVertexAttribute{nullptr, WGPUVertexFormat_Float32x3, 5 * sizeof(float), 2}, 0, WGPUVertexStepMode_Vertex, true},
-        {WGPUVertexAttribute{nullptr, WGPUVertexFormat_Float32x4, 8 * sizeof(float), 3}, 0, WGPUVertexStepMode_Vertex, true},
+        {CLITERAL(WGPUVertexAttribute){NULL, WGPUVertexFormat_Float32x3, 0 * sizeof(float), 0}, 0, WGPUVertexStepMode_Vertex, true},
+        {CLITERAL(WGPUVertexAttribute){NULL, WGPUVertexFormat_Float32x2, 3 * sizeof(float), 1}, 0, WGPUVertexStepMode_Vertex, true},
+        {CLITERAL(WGPUVertexAttribute){NULL, WGPUVertexFormat_Float32x3, 5 * sizeof(float), 2}, 0, WGPUVertexStepMode_Vertex, true},
+        {CLITERAL(WGPUVertexAttribute){NULL, WGPUVertexFormat_Float32x4, 8 * sizeof(float), 3}, 0, WGPUVertexStepMode_Vertex, true},
     };
     
     //arraySetter(shaderInputs.per_vertex_sizes, {3,2,4});
     //arraySetter(shaderInputs.uniform_minsizes, {64, 0, 0, 0});
     //uarraySetter(shaderInputs.uniform_types, {uniform_buffer, texture2d, sampler, storage_buffer});
-    auto colorTexture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true);
+    Texture2D colorTexture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true);
     //g_wgpustate.mainWindowRenderTarget.texture = colorTexture;
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT)
         g_renderstate.mainWindowRenderTarget.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 4, 1);
-    auto depthTexture = LoadTexturePro(width,
+    Texture2D depthTexture = LoadTexturePro(width,
                                   height,
                                   PIXELFORMAT_DEPTH_32_FLOAT,
                                   WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
@@ -317,12 +318,12 @@ RGAPI void* InitWindow(int width, int height, const char* title){
 
     LoadFontDefault();
     for(size_t i = 0;i < 4;i++){
-        DescribedBufferVector_push_back(&g_renderstate.smallBufferPool, GenVertexBuffer(nullptr, sizeof(vertex) * VERTEX_BUFFER_CACHE_SIZE));
+        DescribedBufferVector_push_back(&g_renderstate.smallBufferPool, GenVertexBuffer(NULL, sizeof(vertex) * VERTEX_BUFFER_CACHE_SIZE));
     }
 
-    vboptr = (vertex*)std::calloc(10000, sizeof(vertex));
+    vboptr = (vertex*)RL_CALLOC(10000, sizeof(vertex));
     vboptr_base = vboptr;
-    renderBatchVBO = GenVertexBuffer(nullptr, size_t(RENDERBATCH_SIZE) * sizeof(vertex));
+    renderBatchVBO = GenVertexBuffer(NULL, (size_t)((RENDERBATCH_SIZE) * sizeof(vertex)));
     
     renderBatchVAO = LoadVertexArray();
     VertexAttribPointer(renderBatchVAO, renderBatchVBO, 0, WGPUVertexFormat_Float32x3, 0 * sizeof(float), WGPUVertexStepMode_Vertex);
@@ -330,28 +331,24 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     VertexAttribPointer(renderBatchVAO, renderBatchVBO, 2, WGPUVertexFormat_Float32x3, 5 * sizeof(float), WGPUVertexStepMode_Vertex);
     VertexAttribPointer(renderBatchVAO, renderBatchVBO, 3, WGPUVertexFormat_Float32x4, 8 * sizeof(float), WGPUVertexStepMode_Vertex);
 
-    constexpr WGPUColor opaqueBlack{
+    const WGPUColor opaqueBlack = {
         .r = 0.0,
         .g = 0.0,
         .b = 0.0,
         .a = 1.0
     };
-    g_renderstate.renderpass = LoadRenderpassEx(GetDefaultSettings(), false, opaqueBlack, false, 0.0f);
 
+    g_renderstate.renderpass = LoadRenderpassEx(GetDefaultSettings(), false, opaqueBlack, false, 0.0f);
     g_renderstate.clearPass = LoadRenderpassEx(GetDefaultSettings(), true, opaqueBlack, true, 1.0f);
-    //}
-    //state->clearPass.rca->clearValue = WGPUColor{1.0, 0.4, 0.2, 1.0};
-    //state->clearPass.rca->loadOp = WGPULoadOp_Clear;
-    //state->clearPass.rca->storeOp = WGPUStoreOp_Store;
-    //state->activeRenderpass = nullptr;
+
     #if SUPPORT_GLSL_PARSER == 1
     ShaderSources defaultGLSLSource zeroinit;
     defaultGLSLSource.sourceCount = 2;
     defaultGLSLSource.sources[0].data = vertexSourceGLSL;
-    defaultGLSLSource.sources[0].sizeInBytes = std::strlen(vertexSourceGLSL);
+    defaultGLSLSource.sources[0].sizeInBytes = strlen(vertexSourceGLSL);
     defaultGLSLSource.sources[0].stageMask = WGPUShaderStage_Vertex;
     defaultGLSLSource.sources[1].data = fragmentSourceGLSL;
-    defaultGLSLSource.sources[1].sizeInBytes = std::strlen(fragmentSourceGLSL);
+    defaultGLSLSource.sources[1].sizeInBytes = strlen(fragmentSourceGLSL);
     defaultGLSLSource.sources[1].stageMask = WGPUShaderStage_Fragment;
     //g_renderstate.defaultShader = LoadPipelineForVAOEx(defaultGLSLSource, renderBatchVAO, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), GetDefaultSettings());
     g_renderstate.defaultShader = LoadShaderFromMemory(vertexSourceGLSL, fragmentSourceGLSL);
@@ -385,7 +382,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     #endif
     g_renderstate.activeShader = g_renderstate.defaultShader;
     size_t quadCount = 2000;
-    g_renderstate.quadindicesCache = GenBufferEx(nullptr, quadCount * 6 * sizeof(uint32_t), WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);//allocnew(DescribedBuffer);    //WGPUBufferDescriptor vbmdesc{};
+    g_renderstate.quadindicesCache = GenBufferEx(NULL, quadCount * 6 * sizeof(uint32_t), WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index);//allocnew(DescribedBuffer);    //WGPUBufferDescriptor vbmdesc{};
     uint32_t* indices = (uint32_t*)RL_CALLOC(6 * quadCount, sizeof(uint32_t));
     for(size_t i = 0;i < quadCount;i++){
         indices[i * 6 + 0] = (i * 4 + 0);
@@ -400,7 +397,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     Matrix m = ScreenMatrix(width, height);
     //static_assert(sizeof(Matrix) == 64, "non 4 byte floats? or what");
 
-    MatrixBufferPair_stack_push(&g_renderstate.matrixStack, MatrixBufferPair{});
+    MatrixBufferPair_stack_push(&g_renderstate.matrixStack, CLITERAL(MatrixBufferPair){0});
     SetTexture(1, g_renderstate.whitePixel);
     Matrix iden = MatrixIdentity();
     SetStorageBufferData(3, &iden, 64);
@@ -419,9 +416,9 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     
     #endif
     #ifndef __EMSCRIPTEN__
-    return nullptr;
+    return NULL;
     #else
-    return nullptr;
+    return NULL;
     #endif
 }
 /**
@@ -429,7 +426,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
 
  */
 RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window){
-    WGPUSurface surfacePtr = nullptr;
+    WGPUSurface surfacePtr = NULL;
     window->scaleFactor = 1; // default
     switch (window->type){
         case windowType_sdl3:
@@ -519,7 +516,7 @@ SubWindow OpenSubWindow(int width, int height, const char* title){
     
     return CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle);
 }
-extern "C" void ToggleFullscreenImpl(){
+void ToggleFullscreenImpl(){
     #ifdef MAIN_WINDOW_GLFW
     ToggleFullscreen_GLFW();
     #elif defined(MAIN_WINDOW_SDL2)
@@ -528,12 +525,12 @@ extern "C" void ToggleFullscreenImpl(){
     ToggleFullscreen_SDL3();
     #endif
 }
-extern "C" void ToggleFullscreen(){
+void ToggleFullscreen(){
     g_renderstate.wantsToggleFullscreen = true;
 }
 Vector2 GetTouchPosition(int index){
     #ifdef MAIN_WINDOW_GLFW
-    return Vector2{0,0};//GetTouchPointCount_GLFW(index);
+    return CLITERAL(Vector2){0,0};//GetTouchPointCount_GLFW(index);
     #elif defined(MAIN_WINDOW_SDL2)
     return GetTouchPosition_SDL2(index);
     #else
@@ -541,7 +538,7 @@ Vector2 GetTouchPosition(int index){
     #endif
 }
 int GetTouchPointCount(cwoid){
-    return static_cast<int>(CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.activeSubWindow->handle)->input_state.touchPointsCount);
+    return (int)(CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.activeSubWindow->handle)->input_state.touchPointsCount);
 }
 int GetMonitorWidth(cwoid){
     #ifdef MAIN_WINDOW_GLFW
@@ -573,26 +570,26 @@ void SetWindowShouldClose(){
 
 
 
-extern "C" size_t GetPixelSizeInBytes(PixelFormat format) {
+size_t GetPixelSizeInBytes(PixelFormat format) {
     switch(format){
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB:
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB:
+        case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8:
+        case PIXELFORMAT_UNCOMPRESSED_B8G8R8A8_SRGB:
+        case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8:
+        case PIXELFORMAT_UNCOMPRESSED_R8G8B8A8_SRGB:
         return 4;
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
+        case PIXELFORMAT_UNCOMPRESSED_R16G16B16A16:
         return 8;
-        case PixelFormat::PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
+        case PIXELFORMAT_UNCOMPRESSED_R32G32B32A32:
         return 16;
 
-        case PixelFormat::GRAYSCALE:
+        case GRAYSCALE:
         return 2;
-        case PixelFormat::RGB8:
+        case RGB8:
         return 3;
-        case PixelFormat::PIXELFORMAT_DEPTH_24_PLUS:
-        case PixelFormat::PIXELFORMAT_DEPTH_32_FLOAT:
+        case PIXELFORMAT_DEPTH_24_PLUS:
+        case PIXELFORMAT_DEPTH_32_FLOAT:
         return 4;
-        case PixelFormat::PixelFormat_Force32:
+        case PixelFormat_Force32:
         return 0;
     }
     return 0;

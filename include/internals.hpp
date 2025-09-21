@@ -38,7 +38,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <vector>
 
 
 //template<typename T>
@@ -78,11 +77,11 @@ static inline uint32_t bitcount64(uint64_t x){
 }
 
 static inline size_t hashAttributeAndResidence(const AttributeAndResidence* res){
-    uint64_t attrh = ROT_BYTES(res->attr.shaderLocation * uint64_t(41), 31) ^ ROT_BYTES(res->attr.offset, 11);
+    uint64_t attrh = ROT_BYTES(res->attr.shaderLocation * ((uint64_t)41), 31) ^ ROT_BYTES(res->attr.offset, 11);
     attrh *= 111;
-    attrh ^= ROT_BYTES(res->attr.format, 48) * uint64_t(44497);
-    uint64_t v = ROT_BYTES(res->bufferSlot * uint64_t(756839), 13) ^ ROT_BYTES(attrh * uint64_t(1171), 47);
-    v ^= ROT_BYTES(res->enabled * uint64_t(2976221), 23);
+    attrh ^= ROT_BYTES(res->attr.format, 48) * ((uint64_t)44497);
+    uint64_t v = ROT_BYTES(res->bufferSlot * ((uint64_t)756839), 13) ^ ROT_BYTES(attrh * ((uint64_t)1171), 47);
+    v ^= ROT_BYTES(res->enabled * ((uint64_t)2976221), 23);
     return v;
 }
 static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResidence* attribs, uint32_t count){
@@ -209,7 +208,7 @@ static inline uint64_t hash_bytes(const void* bytes, size_t count) {
 }
 
 static inline size_t hashVertexBufferLayoutSet(const VertexBufferLayoutSet* set){
-    xorshiftstate_c99 xsstate{uint64_t(0x1919846573) * uint64_t(set->number_of_buffers << 14)};
+    xorshiftstate_c99 xsstate = {((uint64_t)0x1919846573) * ((uint64_t)set->number_of_buffers << 14)};
     for(uint32_t i = 0;i < set->number_of_buffers;i++){
         for(uint32_t j = 0;j < set->layouts[i].attributeCount;j++){
             update_xorshiftstate(&xsstate, (set->layouts[i].attributes[j].offset << 32) | set->layouts[i].attributes[j].shaderLocation);
@@ -289,9 +288,10 @@ DEFINE_QUICKSORT_FUNCTION(ResourceTypeDescriptor, left->location < right->locati
 //}
 
 
-struct ColorAttachmentState{
+typedef struct ColorAttachmentState{
     PixelFormat attachmentFormats[MAX_COLOR_ATTACHMENTS];
     uint32_t colorAttachmentCount;
+    #ifdef __cplusplus
     bool operator==(const ColorAttachmentState& other)const noexcept{
         if(colorAttachmentCount == other.colorAttachmentCount){
             for(uint32_t i = 0;i < colorAttachmentCount;i++){
@@ -303,7 +303,21 @@ struct ColorAttachmentState{
         }
         return false;
     }
-};
+    #endif
+}ColorAttachmentState;
+
+static inline bool ColorAttachmentState_eq(const ColorAttachmentState* a, const ColorAttachmentState* b){
+    if(a->colorAttachmentCount == b->colorAttachmentCount){
+        for(uint32_t i = 0;i < a->colorAttachmentCount;i++){
+            if(a->attachmentFormats[i] != b->attachmentFormats[i]){
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 typedef struct ModifiablePipelineState{
     AttributeAndResidence* vertexAttributes;
     uint32_t vertexAttributeCount;
@@ -369,16 +383,16 @@ static inline bool ModifiablePipelineState_eq(const ModifiablePipelineState msp1
     const ModifiablePipelineState* msp1 = &msp1_;
     const ModifiablePipelineState* msp2 = &msp2_;
     return vertexArCompare(msp1->vertexAttributes, msp1->vertexAttributeCount, msp2->vertexAttributes, msp2->vertexAttributeCount)
-    && msp1->primitiveType        == msp2->primitiveType
-    && msp1->settings             == msp2->settings
-    && msp1->colorAttachmentState == msp2->colorAttachmentState;
+    && msp1->primitiveType == msp2->primitiveType
+    && RenderSettings_eq(&msp1->settings, &msp2->settings)
+    && ColorAttachmentState_eq(&msp1->colorAttachmentState, &msp2->colorAttachmentState);
 }
 
 static inline size_t hashModifiablePipelineState(ModifiablePipelineState mfps_){
     ModifiablePipelineState* mfps = &mfps_;
     size_t ret = hashVectorOfAttributeAndResidence(mfps->vertexAttributes, mfps->vertexAttributeCount) ^ hash_bytes(&mfps->settings, sizeof(RenderSettings)) ^ ROT_BYTES(mfps->primitiveType, 17);
     for(uint32_t i = 0;i < mfps->colorAttachmentState.colorAttachmentCount;i++){
-        ret = ROT_BYTES(mfps->primitiveType, 3) ^ size_t(mfps->colorAttachmentState.attachmentFormats[i]);
+        ret = ROT_BYTES(mfps->primitiveType, 3) ^ ((size_t)mfps->colorAttachmentState.attachmentFormats[i]);
     }
     return ret;
 }
@@ -630,20 +644,19 @@ static inline size_t hashModifiablePipelineState(ModifiablePipelineState mfps_){
         }                                                                                                                        \
     }
 
-RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState,
-    ModifiablePipelineState_eq, ModifiablePipelineState{0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
+RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState, ModifiablePipelineState_eq, (ModifiablePipelineState){0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
 
 
-extern "C" WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout);
+WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout);
 
-static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap, const ModifiablePipelineState& mst, const DescribedShaderModule& shaderModule, const DescribedBindGroupLayout& bglayout, const DescribedPipelineLayout& pllayout){
-    WGPURenderPipeline* pl = PipelineHashMap_get(cacheMap, mst);
+static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap, const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout){
+    WGPURenderPipeline* pl = PipelineHashMap_get(cacheMap, *mst);
     if(pl){
         return *pl;
     }
     else{
         WGPURenderPipeline toEmplace = createSingleRenderPipe(mst, shaderModule, bglayout, pllayout);
-        PipelineHashMap_put(cacheMap, mst, toEmplace);
+        PipelineHashMap_put(cacheMap, *mst, toEmplace);
         return toEmplace;
     }
 }
@@ -670,7 +683,7 @@ typedef struct DescribedPipeline{
  * @return VertexBufferLayoutSet 
  */
 
-inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
+inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
     VertexBufferLayoutSet result;
     result.number_of_buffers = number_of_buffers;
     result.layouts = NULL;
@@ -739,7 +752,7 @@ inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndRes
 
     return result;
 }
-extern "C" const char* copyString(const char* str);
+const char* copyString(const char* str);
 //static inline void UnloadBufferLayoutSet(VertexBufferLayoutSet set){
 //    std::free(set.layouts);
 //    std::free(set.attributePool);
@@ -775,7 +788,7 @@ static inline ShaderSources singleStage(const char* code, ShaderSourceType langu
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
-    sources.sources[0].sizeInBytes = std::strlen(code);
+    sources.sources[0].sizeInBytes = strlen(code);
     sources.sources[0].stageMask = (1u << stage);
     return sources;
 }
@@ -785,27 +798,29 @@ static inline ShaderSources dualStage(const char* code, ShaderSourceType languag
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
-    sources.sources[0].sizeInBytes = std::strlen(code);
-    sources.sources[0].stageMask = WGPUShaderStage((1u << uint32_t(stage1)) | (1u << uint32_t(stage2)));
+    sources.sources[0].sizeInBytes = strlen(code);
+    sources.sources[0].stageMask = ((WGPUShaderStage)(1u << (uint32_t)(stage1)) | (1u << (uint32_t)(stage2)));
     return sources;
 }
-static inline ShaderSources dualStage(const char* code1, const char* code2, ShaderSourceType language, WGPUShaderStageEnum stage1, WGPUShaderStageEnum stage2){
+
+
+static inline ShaderSources dualStageDualSource(const char* code1, const char* code2, ShaderSourceType language, WGPUShaderStageEnum stage1, WGPUShaderStageEnum stage2){
     ShaderSources sources zeroinit;
     sources.language = language;
     sources.sourceCount = 2;
     sources.sources[0].data = code1;
-    sources.sources[0].sizeInBytes = std::strlen(code1);
-    sources.sources[0].stageMask = WGPUShaderStage(1ull << uint32_t(+stage1));
+    sources.sources[0].sizeInBytes = strlen(code1);
+    sources.sources[0].stageMask = ((WGPUShaderStage)(1ull << (uint32_t)(+stage1)));
 
     sources.sources[1].data = code2;
-    sources.sources[1].sizeInBytes = std::strlen(code2);
-    sources.sources[1].stageMask = WGPUShaderStage(1ull << uint32_t(+stage2));
+    sources.sources[1].sizeInBytes = strlen(code2);
+    sources.sources[1].stageMask = ((WGPUShaderStage)(1ull << (uint32_t)(+stage2)));
  
     return sources;
 }
 
 void detectShaderLanguage(ShaderSources* sources);
-ShaderSourceType detectShaderLanguage(const void* sourceptr, size_t size);
+ShaderSourceType detectShaderLanguageSingle(const void* sourceptr, size_t size);
 StringToUniformMap* getBindingsGLSL(ShaderSources source);
 typedef struct EntryPointSet{
     char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
@@ -816,13 +831,14 @@ DescribedShaderModule LoadShaderModule(ShaderSources source);
 InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
 StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
 EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
+
 inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
     uint32_t maxslot = 0;
     for(size_t i = 0;i < number_of_attribs;i++){
         maxslot = std_max_u32(maxslot, attributes[i].bufferSlot);
     }
     const uint32_t number_of_buffers = maxslot + 1;
-    return getBufferLayoutRepresentation(attributes, number_of_attribs, number_of_buffers);
+    return getBufferLayoutRepresentation2(attributes, number_of_attribs, number_of_buffers);
 }
 typedef struct BufferEntry{
     DescribedBuffer* buffer;
@@ -1266,40 +1282,40 @@ RG_DEFINE_GENERIC_HASH_MAP(
 )
 
 
-static size_t hashVertexArray(const VertexArray va){
+static inline size_t hashVertexArray(const VertexArray va){
     size_t hashValue = 0;
     // Hash the attributes
     for (size_t i = 0;i < va.attributes_count;i++) {
         AttributeAndResidence* attrRes = &va.attributes[i];
         // Hash bufferSlot
-        size_t bufferSlotHash = std::hash<size_t>()(attrRes->bufferSlot);
+        size_t bufferSlotHash = (attrRes->bufferSlot);
         hashValue ^= bufferSlotHash;
         hashValue = ROT_BYTES(hashValue, 5);
         // Hash stepMode
-        size_t stepModeHash = std::hash<int>()(static_cast<int>(attrRes->stepMode));
+        size_t stepModeHash = (int)(attrRes->stepMode);
         hashValue ^= stepModeHash;
         hashValue = ROT_BYTES(hashValue, 5);
         // Hash shaderLocation
-        size_t shaderLocationHash = std::hash<uint32_t>()(attrRes->attr.shaderLocation);
+        size_t shaderLocationHash = (attrRes->attr.shaderLocation);
         hashValue ^= shaderLocationHash;
         hashValue = ROT_BYTES(hashValue, 5);
         // Hash format
-        size_t formatHash = std::hash<int>()(static_cast<int>(attrRes->attr.format));
+        size_t formatHash = ((int)(attrRes->attr.format));
         hashValue ^= formatHash;
         hashValue = ROT_BYTES(hashValue, 5);
         // Hash offset
-        size_t offsetHash = std::hash<uint32_t>()(attrRes->attr.offset);
+        size_t offsetHash = (attrRes->attr.offset);
         hashValue ^= offsetHash;
         hashValue = ROT_BYTES(hashValue, 5);
         // Hash enabled flag
-        size_t enabledHash = std::hash<bool>()(attrRes->enabled);
+        size_t enabledHash = (attrRes->enabled);
         hashValue ^= enabledHash;
         hashValue = ROT_BYTES(hashValue, 5);
     }
     // Hash the buffers (excluding DescribedBuffer* pointers)
     for (size_t i = 0;i < va.buffers_count;i++) {
         // Only hash the WGPUVertexStepMode, not the buffer pointer
-        size_t stepModeHash = std::hash<uint64_t>()(static_cast<uint64_t>(va.buffers[i].stepMode));
+        size_t stepModeHash = (uint64_t)(va.buffers[i].stepMode);
         hashValue ^= stepModeHash;
         hashValue = ROT_BYTES(hashValue, 5);
     }
@@ -1319,9 +1335,9 @@ static size_t hashVertexArray(const VertexArray va){
  * Returns _two_ spirv blobs containing the respective modules.
  */
 
- std::pair<std::vector<uint32_t>, std::vector<uint32_t>> glsl_to_spirv(const char* vs, const char* fs);
-std::vector<uint32_t> wgsl_to_spirv(const char* anything);
-std::vector<uint32_t> glsl_to_spirv(const char* cs);
+//std::pair<std::vector<uint32_t>, std::vector<uint32_t>> glsl_to_spirv(const char* vs, const char* fs);
+//std::vector<uint32_t> wgsl_to_spirv(const char* anything);
+//std::vector<uint32_t> glsl_to_spirv(const char* cs);
 ShaderSources wgsl_to_spirv(ShaderSources sources);
 ShaderSources glsl_to_spirv(ShaderSources sources);
 RGAPI void UpdatePipeline(DescribedPipeline* pl);
@@ -1330,7 +1346,7 @@ RGAPI void ResetSyncState(cwoid);
 RGAPI void CharCallback(void* window, unsigned int codePoint);
 struct RGFW_window;
 
-RGAPI WGPUSurface RGFW_GetWGPUSurface(void* instance, RGFW_window* window);
+RGAPI WGPUSurface RGFW_GetWGPUSurface(void* instance, struct RGFW_window* window);
 RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window);
 RGAPI WGPUSurface CreateSurfaceForWindow_SDL2(void* windowHandle);
 RGAPI WGPUSurface CreateSurfaceForWindow_SDL3(void* windowHandle);

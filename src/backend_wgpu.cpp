@@ -228,18 +228,12 @@ inline uint64_t bgEntryHash(const WGPUBindGroupEntry &bge) {
 }
 
 extern "C" void BindShaderWithSettings(Shader shader, PrimitiveType drawMode, RenderSettings settings) {
-
     ShaderImpl *impl = allocatedShaderIDs_shc + shader.id;
     impl->state.primitiveType = drawMode;
     impl->state.settings = settings;
-    WGPURenderPipeline activePipeline =
-        PipelineHashMap_getOrCreate(&impl->pipelineCache, impl->state, impl->shaderModule, impl->bglayout, impl->layout);
-    wgpuRenderPassEncoderSetPipeline((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder, activePipeline);
-    wgpuRenderPassEncoderSetBindGroup((WGPURenderPassEncoder)g_renderstate.activeRenderpass->rpEncoder,
-                                      0,
-                                      UpdateAndGetNativeBindGroup(&impl->bindGroup),
-                                      0,
-                                      NULL);
+    WGPURenderPipeline activePipeline = PipelineHashMap_getOrCreate(&impl->pipelineCache, &impl->state, &impl->shaderModule, &impl->bglayout, &impl->layout);
+    wgpuRenderPassEncoderSetPipeline(g_renderstate.activeRenderpass->rpEncoder, activePipeline);
+    wgpuRenderPassEncoderSetBindGroup(g_renderstate.activeRenderpass->rpEncoder, 0, UpdateAndGetNativeBindGroup(&impl->bindGroup), 0, NULL);
 }
 
 extern "C" void BindShader(Shader shader, PrimitiveType drawMode) {
@@ -1835,24 +1829,25 @@ void UnloadShaderModule(DescribedShaderModule mod) {
     }
 }
 
-WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst,
-                                          const DescribedShaderModule &shaderModule,
-                                          const DescribedBindGroupLayout &bglayout,
-                                          const DescribedPipelineLayout &pllayout) {
+WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst,
+                                          const DescribedShaderModule* shaderModule,
+                                          const DescribedBindGroupLayout* bglayout,
+                                          const DescribedPipelineLayout* pllayout) {
     WGPURenderPipelineDescriptor pipelineDesc zeroinit;
-    const RenderSettings &settings = mst.settings;
-    pipelineDesc.multisample.count = settings.sampleCount ? settings.sampleCount : 1;
+
+    const RenderSettings* settings = &mst->settings;
+    pipelineDesc.multisample.count = settings->sampleCount ? settings->sampleCount : 1;
     pipelineDesc.multisample.mask = 0xFFFFFFFF;
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
-    pipelineDesc.layout = (WGPUPipelineLayout)pllayout.layout;
+    pipelineDesc.layout = (WGPUPipelineLayout)pllayout->layout;
 
     WGPUVertexState vertexState zeroinit;
     WGPUFragmentState fragmentState zeroinit;
     WGPUBlendState blendState zeroinit;
 
-    vertexState.module = (WGPUShaderModule)shaderModule.stages[WGPUShaderStageEnum_Vertex].module;
+    vertexState.module = (WGPUShaderModule)shaderModule->stages[WGPUShaderStageEnum_Vertex].module;
 
-    VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst.vertexAttributes, mst.vertexAttributeCount);
+    VertexBufferLayoutSet vlayout_complete = getBufferLayoutRepresentation(mst->vertexAttributes, mst->vertexAttributeCount);
     vertexState.bufferCount = vlayout_complete.number_of_buffers;
 
     std::vector<WGPUVertexBufferLayout> layouts_converted;
@@ -1868,22 +1863,22 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst,
     }
     vertexState.buffers = layouts_converted.data();
     vertexState.constantCount = 0;
-    vertexState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name,
-                                            std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
+    vertexState.entryPoint = WGPUStringView{shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name,
+                                            std::strlen(shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
     pipelineDesc.vertex = vertexState;
 
-    fragmentState.module = shaderModule.stages[WGPUShaderStageEnum_Fragment].module;
-    fragmentState.entryPoint = WGPUStringView{shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name,
-                                              std::strlen(shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    fragmentState.module = shaderModule->stages[WGPUShaderStageEnum_Fragment].module;
+    fragmentState.entryPoint = WGPUStringView{shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name,
+                                              std::strlen(shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
     fragmentState.constantCount = 0;
     fragmentState.constants = nullptr;
 
-    blendState.color.srcFactor = settings.blendState.color.srcFactor;
-    blendState.color.dstFactor = settings.blendState.color.dstFactor;
-    blendState.color.operation = settings.blendState.color.operation;
-    blendState.alpha.srcFactor = settings.blendState.alpha.srcFactor;
-    blendState.alpha.dstFactor = settings.blendState.alpha.dstFactor;
-    blendState.alpha.operation = settings.blendState.alpha.operation;
+    blendState.color.srcFactor = settings->blendState.color.srcFactor;
+    blendState.color.dstFactor = settings->blendState.color.dstFactor;
+    blendState.color.operation = settings->blendState.color.operation;
+    blendState.alpha.srcFactor = settings->blendState.alpha.srcFactor;
+    blendState.alpha.dstFactor = settings->blendState.alpha.dstFactor;
+    blendState.alpha.operation = settings->blendState.alpha.operation;
 
     const WGPUColorTargetState colorTarget = {
         .format = toWGPUPixelFormat(g_renderstate.frameBufferFormat),
@@ -1896,14 +1891,14 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst,
     pipelineDesc.fragment = &fragmentState;
     // We setup a depth buffer state for the render pipeline
     WGPUDepthStencilState depthStencilState{};
-    if (settings.depthTest) {
+    if (settings->depthTest) {
         // Keep a fragment only if its depth is lower than the previously blended one
         // Each time a fragment is blended into the target, we update the value of the Z-buffer
         // Store the format in a variable as later parts of the code depend on it
         // Deactivate the stencil alltogether
         WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
 
-        depthStencilState.depthCompare = settings.depthCompare;
+        depthStencilState.depthCompare = settings->depthCompare;
         depthStencilState.depthWriteEnabled = WGPUOptionalBool_True;
         depthStencilState.format = depthTextureFormat;
         depthStencilState.stencilReadMask = 0;
@@ -1911,10 +1906,10 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst,
         depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
         depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
     }
-    pipelineDesc.depthStencil = settings.depthTest ? &depthStencilState : nullptr;
+    pipelineDesc.depthStencil = settings->depthTest ? &depthStencilState : nullptr;
 
-    pipelineDesc.primitive.frontFace = settings.frontFace;
-    pipelineDesc.primitive.cullMode = settings.faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
+    pipelineDesc.primitive.frontFace = settings->frontFace;
+    pipelineDesc.primitive.cullMode = settings->faceCull ? WGPUCullMode_Back : WGPUCullMode_None;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
     auto toWebGPUPrimitive = [](PrimitiveType pt) {
         switch (pt) {
@@ -1931,21 +1926,10 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState &mst,
             rg_unreachable();
         }
     };
-    pipelineDesc.primitive.topology = toWebGPUPrimitive(mst.primitiveType);
+    pipelineDesc.primitive.topology = toWebGPUPrimitive(mst->primitiveType);
     return wgpuDeviceCreateRenderPipeline((WGPUDevice)GetDevice(), &pipelineDesc);
 }
 
-// extern "C" DescribedPipeline* LoadPipelineForVAOEx(ShaderSources sources, VertexArray* vao, const ResourceTypeDescriptor*
-// uniforms, uint32_t uniformCount, RenderSettings settings){
-//     //detectShaderLanguage()
-//
-//     DescribedShaderModule module = LoadShaderModule(sources);
-//
-//     DescribedPipeline* pl = LoadPipelineMod(module, vao->attributes, vao->attributes_count, uniforms, uniformCount, settings);
-//     //DescribedPipeline* pl = LoadPipelineEx(shaderSource, nullptr, 0, uniforms, uniformCount, settings);
-//     PreparePipeline(pl, vao);
-//     return pl;
-// }
 RGAPI Shader LoadPipelineEx(const char *shaderSource,
                             const AttributeAndResidence *attribs,
                             uint32_t attribCount,
@@ -2035,7 +2019,7 @@ WGPUBuffer cloneBuffer(WGPUBuffer b, WGPUBufferUsage usage) {
 }
 
 DescribedComputePipeline *LoadComputePipeline(const char *shaderCode) {
-    ShaderSources sources = singleStage(shaderCode, detectShaderLanguage(shaderCode, strlen(shaderCode)), WGPUShaderStageEnum_Compute);
+    ShaderSources sources = singleStage(shaderCode, detectShaderLanguageSingle(shaderCode, strlen(shaderCode)), WGPUShaderStageEnum_Compute);
 
     StringToUniformMap *bindings = getBindings(sources);
 
@@ -2061,7 +2045,7 @@ DescribedComputePipeline *LoadComputePipeline(const char *shaderCode) {
 RGAPI DescribedComputePipeline *
 LoadComputePipelineEx(const char *shaderCode, const ResourceTypeDescriptor *uniforms, uint32_t uniformCount) {
     ShaderSources sources =
-        singleStage(shaderCode, detectShaderLanguage(shaderCode, std::strlen(shaderCode)), WGPUShaderStageEnum_Compute);
+        singleStage(shaderCode, detectShaderLanguageSingle(shaderCode, std::strlen(shaderCode)), WGPUShaderStageEnum_Compute);
 
     auto bindmap = getBindings(sources);
     DescribedComputePipeline *ret = callocnew(DescribedComputePipeline);

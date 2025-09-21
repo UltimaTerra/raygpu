@@ -76,7 +76,7 @@ static inline const char* cfs_path_c_str(const cfs_path* p);
 
 // --- Filesystem Operations ---
 static inline bool cfs_get_working_directory(cfs_path* working_dir);
-static inline bool cfs_get_absolute_path(const char* path, cfs_path* absolute_path);
+static inline bool cfs_get_absolute_path(cfs_path* absolute_path, const char* path);
 static inline bool cfs_exists(const char* path);
 static inline bool cfs_is_directory(const char* path);
 static inline bool cfs_list_directory(const char* path, cfs_path_list* list);

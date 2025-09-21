@@ -60,7 +60,7 @@ renderstate g_renderstate{};
 
 #define swap_uint32(val) (((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) << 16) | ((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) >> 16))
 
-ShaderSourceType detectShaderLanguage(const void* data, size_t sizeInBytes){
+ShaderSourceType detectShaderLanguageSingle(const void* data, size_t sizeInBytes){
     if(data == 0 || sizeInBytes == 0){
         return sourceTypeUnknown;
     }
@@ -90,7 +90,7 @@ ShaderSourceType detectShaderLanguage(const void* data, size_t sizeInBytes){
 
 void detectShaderLanguage(ShaderSources* sourcesPointer){
     for(uint32_t i = 0;i < sourcesPointer->sourceCount;i++){
-        ShaderSourceType srctype = (sourcesPointer->sources[i].data == nullptr) ? sourceTypeUnknown : detectShaderLanguage(sourcesPointer->sources[i].data, sourcesPointer->sources[i].sizeInBytes);
+        ShaderSourceType srctype = (sourcesPointer->sources[i].data == nullptr) ? sourceTypeUnknown : detectShaderLanguageSingle(sourcesPointer->sources[i].data, sourcesPointer->sources[i].sizeInBytes);
         if(srctype != sourceTypeUnknown){
             sourcesPointer->language = srctype;
             return;
@@ -1673,7 +1673,7 @@ WGPUBindGroup UpdateAndGetNativeBindGroup(DescribedBindGroup* bg){
     return bg->bindGroup;
 }
 
-extern "C" const char* copyString(const char* str){
+const char* copyString(const char* str){
     size_t len = std::strlen(str) + 1;
     char* ret = (char*)std::calloc(len, 1);
     std::memcpy(ret, str, len);

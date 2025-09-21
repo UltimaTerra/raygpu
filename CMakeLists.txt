@@ -348,7 +348,7 @@ endif()
 
 
 set(RG_SOURCES
-    "src/InitWindow.cpp"
+    "src/InitWindow.c"
     "src/raygpu.cpp"
     "src/shader_parse.cpp"
     "src/stb_impl.c"
@@ -414,7 +414,7 @@ if(SUPPORT_SDL2)
     list(APPEND RG_SOURCES "src/sdl2webgpu.c")
 endif()
 if(SUPPORT_SDL3)
-    list(APPEND RG_SOURCES "src/InitWindow_SDL3.cpp")
+    list(APPEND RG_SOURCES "src/InitWindow_SDL3.c")
     list(APPEND RG_SOURCES "src/sdl3webgpu.c")
     if(APPLE)
         set_source_files_properties("src/sdl3webgpu.c"
@@ -428,7 +428,7 @@ if(SUPPORT_RGFW)
     list(APPEND RG_SOURCES "src/rgfwwebgpu.c")
 endif()
 if(SUPPORT_GLFW)
-    list(APPEND RG_SOURCES "src/InitWindow_GLFW.cpp")
+    list(APPEND RG_SOURCES "src/InitWindow_GLFW.c")
     list(APPEND RG_SOURCES "src/glfw3webgpu.c")
     if(SUPPORT_WGPU_BACKEND)
         if(APPLE)

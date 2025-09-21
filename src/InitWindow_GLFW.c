@@ -84,7 +84,7 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
 #endif
 
 void cpcallback(GLFWwindow* window, double x, double y){
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mousePos = Vector2{float(x), float(y)};
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mousePos = CLITERAL(Vector2){(float)x, (float)y};
 }
 
 #ifdef __EMSCRIPTEN__
@@ -192,7 +192,7 @@ void setupGLFWCallbacks(GLFWwindow* window){
 int GetMonitorWidth_GLFW(cwoid){
     glfwInit();
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    if(mode == nullptr){
+    if(mode == NULL){
         return 0;
     }
     return mode->width;
@@ -200,7 +200,7 @@ int GetMonitorWidth_GLFW(cwoid){
 int GetMonitorHeight_GLFW(cwoid){
     glfwInit();
     const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-    if(mode == nullptr){
+    if(mode == NULL){
         return 0;
     }
     return mode->height;
@@ -217,15 +217,14 @@ bool IsCursorHidden_GLFW(GLFWwindow* window){
 void EnableCursor_GLFW(GLFWwindow* window){
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
-void DisableCursor(GLFWwindow* window){
-    
+void DisableCursorGLFW(GLFWwindow* window){
     #if !defined(__EMSCRIPTEN__) && !defined(DAWN_USE_WAYLAND) && defined(GLFW_CURSOR_CAPTURED)
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_CAPTURED);
     #endif
 }
-extern "C" void PollEvents_SDL(cwoid);
+void PollEvents_SDL(cwoid);
 
-extern "C" void PollEvents_GLFW(cwoid){
+void PollEvents_GLFW(cwoid){
     glfwPollEvents();
 }
 int GetCurrentMonitor_GLFW(GLFWwindow* window){
@@ -236,7 +235,7 @@ int GetCurrentMonitor_GLFW(GLFWwindow* window){
 
     if (monitorCount >= 1)
     {
-        if (glfwGetWindowMonitor(window) != nullptr){
+        if (glfwGetWindowMonitor(window) != NULL){
             // Get the handle of the monitor that the specified window is in full screen on
             monitor = glfwGetWindowMonitor(window);
 
@@ -374,14 +373,14 @@ void ToggleFullscreen_GLFW(){
             glfwGetWindowPos(g_renderstate.window, &xpos, &ypos);
         #endif
         glfwGetWindowSize(g_renderstate.window, &xs, &ys);
-        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = CLITERAL(Rectangle){(float)xpos, (float)ypos, (float)xs, (float)ys};
         int monitorCount = 0;
         int monitorIndex = GetCurrentMonitor_GLFW(g_renderstate.window);
         GLFWmonitor **monitors = glfwGetMonitors(&monitorCount);
 
         // Use current monitor, so we correctly get the display the window is on
         GLFWmonitor *monitor = (monitorIndex < monitorCount)? monitors[monitorIndex] : NULL;
-        auto vm = glfwGetVideoMode(monitor);
+        const GLFWvidmode* vm = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(g_renderstate.window, glfwGetPrimaryMonitor(), 0, 0, vm->width, vm->height, vm->refreshRate);
     }
 
@@ -390,7 +389,7 @@ void ToggleFullscreen_GLFW(){
 WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
     #if SUPPORT_VULKAN_BACKEND == 1
     WGPUSurface retp = callocnew(WGPUSurfaceImpl);
-    glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, nullptr, &retp->surface);
+    glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, NULL, &retp->surface);
     float xscale, yscale;
     glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
     CreatedWindowMap_get(&g_renderstate.createdSubwindows, windowHandle)->scaleFactor = xscale;
@@ -417,22 +416,21 @@ WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
 void SetWindowShouldClose_GLFW(GLFWwindow* window){
     glfwSetWindowShouldClose(window, GLFW_TRUE);
 }
-
+static void glfw_e_c_(int code, const char* message) {
+    fprintf(stderr, "GLFW error: %d - %s", code, message);
+}
 SubWindow InitWindow_GLFW(int width, int height, const char* title){
     SubWindow ret = callocnew(RGWindowImpl);
     ret->scaleFactor = 1.0f;
     ret->type = windowType_glfw;
     
-    void* window = nullptr;
+    void* window = NULL;
     if (!glfwInit()) {
         abort();
     }
 
-    GLFWmonitor* mon = nullptr;
-
-    glfwSetErrorCallback([](int code, const char* message) {
-        fprintf(stderr, "GLFW error: %d - %s", code, message);
-    });
+    GLFWmonitor* mon = NULL;
+    glfwSetErrorCallback(glfw_e_c_);
 
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -451,7 +449,7 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     #ifdef __APPLE__
         glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
     #endif
-    window = (void*)glfwCreateWindow(width, height, title, mon, nullptr);
+    window = (void*)glfwCreateWindow(width, height, title, mon, NULL);
     //if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
     //    glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
     
@@ -485,7 +483,7 @@ SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
-    ret->handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    ret->handle = glfwCreateWindow(width, height, title, NULL, NULL);
     CreatedWindowMap_put(&g_renderstate.createdSubwindows, ret->handle, *ret);
     ret = CreatedWindowMap_get(&g_renderstate.createdSubwindows, ret->handle);
     CreatedWindowMap_get(&g_renderstate.createdSubwindows,ret->handle)->input_state = CLITERAL(window_input_state){0};
@@ -493,10 +491,10 @@ SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){
     #endif
     return ret;
 }
-extern "C" bool WindowShouldClose_GLFW(GLFWwindow* win){
+bool WindowShouldClose_GLFW(GLFWwindow* win){
     return glfwWindowShouldClose(win);
 }
-extern "C" void CloseSubWindow_GLFW(SubWindow subWindow){
+void CloseSubWindow_GLFW(SubWindow subWindow){
     CreatedWindowMap_erase(&g_renderstate.createdSubwindows, subWindow->handle);
     glfwWindowShouldClose((GLFWwindow*)subWindow->handle);
     glfwSetWindowShouldClose((GLFWwindow*)subWindow->handle, GLFW_TRUE);

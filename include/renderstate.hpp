@@ -332,7 +332,7 @@ DEFINE_PTR_HASH_MAP_R(static inline, CreatedWindowMap, RGWindowImpl)
 DEFINE_VECTOR_IW(static inline, DescribedBuffer*, DescribedBufferVector)
 
 
-struct renderstate {
+typedef struct renderstate {
     WGPUPresentMode unthrottled_PresentMode;
     WGPUPresentMode throttled_PresentMode;
 
@@ -373,20 +373,20 @@ struct renderstate {
     RenderTexture mainWindowRenderTarget;
 
 
-    int windowFlags = 0;
+    int windowFlags;
     // Frame timing / FPS
     int targetFPS;
-    uint64_t total_frames = 0;
+    uint64_t total_frames;
     uint64_t init_timestamp;
 
-    int64_t last_timestamps[64] = {0};
+    int64_t last_timestamps[64];
 
     GIFRecordState *grst;
 
-    SubWindow mainWindow{};
+    SubWindow mainWindow;
     CreatedWindowMap createdSubwindows;
-    SubWindow activeSubWindow{};
+    SubWindow activeSubWindow;
 
-    bool closeFlag = false;
-};
+    bool closeFlag;
+} renderstate;
 // end file include/renderstate.hpp
