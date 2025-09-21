@@ -1818,23 +1818,22 @@ void PrepareShader(Shader shader, VertexArray* va){
     impl->state.vertexAttributeCount = va->attributes_count;
 }
 
-const char mipmapComputerSource[] = R"(
-@group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
-@group(0) @binding(1) var nextMipLevel: texture_storage_2d<rgba8unorm, write>;
-
-@compute @workgroup_size(8, 8)
-fn compute_main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let offset = vec2<u32>(0, 1);
-    
-    let color = (
-        textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.xy, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.yx, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)
-    ) * 0.25;
-    textureStore(nextMipLevel, id.xy, color);
-}
-)";
+const char mipmapComputerSource[] =
+"@group(0) @binding(0) var previousMipLevel: texture_2d<f32>;\n"
+"@group(0) @binding(1) var nextMipLevel: texture_storage_2d<rgba8unorm, write>;\n"
+"\n"
+"@compute @workgroup_size(8, 8)\n"
+"fn compute_main(@builtin(global_invocation_id) id: vec3<u32>) {\n"
+"    let offset = vec2<u32>(0, 1);\n"
+"    \n"
+"    let color = (\n"
+"        textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +\n"
+"        textureLoad(previousMipLevel, 2 * id.xy + offset.xy, 0) +\n"
+"        textureLoad(previousMipLevel, 2 * id.xy + offset.yx, 0) +\n"
+"        textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)\n"
+"    ) * 0.25;\n"
+"    textureStore(nextMipLevel, id.xy, color);\n"
+"}\n";
 
 DescribedBindGroupLayout LoadBindGroupLayoutMod(const DescribedShaderModule* shaderModule){
     ResourceTypeDescriptor* flat = (ResourceTypeDescriptor*)RL_CALLOC(shaderModule->reflectionInfo.uniforms->current_size, sizeof(ResourceTypeDescriptor));
