@@ -534,7 +534,7 @@ Vector2 GetTouchPosition(int index){
     #elif defined(MAIN_WINDOW_SDL2)
     return GetTouchPosition_SDL2(index);
     #else
-    return Vector2{0, 0};
+    return CLITERAL(Vector2){0, 0};
     #endif
 }
 int GetTouchPointCount(cwoid){

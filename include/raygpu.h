@@ -1442,6 +1442,7 @@ EXTERN_C_BEGIN
     RGAPI void RenderPassDrawIndexed (DescribedRenderpass* drp, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance);
 
     RGAPI uint32_t GetUniformLocation       (Shader shader, const char* uniformName);
+    RGAPI uint32_t GetComputeShaderLocation (DescribedComputePipeline* shader, const char* uniformName);
     RGAPI uint32_t GetUniformLocationCompute(Shader shader, const char* uniformName);
     RGAPI uint32_t rlGetLocationUniform     (const uint32_t shaderID, const char* uniformName);
     RGAPI uint32_t rlGetLocationAttrib      (const uint32_t shaderID, const char*  attribName);

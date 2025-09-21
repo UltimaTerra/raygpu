@@ -42,11 +42,24 @@
 
 // Some includes required for timing
 #if defined(_WIN32)
-
+        #define Rectangle w__Rectangle
+    #define LoadImage w__LoadImage
+    #define DrawText w__DrawText
+    #define DrawTextEx w__DrawTextEx
+    #define ShowCursor w__ShowCursor
+    #define AdapterType w__AdapterType
+    #include <windows.h>
+    #include <synchapi.h>
+    #undef AdapterType
+    #undef ShowCursor
+    #undef LoadImage
+    #undef DrawTextEx
+    #undef DrawText
+    #undef Rectangle
     // #include <windows.h> 
     // #include <synchapi.h>
     // Instead of including windows.h and friends 🤮, use these forward declarations
-    typedef long LONG;
+    /*typedef long LONG;
     typedef unsigned long DWORD;
     typedef long long LONGLONG;
     typedef unsigned long long ULONGLONG;
@@ -62,12 +75,13 @@
     __declspec(dllimport) HANDLE __stdcall CreateWaitableTimerW(void *lpTimerAttributes,int bManualReset,const wchar_t *lpTimerName);
     __declspec(dllimport) int __stdcall SetWaitableTimer(HANDLE hTimer,const LARGE_INTEGER *pDueTime,long lPeriod,void *pfnCompletionRoutine,void *lpArg,int fResume);
     __declspec(dllimport) int __stdcall WaitForSingleObject(HANDLE hHandle,DWORD dwMilliseconds);
-    __declspec(dllimport) int __stdcall CloseHandle(HANDLE hObject);
+    __declspec(dllimport) int __stdcall CloseHandle(HANDLE hObject);*/
     
 #elif defined(__APPLE__)
     #include <TargetConditionals.h>
     #include <AvailabilityMacros.h>
     #include <time.h>
+    #include <errno.h>
     #include <mach/mach_time.h>
 #else
     #include <time.h>
@@ -776,14 +790,14 @@ EM_JS(void, requestAnimationFrameLoopWithJSPIArg_impl, (FrameCallbackArg callbac
 });
 //#define emscripten_set_main_loop requestAnimationFrameLoopWithJSPI
 #endif
-RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int, int){
+RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int p1, int p2){
     #ifdef __EMSCRIPTEN__
     requestAnimationFrameLoopWithJSPIArg_impl(callback, userData);
     #else
     TRACELOG(LOG_WARNING, "requestAnimationFrame not supported outside of emscripten");
     #endif
 }
-RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int, int){
+RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int p1, int p2){
     #ifdef __EMSCRIPTEN__
     requestAnimationFrameLoopWithJSPI_impl(callback);
     #else
@@ -1245,8 +1259,7 @@ static inline void conv_rgba16f_to_bgra8(const RGBA16FColor* s, BGRA8Color* d, s
 static inline void CopyImageRows(const Image* src, Image* dst) {
     const uint8_t* s = (const uint8_t*)src->data;
     uint8_t* d = (uint8_t*)dst->data;
-    uint64_t rowBytes = src->rowStrideInBytes < dst->rowStrideInBytes
-                      ? src->rowStrideInBytes : dst->rowStrideInBytes;
+    uint64_t rowBytes = src->rowStrideInBytes < dst->rowStrideInBytes ? src->rowStrideInBytes : dst->rowStrideInBytes;
     for (uint32_t i = 0; i < src->height; ++i) {
         memcpy(d + dst->rowStrideInBytes * i, s + src->rowStrideInBytes * i, (size_t)rowBytes);
     }
@@ -1689,6 +1702,16 @@ RGAPI uint32_t GetUniformLocation(Shader shader, const char* uniformName){
     const ResourceTypeDescriptor* desc = StringToUniformMap_get(impl->shaderModule.reflectionInfo.uniforms, identifier);
     return desc ? desc->location : LOCATION_NOT_FOUND;
 }
+RGAPI uint32_t GetComputeShaderLocation(DescribedComputePipeline* shader, const char* uniformName){
+    BindingIdentifier identifier = {
+        .length = (uint32_t)strlen(uniformName)
+    };
+    rassert(identifier.length <= MAX_BINDING_NAME_LENGTH, "Identifier too short");
+    memcpy(identifier.name, uniformName, identifier.length < MAX_BINDING_NAME_LENGTH ? identifier.length : MAX_BINDING_NAME_LENGTH);
+    const ResourceTypeDescriptor* desc = StringToUniformMap_get(shader->shaderModule.reflectionInfo.uniforms, identifier);
+    return desc ? desc->location : LOCATION_NOT_FOUND;
+}
+
 RGAPI uint32_t GetAttributeLocation(Shader shader, const char* attributeName){
     //Returns LOCATION_NOT_FOUND if not found
     return getReflectionAttributeLocation(&GetShaderImpl(shader)->shaderModule.reflectionInfo.attributes, attributeName);

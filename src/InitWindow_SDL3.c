@@ -4,7 +4,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_error.h>
-#include <format>
 #include <raygpu.h>
 #include <internals.hpp>
 #include <renderstate.hpp>
@@ -17,7 +16,7 @@
 #endif
 #include "sdl3webgpu.h"
 
-constexpr uint32_t max_format_count = 16;
+#define max_format_count 16
 
 typedef struct SurfaceAndSwapchainSupport{
     PixelFormat supportedFormats[max_format_count];
@@ -34,10 +33,10 @@ uint32_t GetPresentQueueIndex(void* instanceHandle, void* adapterHandle){
     VkPhysicalDevice adapter = (VkPhysicalDevice)adapterHandle;
     
     uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(adapter, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(adapter, &queueFamilyCount, NULL);
 
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(adapter, &queueFamilyCount, queueFamilies.data());
+    VkQueueFamilyProperties queueFamilies[64];
+    vkGetPhysicalDeviceQueueFamilyProperties(adapter, &queueFamilyCount, queueFamilies);
     for(uint32_t index = 0;index < queueFamilyCount;index++){
         bool ps = SDL_Vulkan_GetPresentationSupport((VkInstance)instanceHandle, (VkPhysicalDevice)adapterHandle, index);
         if(ps){
@@ -144,12 +143,12 @@ SurfaceAndSwapchainSupport QuerySurfaceAndSwapchainSupport(void* instanceHandle,
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(adapter, surface, &capabilities);
     uint32_t formatCount;
 
-    vkGetPhysicalDeviceSurfaceFormatsKHR(adapter, surface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(adapter, surface, &formatCount, NULL);
     
     if(formatCount != 0) {
         ret.supportedFormatCount = formatCount;
-        std::vector<VkSurfaceFormatKHR> formats(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(adapter, surface, &formatCount, formats.data());
+        VkSurfaceFormatKHR formats[128] = {0};
+        vkGetPhysicalDeviceSurfaceFormatsKHR(adapter, surface, &formatCount, formats);
         for(uint32_t i = 0;i < formatCount;i++){
             ret.supportedFormats[i] = fromWGPUPixelFormat(fromVulkanPixelFormat(formats[i].format));
         }
@@ -157,18 +156,18 @@ SurfaceAndSwapchainSupport QuerySurfaceAndSwapchainSupport(void* instanceHandle,
 
     // Present Modes
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter, surface, &presentModeCount, nullptr);
-    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter, surface, &presentModeCount, presentModes.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter, surface, &presentModeCount, NULL);
+    VkPresentModeKHR presentModes[32];
+    vkGetPhysicalDeviceSurfacePresentModesKHR(adapter, surface, &presentModeCount, presentModes);
     
     #endif
     return ret;
 }
 
 
-void negotiateSurfaceFormatAndPresentMode(void* nsurface){
-    //TODO
-}
+//void negotiateSurfaceFormatAndPresentMode(void* nsurface){
+// TODO
+//}
 #define SCANCODE_MAPPED_NUM 232
 static const KeyboardKey mapScancodeToKey[SCANCODE_MAPPED_NUM] = {
     KEY_NULL,           // SDL_SCANCODE_UNKNOWN
@@ -298,10 +297,10 @@ int GetMonitorWidth_SDL3(cwoid){
     Initialize_SDL3();
     int displayCount = 0;
     SDL_GetDisplays(&displayCount);
-    SDL_Point zeropoint{};
+    SDL_Point zeropoint = {0};
     SDL_DisplayID id = SDL_GetDisplayForPoint(&zeropoint);
     const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(id);
-    if(mode == nullptr){
+    if(mode == NULL){
         const char* errormessage = SDL_GetError();
         TRACELOG(LOG_WARNING, errormessage);
     }
@@ -310,7 +309,7 @@ int GetMonitorWidth_SDL3(cwoid){
 
 int GetMonitorHeight_SDL3(cwoid){
     Initialize_SDL3();
-    SDL_Point zeropoint{};
+    SDL_Point zeropoint = {0};
     SDL_DisplayID id = SDL_GetDisplayForPoint(&zeropoint);
     const SDL_DisplayMode* mode = SDL_GetDesktopDisplayMode(id);
     return mode->h;
@@ -338,7 +337,7 @@ void PenAxisCallback(SDL_Window* window, SDL_PenID penID, SDL_PenAxis axis, floa
     CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.penStates[penID].value.axes[axis] = value;
 }
 void PenMotionCallback(SDL_Window* window, SDL_PenID penID, float x, float y){
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.penStates[penID].value.position = Vector2{x,y };
+    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.penStates[penID].value.position = CLITERAL(Vector2){x,y };
 }
 void FingerMotionCallback(SDL_Window* window, SDL_FingerID finger, float x, float y){
     
@@ -476,7 +475,7 @@ void ToggleFullscreen_SDL3(cwoid){
         SDL_GetWindowPosition((SDL_Window*)g_renderstate.window, &xpos, &ypos);
         #endif
         SDL_GetWindowSize((SDL_Window*)g_renderstate.window, &xs, &ys);
-        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = Rectangle{float(xpos), float(ypos), float(xs), float(ys)};
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->input_state.windowPosition = CLITERAL(Rectangle){(float)xpos, ((float)ypos), ((float)xs), ((float)ys)};
         SDL_SetWindowSize((SDL_Window*)g_renderstate.window, GetMonitorWidth_SDL3(), GetMonitorHeight_SDL3());
         SDL_SetWindowFullscreen((SDL_Window*)g_renderstate.window, SDL_WINDOW_FULLSCREEN);
     }

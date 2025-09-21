@@ -126,11 +126,7 @@ void mainloop(void){
     }
 }
 int main(){
-    //SetConfigFlags(FLAG_VSYNC_HINT);
-    //SetConfigFlags(FLAG_STDOUT_TO_FFMPEG);
-    //if(headless)
-    //    SetConfigFlags(FLAG_HEADLESS);
-    //RequestLimit(maxBufferSize, 1ull << 30);
+    SetConfigFlags(FLAG_VSYNC_HINT);
     InitWindow(1600, 900, "Compute Shader");
     SetTargetFPS(60);
     
@@ -140,9 +136,7 @@ int main(){
     std::normal_distribution<float> ndis(0.6,0.2);
     std::normal_distribution<float> ndis2(1,0.3);
     std::vector<Vector2> pos(parts), vel(parts);
-    //std::generate(pos.begin(), pos.end(), [&]{
-    //    return Vector2{dis(gen)*0.01f, dis(gen) * 0.01f};
-    //});
+    
     for(size_t i = 0;i < parts;i++){
         float arg = M_PI * (dis(gen) + 1);
         float mag = std::sqrt(dis(gen)) * 0.2f;
@@ -167,9 +161,9 @@ int main(){
     velocities = GenBufferEx(vel.data(), vel.size() * sizeof(Vector2), WGPUBufferUsage_Vertex | WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst);
 
     firstPassPipeline = LoadComputePipeline(computeSource);
-    (*firstPassPipeline)["posBuffer"] = positions;
-    (*firstPassPipeline)["velBuffer"] = velocities;
-
+    SetBindgroupStorageBuffer(&firstPassPipeline->bindGroup, GetComputeShaderLocation(firstPassPipeline, "posBuffer"), positions);
+    SetBindgroupStorageBuffer(&firstPassPipeline->bindGroup, GetComputeShaderLocation(firstPassPipeline, "velBuffer"), velocities);
+    
     //SetBindgroupStorageBuffer(&cpl->bindGroup, GetUniformLocationCompute(cpl, "posBuffer"), positions);
     //SetBindgroupStorageBuffer(&cpl->bindGroup, GetUniformLocationCompute(cpl, "velBuffer"), velocities);
 
