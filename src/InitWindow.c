@@ -3,112 +3,105 @@
 #include <c_fs_utils.h>
 #include <raygpu.h>
 #include <internals.hpp>
+const char shaderSource[] = "struct VertexInput {\n"
+"    @location(0) position: vec3f,\n"
+"    @location(1) uv: vec2f,\n"
+"    @location(2) normal: vec3f,\n"
+"    @location(3) color: vec4f,\n"
+"};\n"
+"\n"
+"struct VertexOutput {\n"
+"    @builtin(position) position: vec4f,\n"
+"    @location(0) uv: vec2f,\n"
+"    @location(1) color: vec4f,\n"
+"};\n"
+"\n"
+"struct LightBuffer {\n"
+"    count: u32,\n"
+"    positions: array<vec3f>\n"
+"};\n"
+"\n"
+"@group(0) @binding(0) var<uniform> Perspective_View: mat4x4f;\n"
+"@group(0) @binding(1) var texture0: texture_2d<f32>;\n"
+"@group(0) @binding(2) var texSampler: sampler;\n"
+"@group(0) @binding(3) var<storage, read> modelMatrix: array<mat4x4f>;\n"
+//"@group(0) @binding(4) var<storage> lights: LightBuffer;\n"
+//"@group(0) @binding(5) var<storage> lights2: LightBuffer;\n"
+"\n"
+//"Can be omitted\n"
+//"@group(0) @binding(3) var<storage> storig: array<vec4f>;\n"
+"\n"
+"\n"
+"@vertex\n"
+"fn vs_main(@builtin(instance_index) instanceIdx : u32, in: VertexInput) -> VertexOutput {\n"
+"    var out: VertexOutput;\n"
+"    out.position = Perspective_View * \n"
+"                   modelMatrix[instanceIdx] *\n"
+"    vec4f(in.position.xyz, 1.0f);\n"
+"    out.color = in.color;\n"
+"    out.uv = in.uv;\n"
+"    return out;\n"
+"}\n"
+"\n"
+"@fragment\n"
+"fn fs_main(in: VertexOutput) -> @location(0) vec4f {\n"
+"    return textureSample(texture0, texSampler, in.uv).rgba * in.color;\n"
+"}\n";
 
-const char shaderSource[] = R"(
-struct VertexInput {
-    @location(0) position: vec3f,
-    @location(1) uv: vec2f,
-    @location(2) normal: vec3f,
-    @location(3) color: vec4f,
-};
+const char vertexSourceGLSL[] = "#version 450\n"
+"\n"
+// " Input attributes.\n"
+"layout(location = 0) in vec3 in_position;  // position\n"
+"layout(location = 1) in vec2 in_uv;        // texture coordinates\n"
+"layout(location = 2) in vec3 in_normal;    // normal (unused)\n"
+"layout(location = 3) in vec4 in_color;     // vertex color\n"
+"\n"
+// " Outputs to fragment shader.\n"
+"layout(location = 0) out vec2 frag_uv;\n"
+"layout(location = 1) out vec4 frag_color;\n"
+"layout(location = 2) out vec3 out_normal;\n"
+// " Uniform block for Perspective_View matrix (binding = 0).\n"
+"layout(binding = 0) uniform Perspective_View {\n"
+"    mat4 pvmatrix;\n"
+"};\n"
+"\n"
+// " Storage buffer for model matrices (binding = 3).\n"
+// " Note: 'buffer' qualifier makes it a shader storage buffer.\n"
+"layout(binding = 3) readonly buffer modelMatrix {\n"
+"    mat4 modelMatrices[];  // Array of model matrices.\n"
+"};\n"
+"\n"
+"void main() {\n"
+"    gl_PointSize = 1.0f;\n"
+"    \n"
+"    // Compute transformed position using instance-specific model matrix.\n"
+"    gl_Position = pvmatrix * modelMatrices[gl_InstanceIndex] * vec4(in_position, 1.0);\n"
+"    //gl_Position = vec4(0.001f * vec4(in_position, 1.0).xy - vec2(1, 1), 0, 1);\n"
+"    //gl_Position = vec4(in_position, 1.0);\n"
+"    frag_uv = in_uv;\n"
+"    frag_color = in_color;\n"
+"    out_normal = in_normal;\n"
+"}\n";
 
-struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) uv: vec2f,
-    @location(1) color: vec4f,
-};
-
-struct LightBuffer {
-    count: u32,
-    positions: array<vec3f>
-};
-
-@group(0) @binding(0) var<uniform> Perspective_View: mat4x4f;
-@group(0) @binding(1) var texture0: texture_2d<f32>;
-@group(0) @binding(2) var texSampler: sampler;
-@group(0) @binding(3) var<storage, read> modelMatrix: array<mat4x4f>;
-//@group(0) @binding(4) var<storage> lights: LightBuffer;
-//@group(0) @binding(5) var<storage> lights2: LightBuffer;
-
-//Can be omitted
-//@group(0) @binding(3) var<storage> storig: array<vec4f>;
-
-
-@vertex
-fn vs_main(@builtin(instance_index) instanceIdx : u32, in: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    out.position = Perspective_View * 
-                   modelMatrix[instanceIdx] *
-    vec4f(in.position.xyz, 1.0f);
-    out.color = in.color;
-    out.uv = in.uv;
-    return out;
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(texture0, texSampler, in.uv).rgba * in.color;
-}
-)";
-
-const char vertexSourceGLSL[] = R"(#version 450
-
-// Input attributes.
-layout(location = 0) in vec3 in_position;  // position
-layout(location = 1) in vec2 in_uv;        // texture coordinates
-layout(location = 2) in vec3 in_normal;    // normal (unused)
-layout(location = 3) in vec4 in_color;     // vertex color
-
-// Outputs to fragment shader.
-layout(location = 0) out vec2 frag_uv;
-layout(location = 1) out vec4 frag_color;
-layout(location = 2) out vec3 out_normal;
-// Uniform block for Perspective_View matrix (binding = 0).
-layout(binding = 0) uniform Perspective_View {
-    mat4 pvmatrix;
-};
-
-// Storage buffer for model matrices (binding = 3).
-// Note: 'buffer' qualifier makes it a shader storage buffer.
-layout(binding = 3) readonly buffer modelMatrix {
-    mat4 modelMatrices[];  // Array of model matrices.
-};
-
-void main() {
-    gl_PointSize = 1.0f;
-    
-    // Compute transformed position using instance-specific model matrix.
-    gl_Position = pvmatrix * modelMatrices[gl_InstanceIndex] * vec4(in_position, 1.0);
-    //gl_Position = vec4(0.001f * vec4(in_position, 1.0).xy - vec2(1, 1), 0, 1);
-    //gl_Position = vec4(in_position, 1.0);
-    frag_uv = in_uv;
-    frag_color = in_color;
-    out_normal = in_normal;
-}
-)";
-
-const char fragmentSourceGLSL[] = R"(#version 450
-#extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed
-
-// Inputs from vertex shader.
-layout(location = 0) in vec2 frag_uv;
-layout(location = 1) in vec4 frag_color;
-
-// Output fragment color.
-layout(location = 0) out vec4 outColor;
-
-// Texture and sampler, bound separately.
-layout(binding = 1) uniform texture2D texture0;  // Texture (binding = 1)
-layout(binding = 2) uniform sampler texSampler;    // Sampler (binding = 2)
-
-void main() {
-    // Sample the texture using the combined sampler.
-    vec4 texColor = texture(sampler2D(texture0, texSampler), frag_uv);
-    outColor = texColor * frag_color;
-    //outColor = vec4(frag_color.xyz,1);
-    //outColor = vec4(1,0,1,1);
-}
-)";
+const char fragmentSourceGLSL[] = "#version 450\n"
+"#extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed\n"
+"\n"
+// " Inputs from vertex shader.\n"
+"layout(location = 0) in vec2 frag_uv;\n"
+"layout(location = 1) in vec4 frag_color;\n"
+"\n"
+// " Output fragment color.\n"
+"layout(location = 0) out vec4 outColor;\n"
+"\n"
+// " Texture and sampler, bound separately.\n"
+"layout(binding = 1) uniform texture2D texture0;  // Texture (binding = 1)\n"
+"layout(binding = 2) uniform sampler texSampler;    // Sampler (binding = 2)\n"
+"\n"
+"void main() {\n"
+"    // Sample the texture using the combined sampler.\n"
+"    vec4 texColor = texture(sampler2D(texture0, texSampler), frag_uv);\n"
+"    outColor = texColor * frag_color;\n"
+"";
 
 const uint32_t default_vert_spv_data[] = {
 
