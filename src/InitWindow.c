@@ -73,27 +73,17 @@ const char vertexSourceGLSL[] = "#version 450\n"
 "\n"
 "void main() {\n"
 "    gl_PointSize = 1.0f;\n"
-"    \n"
 "    // Compute transformed position using instance-specific model matrix.\n"
 "    gl_Position = pvmatrix * modelMatrices[gl_InstanceIndex] * vec4(in_position, 1.0);\n"
-"    //gl_Position = vec4(0.001f * vec4(in_position, 1.0).xy - vec2(1, 1), 0, 1);\n"
-"    //gl_Position = vec4(in_position, 1.0);\n"
 "    frag_uv = in_uv;\n"
 "    frag_color = in_color;\n"
 "    out_normal = in_normal;\n"
 "}\n";
 
 const char fragmentSourceGLSL[] = "#version 450\n"
-"#extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed\n"
-"\n"
-// " Inputs from vertex shader.\n"
 "layout(location = 0) in vec2 frag_uv;\n"
 "layout(location = 1) in vec4 frag_color;\n"
-"\n"
-// " Output fragment color.\n"
 "layout(location = 0) out vec4 outColor;\n"
-"\n"
-// " Texture and sampler, bound separately.\n"
 "layout(binding = 1) uniform texture2D texture0;  // Texture (binding = 1)\n"
 "layout(binding = 2) uniform sampler texSampler;    // Sampler (binding = 2)\n"
 "\n"
@@ -101,7 +91,7 @@ const char fragmentSourceGLSL[] = "#version 450\n"
 "    // Sample the texture using the combined sampler.\n"
 "    vec4 texColor = texture(sampler2D(texture0, texSampler), frag_uv);\n"
 "    outColor = texColor * frag_color;\n"
-"";
+"}\n";
 
 const uint32_t default_vert_spv_data[] = {
 

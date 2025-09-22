@@ -658,12 +658,7 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Operation is already BlendOperation_Add
             break;
 
-        case BLEND_CUSTOM:
-            // Custom blend mode is not set here, it should be configured separately before drawing.
-            // Fall through to default or handle appropriately if this function should reset to a default custom state.
-            // For now, assuming it shouldn't be called with BLEND_CUSTOM, matching original rg_unreachable().
-            [[fallthrough]]; // Explicit fallthrough if C++17 or later, otherwise just let it fall.
-
+        case BLEND_CUSTOM: // Fallthrough
         default:
             // If an unknown or BLEND_CUSTOM mode is passed, trigger unreachable.
             // This indicates a logic error or that BLEND_CUSTOM should be handled elsewhere.
