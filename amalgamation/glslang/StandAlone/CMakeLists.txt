@@ -31,31 +31,31 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-find_package(Python3 REQUIRED)
+# find_package(Python3 REQUIRED)
 
 set(GLSLANG_INTRINSIC_H          "${GLSLANG_GENERATED_INCLUDEDIR}/glslang/glsl_intrinsic_header.h")
 set(GLSLANG_INTRINSIC_PY         "${CMAKE_CURRENT_SOURCE_DIR}/../gen_extension_headers.py")
 set(GLSLANG_INTRINSIC_HEADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../glslang/ExtensionHeaders")
 
-add_custom_command(
-    OUTPUT  ${GLSLANG_INTRINSIC_H}
-    COMMAND Python3::Interpreter "${GLSLANG_INTRINSIC_PY}"
-            "-i" ${GLSLANG_INTRINSIC_HEADER_DIR}
-            "-o" ${GLSLANG_INTRINSIC_H}
-    DEPENDS ${GLSLANG_INTRINSIC_PY}
-    COMMENT "Generating ${GLSLANG_INTRINSIC_H}")
+#add_custom_command(
+#    OUTPUT  ${GLSLANG_INTRINSIC_H}
+#    COMMAND Python3::Interpreter "${GLSLANG_INTRINSIC_PY}"
+#            "-i" ${GLSLANG_INTRINSIC_HEADER_DIR}
+#            "-o" ${GLSLANG_INTRINSIC_H}
+#    DEPENDS ${GLSLANG_INTRINSIC_PY}
+#    COMMENT "Generating ${GLSLANG_INTRINSIC_H}")
 
-set(SOURCES StandAlone.cpp DirStackFileIncluder.h  ${GLSLANG_INTRINSIC_H})
+#set(SOURCES StandAlone.cpp DirStackFileIncluder.h  ${GLSLANG_INTRINSIC_H})
 
-add_executable(glslang-standalone ${SOURCES})
+#add_executable(glslang-standalone ${SOURCES})
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-    target_compile_options(glslang-standalone PRIVATE -Wconversion)
+    #target_compile_options(glslang-standalone PRIVATE -Wconversion)
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" AND NOT MSVC)
-    target_compile_options(glslang-standalone PRIVATE -Wshorten-64-to-32)
+    #target_compile_options(glslang-standalone PRIVATE -Wshorten-64-to-32)
 endif()
-set_property(TARGET glslang-standalone PROPERTY FOLDER tools)
-set_property(TARGET glslang-standalone PROPERTY OUTPUT_NAME glslang)
-glslang_set_link_args(glslang-standalone)
+#set_property(TARGET glslang-standalone PROPERTY FOLDER tools)
+#set_property(TARGET glslang-standalone PROPERTY OUTPUT_NAME glslang)
+#glslang_set_link_args(glslang-standalone)
 
 set(LIBRARIES
     glslang
@@ -70,9 +70,9 @@ elseif(UNIX)
     endif()
 endif()
 
-target_link_libraries(glslang-standalone ${LIBRARIES})
-target_include_directories(glslang-standalone PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../External>)
+#target_link_libraries(glslang-standalone ${LIBRARIES})
+#target_include_directories(glslang-standalone PUBLIC
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../External>)
 
 if(ENABLE_SPIRV)
     if(ENABLE_SPVREMAPPER)
@@ -95,12 +95,12 @@ if(WIN32 OR MINGW)
   set(link_method copy_if_different)
 endif()
 
-add_custom_command(
-    TARGET glslang-standalone POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E "${link_method}" "\$<TARGET_FILE_NAME:glslang-standalone>" "${legacy_glslang_name}"
-    WORKING_DIRECTORY "\$<TARGET_FILE_DIR:glslang-standalone>"
-    VERBATIM
-)
+#add_custom_command(
+#    TARGET glslang-standalone POST_BUILD
+#    COMMAND "${CMAKE_COMMAND}" -E "${link_method}" "\$<TARGET_FILE_NAME:glslang-standalone>" "${legacy_glslang_name}"
+#    WORKING_DIRECTORY "\$<TARGET_FILE_DIR:glslang-standalone>"
+#    VERBATIM
+#)
 
 if(GLSLANG_ENABLE_INSTALL)
     install(TARGETS glslang-standalone EXPORT glslang-targets)

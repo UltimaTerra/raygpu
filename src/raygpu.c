@@ -378,7 +378,6 @@ RGAPI Texture GetMultisampleColorTarget(){
     return RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample;
 }
 
-
 RGAPI void drawCurrentBatch(){
     size_t vertexCount = vboptr - vboptr_base;
     if(vertexCount == 0)return;
@@ -431,16 +430,21 @@ RGAPI void drawCurrentBatch(){
             const size_t quadCount = vertexCount / 4;
             if(g_renderstate.quadindicesCache->size < 6 * quadCount * sizeof(uint32_t)){
                 uint32_t* indices = (uint32_t*)RL_CALLOC(6 * quadCount, sizeof(uint32_t));
-                for(size_t i = 0;i < quadCount;i++){
-                    indices[i * 6 + 0] = (i * 4 + 0);
-                    indices[i * 6 + 1] = (i * 4 + 1);
-                    indices[i * 6 + 2] = (i * 4 + 3);
-                    indices[i * 6 + 3] = (i * 4 + 1);
-                    indices[i * 6 + 4] = (i * 4 + 2);
-                    indices[i * 6 + 5] = (i * 4 + 3);
+                if(indices){
+                    for(size_t i = 0;i < quadCount;i++){
+                        indices[i * 6 + 0] = (i * 4 + 0);
+                        indices[i * 6 + 1] = (i * 4 + 1);
+                        indices[i * 6 + 2] = (i * 4 + 3);
+                        indices[i * 6 + 3] = (i * 4 + 1);
+                        indices[i * 6 + 4] = (i * 4 + 2);
+                        indices[i * 6 + 5] = (i * 4 + 3);
+                    }
+                    BufferData(g_renderstate.quadindicesCache, indices, 6 * quadCount * sizeof(uint32_t));
+                    RL_FREE(indices);
                 }
-                BufferData(g_renderstate.quadindicesCache, indices, 6 * quadCount * sizeof(uint32_t));
-                RL_FREE(indices);
+                else{
+                    TRACELOG(LOG_ERROR, "Failed to allocated space for index buffer");
+                }
             }
             const DescribedBuffer* ibuf = g_renderstate.quadindicesCache;
             BindShaderVertexArray(GetActiveShader(), renderBatchVAO);
@@ -1680,7 +1684,7 @@ RGAPI Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode);
 
 #if SUPPORT_GLSL_PARSER == 0 || !defined(SUPPORT_GLSL_PARSER)
 Shader rlLoadShaderCode(const char* vertexCode, const char* fragmentCode){
-    return Shader{};
+    return CLITERAL(Shader){};
 }
 #endif
 
@@ -1832,16 +1836,20 @@ const char mipmapComputerSource[] =
 
 DescribedBindGroupLayout LoadBindGroupLayoutMod(const DescribedShaderModule* shaderModule){
     ResourceTypeDescriptor* flat = (ResourceTypeDescriptor*)RL_CALLOC(shaderModule->reflectionInfo.uniforms->current_size, sizeof(ResourceTypeDescriptor));
-    uint32_t insertIndex = 0;
-    for(size_t i = 0;i <  shaderModule->reflectionInfo.uniforms->current_capacity;i++){
-        if(shaderModule->reflectionInfo.uniforms->table[i].key.length > 0){
-            flat[insertIndex++] = shaderModule->reflectionInfo.uniforms->table[i].value;
+    if(flat){
+        uint32_t insertIndex = 0;
+        for(size_t i = 0;i <  shaderModule->reflectionInfo.uniforms->current_capacity;i++){
+            if(shaderModule->reflectionInfo.uniforms->table[i].key.length > 0){
+                flat[insertIndex++] = shaderModule->reflectionInfo.uniforms->table[i].value;
+            }
         }
+        quickSort_ResourceTypeDescriptor(flat, flat + shaderModule->reflectionInfo.uniforms->current_size);
+        DescribedBindGroupLayout ret =  LoadBindGroupLayout(flat, shaderModule->reflectionInfo.uniforms->current_size, false);
+        RL_FREE(flat);
+        return ret;
     }
-    quickSort_ResourceTypeDescriptor(flat, flat + shaderModule->reflectionInfo.uniforms->current_size);
-    DescribedBindGroupLayout ret =  LoadBindGroupLayout(flat, shaderModule->reflectionInfo.uniforms->current_size, false);
-    RL_FREE(flat);
-    return ret;
+    DescribedBindGroupLayout invalid = {0};
+    return invalid;
 }
 
 Texture LoadTextureEx(uint32_t width, uint32_t height, PixelFormat format, bool to_be_used_as_rendertarget){
@@ -2750,7 +2758,9 @@ static inline void cfs_int_queue_destroy(cfs_search_queue* q) {
         int index = (q->head + i) % q->capacity;
         cfs_path_free_storage(&q->items[index].path);
     }
-    free(q->items);
+    if(q->items != NULL){
+        free(q->items);
+    }
     q->items = NULL;
     q->capacity = 0;
     q->count = 0;
@@ -2815,9 +2825,6 @@ static inline const char* cfs_path_get_filename(const cfs_path* p) {
 }
 
 
-// -----------------------------------------------------------------------------
-// ---[ Core Search Function Implementations ]----------------------------------
-// -----------------------------------------------------------------------------
 
 /**
  * @brief C99 implementation of the breadth-first search logic.
@@ -2828,43 +2835,41 @@ static inline const char* cfs_path_get_filename(const cfs_path* p) {
  * @param user_data Context data to be passed to the predicate function.
  * @return Returns true if the predicate found a match, false otherwise.
  */
-static inline bool breadthFirstSearch_c(
-    cfs_path* result_path,
-    const cfs_path* start_path,
-    int max_depth,
-    cfs_search_predicate predicate,
-    void* user_data)
-{
+static inline bool breadthFirstSearch_c(cfs_path* result_path, const cfs_path* start_path, int max_depth, cfs_search_predicate predicate, void* user_data){
     cfs_search_queue queue;
+    memset(&queue, 0, sizeof(queue));
+
     if (!cfs_int_queue_init(&queue)) {
+        cfs_int_queue_destroy(&queue);
         return false;
     }
 
-    // Push the starting item onto the queue
     cfs_search_item start_item;
     start_item.depth = 0;
     cfs_path_init(&start_item.path);
     if (cfs_path_set(&start_item.path, cfs_path_c_str(start_path))) {
-        cfs_int_queue_push(&queue, start_item);
+        if (!cfs_int_queue_push(&queue, start_item)) {
+            cfs_path_free_storage(&start_item.path);
+            cfs_int_queue_destroy(&queue);
+            return false;
+        }
     } else {
         cfs_path_free_storage(&start_item.path);
         cfs_int_queue_destroy(&queue);
-        return false; // Could not set initial path
+        return false;
     }
 
     bool found = false;
     while (queue.count > 0) {
         cfs_search_item current = cfs_int_queue_pop(&queue);
 
-        // 1. Test the current path against the predicate
         if (predicate(&current.path, user_data)) {
             cfs_path_set(result_path, cfs_path_c_str(&current.path));
             found = true;
-            cfs_path_free_storage(&current.path); // Free the popped item
-            goto cleanup; // Exit search, we found it
+            cfs_path_free_storage(&current.path);
+            break;
         }
 
-        // 2. If it's a directory and we can go deeper, add its children
         if (current.depth < max_depth && cfs_is_directory(cfs_path_c_str(&current.path))) {
             cfs_path_list children;
             if (cfs_list_directory(cfs_path_c_str(&current.path), &children)) {
@@ -2872,24 +2877,23 @@ static inline bool breadthFirstSearch_c(
                     cfs_search_item child_item;
                     child_item.depth = current.depth + 1;
                     cfs_path_init(&child_item.path);
-                    // Move path from list to the search item
                     if (cfs_path_set(&child_item.path, cfs_path_c_str(&children.paths[i]))) {
-                       if (!cfs_int_queue_push(&queue, child_item)) {
-                           // Push failed, free the path we just created
-                           cfs_path_free_storage(&child_item.path);
-                       }
+                        if (!cfs_int_queue_push(&queue, child_item)) {
+                            cfs_path_free_storage(&child_item.path);
+                            // continue; best effort on partial enqueue failure
+                        }
+                    } else {
+                        cfs_path_free_storage(&child_item.path);
                     }
                 }
                 cfs_free_path_list(&children);
             }
         }
-        
-        // 3. Free the path from the item we popped and processed
+
         cfs_path_free_storage(&current.path);
     }
 
-cleanup:
-    cfs_int_queue_destroy(&queue); // This frees any paths remaining in the queue
+    cfs_int_queue_destroy(&queue);
     return found;
 }
 

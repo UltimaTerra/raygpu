@@ -647,7 +647,7 @@ static inline size_t hashModifiablePipelineState(ModifiablePipelineState mfps_){
 RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState, ModifiablePipelineState_eq, CLITERAL(ModifiablePipelineState){0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
 
 
-WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout);
+RGAPI WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout);
 
 static WGPURenderPipeline PipelineHashMap_getOrCreate(PipelineHashMap* cacheMap, const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout){
     WGPURenderPipeline* pl = PipelineHashMap_get(cacheMap, *mst);
@@ -683,7 +683,7 @@ typedef struct DescribedPipeline{
  * @return VertexBufferLayoutSet 
  */
 
-inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
+static inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const AttributeAndResidence* attributes, const uint32_t number_of_attribs, const uint32_t number_of_buffers) {
     VertexBufferLayoutSet result;
     result.number_of_buffers = number_of_buffers;
     result.layouts = NULL;
@@ -832,7 +832,7 @@ RGAPI InOutAttributeInfo                                      getAttributesSPIRV
 RGAPI StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
 RGAPI EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
 
-inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
+static inline VertexBufferLayoutSet getBufferLayoutRepresentation(const AttributeAndResidence* attributes, const uint32_t number_of_attribs){
     uint32_t maxslot = 0;
     for(size_t i = 0;i < number_of_attribs;i++){
         maxslot = std_max_u32(maxslot, attributes[i].bufferSlot);
