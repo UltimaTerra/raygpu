@@ -1636,7 +1636,8 @@ EXTERN_C_BEGIN
 EXTERN_C_END
 
 typedef struct renderstate renderstate;
-extern renderstate g_renderstate;
+
+externcvar renderstate g_renderstate;
 
 #endif
 

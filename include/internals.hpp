@@ -644,7 +644,7 @@ static inline size_t hashModifiablePipelineState(ModifiablePipelineState mfps_){
         }                                                                                                                        \
     }
 
-RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState, ModifiablePipelineState_eq, (ModifiablePipelineState){0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
+RG_DEFINE_GENERIC_HASH_MAP(static inline, PipelineHashMap, ModifiablePipelineState, WGPURenderPipeline, hashModifiablePipelineState, ModifiablePipelineState_eq, CLITERAL(ModifiablePipelineState){0}, ModifiablePipelineState_copy, RenderPipelineCopy, ModifiablePipelineState_free, RenderPipeline_free) 
 
 
 WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst, const DescribedShaderModule* shaderModule, const DescribedBindGroupLayout* bglayout, const DescribedPipelineLayout* pllayout);
@@ -668,7 +668,7 @@ typedef struct ShaderImpl{
     DescribedPipelineLayout layout;
     DescribedBindGroupLayout bglayout;
 }ShaderImpl;
-extern ShaderImpl* allocatedShaderIDs_shc;
+externcvar ShaderImpl* allocatedShaderIDs_shc;
 RGAPI uint32_t getNextShaderID_shc();
 RGAPI ShaderImpl* GetShaderImpl(Shader shader);
 RGAPI ShaderImpl* GetShaderImplByID(uint32_t id);
