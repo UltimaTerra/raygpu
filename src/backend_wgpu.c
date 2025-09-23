@@ -1065,7 +1065,7 @@ void InitBackend() {
 
     sample->instance = wgpuCreateInstance(&instanceDescriptor);
     if (sample->instance == NULL) {
-        std::cerr << "wgpuCreateInstance failed!!!!\n";
+        fprintf(stderr, "wgpuCreateInstance failed!!!!\n");
         abort();
     }
 #endif // __EMSCRIPTEN__

@@ -23,8 +23,8 @@
  * SOFTWARE.
  */
 
-#include "config.h"
-#include "wgvk.h"
+#include <config.h>
+#include <webgpu/webgpu.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -962,10 +962,10 @@ RGAPI void EndDrawing(){
         ToggleFullscreenImpl();
     }
     
-    uint64_t nanosecondsPerFrame = GetTargetFPS() > 0 ? floor(1e9 / GetTargetFPS()) : 0;
+    uint64_t nanosecondsPerFrame = (uint64_t)(GetTargetFPS() > 0 ? floor(1e9 / GetTargetFPS()) : 0.0);
     uint64_t beginframe_stmp = g_renderstate.last_timestamps[(g_renderstate.total_frames - 1) % 64];
     ++g_renderstate.total_frames;
-    g_renderstate.last_timestamps[g_renderstate.total_frames % 64] = NanoTime();
+    g_renderstate.last_timestamps[g_renderstate.total_frames % 64] = (int64_t)NanoTime();
     uint64_t elapsed = NanoTime() - beginframe_stmp;
     if(elapsed & (1ull << 63))return;
     NanoWait(nanosecondsPerFrame - elapsed);
@@ -988,7 +988,7 @@ void EndGIFRecording(){
         }
     }
     #else
-    constexpr char buf[] = "gifexport.gif";
+    char buf[] = "gifexport.gif";
     #endif
     endRecording(g_renderstate.grst, buf);
 }
@@ -1622,10 +1622,11 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     ShaderSources sources zeroinit;
     #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1 
     sources.language = sourceTypeWGSL;
-    auto& src = sources.sources[sources.sourceCount++];
-    src.data = shaderSource;
-    src.sizeInBytes = std::strlen(shaderSource);
-    src.stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
+    ShaderStageSource* src = sources.sources + sources.sourceCount;
+    sources.sourceCount++;
+    src->data = shaderSource;
+    src->sizeInBytes = strlen(shaderSource);
+    src->stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     StringToUniformMap* bindings = getBindings(sources);
     InOutAttributeInfo attribs = getAttributes(sources);
     
@@ -1636,7 +1637,7 @@ Shader LoadShaderSingleSource(const char* shaderSource){
         const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
-            .attr = WGPUVertexAttribute{
+            .attr = {
                 .nextInChain = NULL,
                 .format = format,
                 .offset = offset,

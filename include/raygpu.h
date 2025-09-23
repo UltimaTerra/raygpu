@@ -4,9 +4,6 @@
 #include <config.h>
 #if SUPPORT_WGPU_BACKEND == 1
     #include <webgpu/webgpu.h>
-    #ifdef __cplusplus
-        #include <webgpu/webgpu_cpp.h>
-    #endif
     typedef enum WGPUShaderStageEnum{
         WGPUShaderStageEnum_Vertex,
         WGPUShaderStageEnum_Fragment,
@@ -15,7 +12,7 @@
         WGPUShaderStageEnum_Force32 = 0x7FFFFFFF
     }WGPUShaderStageEnum;
 #else
-    #include <wgvk.h>
+    #include <webgpu/webgpu.h>
 #endif
 #include <stdbool.h>
 #include <stdio.h>
@@ -162,6 +159,18 @@ typedef struct RenderTexture{
     uint32_t colorAttachmentCount;
 }RenderTexture;
 
+
+static inline bool WGPUBlendState_eq(const WGPUBlendState* a, const WGPUBlendState* b){
+    return 
+    
+    a->alpha.dstFactor == b->alpha.dstFactor &&
+    a->alpha.srcFactor == b->alpha.srcFactor &&
+    a->alpha.operation == b->alpha.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    true;
+}
 /**
  * @brief This struct handles the settings that GL handles with global functions
  * 
@@ -178,6 +187,7 @@ typedef struct RenderSettings{
     WGPUBlendState blendState;    
     WGPUFrontFace frontFace;
     WGPUCompareFunction depthCompare;
+    
     #ifdef __cplusplus
     bool operator==(const RenderSettings& rs) const noexcept{
         return
@@ -185,26 +195,14 @@ typedef struct RenderSettings{
                faceCull     == rs.faceCull      && 
                sampleCount  == rs.sampleCount   && 
                lineWidth    == rs.lineWidth     && 
-               blendState   == rs.blendState    && 
+               WGPUBlendState_eq(&blendState, &rs.blendState)    && 
                frontFace    == rs.frontFace     && 
                depthCompare == rs.depthCompare  &&
         true;
     }
     #endif
 }RenderSettings;
-static inline bool WGPUBlendState_eq(const WGPUBlendState* a, const WGPUBlendState* b){
-    return 
-    
-    a->alpha.dstFactor == b->alpha.dstFactor &&
-    a->alpha.srcFactor == b->alpha.srcFactor &&
-    a->alpha.operation == b->alpha.operation &&
-    a->color.operation == b->color.operation &&
-    a->color.operation == b->color.operation &&
-    a->color.operation == b->color.operation &&
-    true;
 
-
-}
 static inline bool RenderSettings_eq(const RenderSettings* a, const RenderSettings* b){
     return
         a->depthTest    == b->depthTest     && 

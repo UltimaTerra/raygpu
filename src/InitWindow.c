@@ -339,7 +339,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     ShaderSources defaultWGSLSource zeroinit;
     defaultWGSLSource.sourceCount = 1;
     defaultWGSLSource.sources[0].data = shaderSource;
-    defaultWGSLSource.sources[0].sizeInBytes = std::strlen(shaderSource);
+    defaultWGSLSource.sources[0].sizeInBytes = strlen(shaderSource);
     defaultWGSLSource.sources[0].stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     //g_renderstate.defaultShader = LoadPipeline(shaderSource);
     g_renderstate.defaultShader = LoadShaderSingleSource(

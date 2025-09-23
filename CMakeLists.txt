@@ -11,7 +11,7 @@ option(SUPPORT_GLFW "Enable windowing with GLFW" OFF)
 option(SUPPORT_RGFW "Enable windowing with RGFW" OFF)
 option(RAYGPU_BUILD_TESTS "Build test executables for raygpu" OFF)
 option(RAYGPU_BUILD_SHARED_LIBRARY "Build shared raygpu library" OFF)
-option(RAYGPU_ENABLE_INSTALL "(EXPERIMENTAL!) Enable install targets for raygpu" OFF)
+option(RAYGPU_ENABLE_INSTALL "Enable install targets for raygpu" OFF)
 
 if(NOT SUPPORT_WGPU_BACKEND)
     option(SUPPORT_WGPU_BACKEND "Enable the WebGPU backend" OFF)
@@ -406,7 +406,7 @@ if(SUPPORT_VULKAN_BACKEND)
 endif()
 if(SUPPORT_WGPU_BACKEND)
     list(APPEND RG_SOURCES
-        "src/backend_wgpu.cpp"
+        "src/backend_wgpu.c"
     )
 endif()
 if(SUPPORT_SDL2)
@@ -563,7 +563,7 @@ else()
         list(APPEND raygpu_linked_deps glslang)
     endif()
     if(SUPPORT_VULKAN_BACKEND)
-        target_include_directories(${raygpu_core_library_name} PUBLIC "amalgamation/vulkan_headers/include")
+        target_include_directories(${raygpu_core_library_name} PRIVATE "amalgamation/vulkan_headers/include")
         list(APPEND raygpu_linked_deps wgvk)
     else()
         list(APPEND raygpu_linked_deps webgpu_dawn)
@@ -592,8 +592,8 @@ else()
 endif()
 list(APPEND raygpu_linked_deps spirv-reflect-static)
 
-target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
-
+target_link_libraries(${raygpu_core_library_name} PRIVATE ${raygpu_linked_deps})
+target_link_libraries(${raygpu_core_library_name} PUBLIC wgvk)
 #add_executable(example "src/example.cpp")
 target_compile_features(${raygpu_core_library_name} PUBLIC cxx_std_20)
 if(NOT MSVC)
@@ -648,6 +648,70 @@ if(DEFINED ENV{HOMEBREW_PREFIX})
     target_link_options(${raygpu_core_library_name} PUBLIC "-Wl,-rpath,${HOMEBREW_LIB_RPATH}")
     message(STATUS "HOMEBREW_PREFIX detected. Adding ${HOMEBREW_LIB_RPATH} to RPATH for ${raygpu_core_library_name}.")
 endif()
+
+
+# ----- Install targets for raygpu -----
+if(RAYGPU_ENABLE_INSTALL)
+  include(CMakePackageConfigHelpers)
+
+  # Exported target names
+  set(RAYGPU_INSTALL_EXPORT RaygpuTargets)
+  set(RAYGPU_NAMESPACE raygpu::)
+
+  # 1) Install libraries
+  install(
+    TARGETS
+      raygpu
+    EXPORT ${RAYGPU_INSTALL_EXPORT}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    INCLUDES DESTINATION include/raygpu
+  )
+
+  install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION include/raygpu
+    FILES_MATCHING
+      PATTERN "*.h" PATTERN "*.hpp"
+  )
+
+  set(RAYGPU_CONFIG_INSTALL_DIR lib/cmake/raygpu)
+
+  configure_package_config_file(
+    "${CMAKE_CURRENT_LIST_DIR}/cmake/raygpuConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
+    INSTALL_DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+    NO_SET_AND_CHECK_MACRO
+    NO_CHECK_REQUIRED_COMPONENTS_MACRO
+  )
+
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
+    VERSION 0.1.0
+    COMPATIBILITY SameMajorVersion
+  )
+
+  install(
+    FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
+      "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
+    DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+  )
+
+  install(
+    EXPORT ${RAYGPU_INSTALL_EXPORT}
+    NAMESPACE ${RAYGPU_NAMESPACE}
+    DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+  )
+
+  export(
+    EXPORT ${RAYGPU_INSTALL_EXPORT}
+    NAMESPACE ${RAYGPU_NAMESPACE}
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/raygpuTargets.cmake"
+  )
+endif()
+
 
 add_subdirectory("examples")
 if(RAYGPU_GENERATE_PYTHON_BINDINGS)

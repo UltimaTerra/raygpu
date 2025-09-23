@@ -85,6 +85,7 @@ static inline WGPUVertexFormat sw_vf_from_numeric(int comps, WgslNumericType nt)
                 case 2: return WGPUVertexFormat_Float32x2;
                 case 3: return WGPUVertexFormat_Float32x3;
                 case 4: return WGPUVertexFormat_Float32x4;
+                default: return (WGPUVertexFormat)0;
             } break;
         case WGSL_NUM_I32:
             switch (comps) {
@@ -92,6 +93,7 @@ static inline WGPUVertexFormat sw_vf_from_numeric(int comps, WgslNumericType nt)
                 case 2: return WGPUVertexFormat_Sint32x2;
                 case 3: return WGPUVertexFormat_Sint32x3;
                 case 4: return WGPUVertexFormat_Sint32x4;
+                default: return (WGPUVertexFormat)0;
             } break;
         case WGSL_NUM_U32:
         case WGSL_NUM_BOOL:
@@ -100,6 +102,7 @@ static inline WGPUVertexFormat sw_vf_from_numeric(int comps, WgslNumericType nt)
                 case 2: return WGPUVertexFormat_Uint32x2;
                 case 3: return WGPUVertexFormat_Uint32x3;
                 case 4: return WGPUVertexFormat_Uint32x4;
+                default: return (WGPUVertexFormat)0;
             } break;
         case WGSL_NUM_F16:
             switch (comps) {
@@ -107,6 +110,7 @@ static inline WGPUVertexFormat sw_vf_from_numeric(int comps, WgslNumericType nt)
                 case 2: return WGPUVertexFormat_Float16x2;
                 // vec3<f16> is not valid for vertex formats
                 case 4: return WGPUVertexFormat_Float16x4;
+                default: return (WGPUVertexFormat)0;
             } break;
         default: break;
     }
