@@ -825,9 +825,9 @@ StringToUniformMap* getBindingsGLSL(ShaderSources source);
 typedef struct EntryPointSet{
     char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
 }EntryPointSet;
-EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL);
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
+RGAPI EntryPointSet                                           getEntryPointsWGSL (const char* shaderSourceWGSL);
 RGAPI InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
 RGAPI StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
 RGAPI EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);

@@ -7,6 +7,7 @@
 CC ?= clang
 AR ?= ar
 CXX ?= clang++
+SUPPORT_GLFW ?= 1
 OPT_OR_DEBUG_FLAGS ?= -O3
 # Compiler/Linker flags
 CFLAGS   = -fPIC $(OPT_OR_DEBUG_FLAGS) -DSUPPORT_VULKAN_BACKEND=1 -DRG_STATIC=1 -DSUPPORT_GLSL_PARSER=1 -DENABLE_SPIRV
@@ -49,21 +50,46 @@ DL_WGVK_C       = $(DL_DIR)/wgvk.c
 DL_WGVK_H       = $(DL_DIR)/wgvk.h
 DL_WGVK_STRUCTS = $(DL_DIR)/wgvk_structs_impl.h
 DL_WGVK_CONFIG  = $(DL_DIR)/wgvk_config.h
-DL_ALL          = $(DL_WGVK_C) $(DL_WGVK_H) $(DL_WGVK_STRUCTS) $(DL_WGVK_CONFIG)
+DL_WEBGPU_H     = $(DL_DIR)/webgpu/webgpu.h
+DL_VOLK_H       = $(DL_DIR)/external/volk.h
+DL_VOLK_C       = $(DL_DIR)/src/volk.c
+DL_ALL          = $(DL_WGVK_C) $(DL_WGVK_H) $(DL_WGVK_STRUCTS) $(DL_WGVK_CONFIG) $(DL_WEBGPU_H) $(DL_VOLK_H) $(DL_VOLK_C)
 
 $(DL_DIR):
 	@mkdir -p $(DL_DIR)
 
+$(DL_DIR)/webgpu:
+	@mkdir -p $(DL_DIR)/webgpu
+
+$(DL_DIR)/src:
+	@mkdir -p $(DL_DIR)/src
+
+$(DL_DIR)/external:
+	@mkdir -p $(DL_DIR)/external
+
 $(DL_WGVK_C): | $(DL_DIR)
 	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/src/wgvk.c -o $@; fi
+
 $(DL_WGVK_H): | $(DL_DIR)
 	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk.h -o $@; fi
+
 $(DL_WGVK_STRUCTS): | $(DL_DIR)
 	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk_structs_impl.h -o $@; fi
+
 $(DL_WGVK_CONFIG): | $(DL_DIR)
 	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/wgvk_config.h -o $@; fi
 
+$(DL_WEBGPU_H): | $(DL_DIR)/webgpu
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/webgpu/webgpu.h -o $@; fi
+
+$(DL_VOLK_H): | $(DL_DIR)/external
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/include/external/volk.h -o $@; fi
+
+$(DL_VOLK_C): | $(DL_DIR)/src
+	@if [ ! -f $@ ]; then echo "Downloading $@"; curl -fsSL $(WGVK_URL_BASE)/src/volk.c -o $@; fi
+
 dl_deps: $(DL_ALL)
+
 
 ###############################################################################
 # Determine PLATFORM_OS when required
@@ -118,9 +144,10 @@ CFLAGS   += -DRAYGPU_USE_X11=1
 CXXFLAGS += -DRAYGPU_USE_X11=1
 endif
 
-CFLAGS += -DSUPPORT_GLFW=1
+ifeq ($(SUPPORT_GLFW), 1)
+CFLAGS   += -DSUPPORT_GLFW=1
 CXXFLAGS += -DSUPPORT_GLFW=1
-
+endif
 ###############################################################################
 # Source Files
 ###############################################################################
