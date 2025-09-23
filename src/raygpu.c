@@ -2459,6 +2459,85 @@ float GetFrameTime(){
 void SetConfigFlags(int /* enum WindowFlag */ flag){
     g_renderstate.windowFlags |= flag;
 }
+InOutAttributeInfo                                      getAttributesWGSL_Simple(ShaderSources sources);
+StringToUniformMap*                                     getBindingsWGSL_Simple  (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL_Simple(const char* shaderSourceWGSL);
+
+InOutAttributeInfo                                      getAttributesWGSL_Tint  (ShaderSources sources);
+StringToUniformMap*                                     getBindingsWGSL_Tint    (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL_Tint (const char* shaderSourceWGSL);
+
+InOutAttributeInfo                                      getAttributesWGSL       (ShaderSources sources);
+StringToUniformMap*                                     getBindingsWGSL         (ShaderSources sources);
+EntryPointSet                                           getEntryPointsWGSL      (const char* shaderSourceWGSL);
+
+InOutAttributeInfo getAttributesWGSL(ShaderSources sources) {
+#if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
+    return getAttributesWGSL_Tint(sources);
+#else
+    return getAttributesWGSL_Simple(sources);
+#endif
+}
+
+StringToUniformMap* getBindingsWGSL(ShaderSources sources) {
+#if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
+    return getBindingsWGSL_Tint(sources);
+#else
+    return getBindingsWGSL_Simple(sources);
+#endif
+}
+
+EntryPointSet getEntryPointsWGSL(const char* shaderSourceWGSL) {
+#if defined(SUPPORT_TINT_WGSL_PARSER) && (SUPPORT_TINT_WGSL_PARSER == 1)
+    return getEntryPointsWGSL_Tint(shaderSourceWGSL);
+#else
+    return getEntryPointsWGSL_Simple(shaderSourceWGSL);
+#endif
+}
+
+
+InOutAttributeInfo getAttributes(ShaderSources sources){
+    
+    rassert(sources.language != sourceTypeUnknown, "Source type must be known");
+    const ShaderSourceType language = sources.language;
+    if(language == sourceTypeGLSL){
+        #if SUPPORT_GLSL_PARSER == 1
+        return getAttributesGLSL(sources);
+        #endif
+        TRACELOG(LOG_FATAL, "Attempted to get GLSL attributes without GLSL parser enabled");
+    }
+    if(language == sourceTypeWGSL){
+        #if SUPPORT_WGSL_PARSER == 1
+        return getAttributesWGSL(sources);
+        #endif
+        TRACELOG(LOG_FATAL, "Attempted to get WGSL attributes without WGSL parser enabled");
+    }
+    if(language == sourceTypeSPIRV){
+        TRACELOG(LOG_FATAL, "Attempted to get SPIRV attributes, not yet implemented");
+    }
+    return (InOutAttributeInfo){0};
+}
+StringToUniformMap* getBindings(ShaderSources sources){
+    
+    rassert(sources.language != sourceTypeUnknown, "Source type must be known");
+    const ShaderSourceType language = sources.language;
+    if(language == sourceTypeGLSL){
+        #if SUPPORT_GLSL_PARSER == 1
+        return getBindingsGLSL(sources);
+        #endif
+        TRACELOG(LOG_FATAL, "Attempted to get GLSL bindings without GLSL parser enabled");
+    }
+    if(language == sourceTypeWGSL){
+        #if SUPPORT_WGSL_PARSER == 1
+        return getBindingsWGSL(sources);
+        #endif
+        TRACELOG(LOG_FATAL, "Attempted to get WGSL bindings without WGSL parser enabled");
+    }
+    if(language == sourceTypeSPIRV){
+        TRACELOG(LOG_FATAL, "Attempted to get SPIRV bindings, not yet implemented");
+    }
+    return NULL;
+}
 
 #if defined(_WIN32)
 static uint64_t now_ns(void) {

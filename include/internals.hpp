@@ -827,7 +827,7 @@ typedef struct EntryPointSet{
 }EntryPointSet;
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
-RGAPI EntryPointSet                                           getEntryPointsWGSL(const char* shaderSourceWGSL);
+RGAPI EntryPointSet                                           getEntryPointsWGSL (const char* shaderSourceWGSL);
 RGAPI InOutAttributeInfo                                      getAttributesSPIRV (ShaderSources sources);
 RGAPI StringToUniformMap*                                     getBindingsSPIRV   (ShaderSources sources);
 RGAPI EntryPointSet                                           getEntryPointsSPIRV(const uint32_t* shaderSourceSPIRV, uint32_t wordCount);
