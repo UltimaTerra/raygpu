@@ -400,7 +400,7 @@ if(SUPPORT_VULKAN_BACKEND)
         #cst_bundle_libraries(wgvk_full wgvk_standalone)
     endif()
     
-    list(APPEND RG_SOURCES "src/backend_wgpu.cpp")
+    list(APPEND RG_SOURCES "src/backend_wgpu.c")
 
     
 endif()

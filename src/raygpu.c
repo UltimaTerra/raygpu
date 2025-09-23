@@ -1556,7 +1556,10 @@ void DrawFPS(int posX, int posY){
     snprintf(fpstext, 255, "%d FPS", GetFPS());
     double ratio = (double)(GetFPS()) / GetTargetFPS();
     ratio = std_max_f64(0.0, std_min_f64(1.0, ratio));
-    uint8_t v8 = ratio * 200;
+    if(isnan(ratio) || isinf(ratio)){
+        return;
+    }
+    uint8_t v8 = (uint8_t)(std_clamp_f64(ratio, 0, 1) * 200);
     DrawText(fpstext, posX, posY, 40, CLITERAL(Color){(uint8_t)(255 - (uint8_t)(ratio * ratio * 255)), v8, 20, 255});
 }
 

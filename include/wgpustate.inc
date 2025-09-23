@@ -1,17 +1,9 @@
-#include <vector>
-#include <mutex>
-#include <unordered_map>
-#include <map>
-#include <deque>
-#include <array>
 
-
-
-struct wgpustate{
+typedef struct wgpustate{
     WGPUInstance instance;
     WGPUAdapter adapter;
     WGPUDevice device;
     WGPUQueue queue;
-};
+}wgpustate;
 
 #include "renderstate.hpp"

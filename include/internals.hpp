@@ -98,9 +98,9 @@ static inline size_t hashVectorOfAttributeAndResidence(const AttributeAndResiden
  * 
  * @param shaderSource
  */
-StringToUniformMap* getBindingsWGSL(ShaderSources source);
-StringToUniformMap* getBindingsGLSL(ShaderSources source);
-StringToUniformMap* getBindings    (ShaderSources source);
+RGAPI StringToUniformMap* getBindingsWGSL(ShaderSources source);
+RGAPI StringToUniformMap* getBindingsGLSL(ShaderSources source);
+RGAPI StringToUniformMap* getBindings    (ShaderSources source);
 
 
 
@@ -112,9 +112,9 @@ StringToUniformMap* getBindings    (ShaderSources source);
  * @param shaderSource 
  * @return std::unordered_map<std::string, std::pair<WGPUVertexFormat, uint32_t>> 
  */
-InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
-InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
-InOutAttributeInfo getAttributes    (ShaderSources sources);
+RGAPI InOutAttributeInfo getAttributesWGSL(ShaderSources sources);
+RGAPI InOutAttributeInfo getAttributesGLSL(ShaderSources sources);
+RGAPI InOutAttributeInfo getAttributes    (ShaderSources sources);
 
 RGAPI DescribedBuffer* UpdateVulkanRenderbatch();
 void PushUsedBuffer(void* nativeBuffer);

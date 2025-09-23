@@ -306,7 +306,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
 
     vboptr = (vertex*)RL_CALLOC(10000, sizeof(vertex));
     vboptr_base = vboptr;
-    renderBatchVBO = GenVertexBuffer(NULL, (size_t)((RENDERBATCH_SIZE) * sizeof(vertex)));
+    renderBatchVBO = GenVertexBuffer(NULL, ((size_t)(RENDERBATCH_SIZE) * sizeof(vertex)));
     
     renderBatchVAO = LoadVertexArray();
     VertexAttribPointer(renderBatchVAO, renderBatchVBO, 0, WGPUVertexFormat_Float32x3, 0 * sizeof(float), WGPUVertexStepMode_Vertex);
