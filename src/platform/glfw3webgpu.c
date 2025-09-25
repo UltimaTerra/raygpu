@@ -1,3 +1,4 @@
+// begin file src/glfw3webgpu.c
 #include "glfw3webgpu.h"
 
 #include <webgpu/webgpu.h>
@@ -136,3 +137,6 @@ WGPUSurface glfwCreateWindowWGPUSurface(WGPUInstance instance, GLFWwindow* windo
         return NULL;
     }
 }
+
+
+// end file src/glfw3webgpu.c

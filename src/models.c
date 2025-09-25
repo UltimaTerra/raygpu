@@ -2969,4 +2969,6 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 
     return mesh;
 }
+
+
 // end file src/models.c

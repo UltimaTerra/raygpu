@@ -22,4 +22,6 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window);
 #endif
 
 #endif // _sdl2_webgpu_h_
+
+
 // end file src/sdl3webgpu.h

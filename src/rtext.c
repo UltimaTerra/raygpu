@@ -2503,4 +2503,6 @@ static GlyphInfo *LoadFontDataBDF(const unsigned char *fileData, int dataSize, i
 
 #endif      // SUPPORT_MODULE_RTEXT
 
+
+
 // end file src/rtext.c

@@ -1,4 +1,4 @@
-// begin file src/backend_wgpu.cpp
+// begin file src/backend_wgpu.c
 
 #include <raygpu.h>
 #ifdef SUPPORT_VULKAN_BACKEND
@@ -2893,4 +2893,6 @@ const char* TextureFormatName(WGPUTextureFormat fmt) {
     }
 }
 
-// end file src/backend_wgpu.cpp
+
+
+// end file src/backend_wgpu.c

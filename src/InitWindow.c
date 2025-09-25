@@ -1,7 +1,15 @@
 // begin file src/InitWindow.c
+#define Font rlFont
+#define Rectangle rlRectangle
+#define LoadImage rlLoadImage
+#define DrawText rlDrawText
+#define DrawTextEx rlDrawTextEx
+#define ShowCursor rlShowCursor
+#define AdapterType rlAdapterType
+#include <raygpu.h>
+#undef Font
 #include "config.h"
 #include <c_fs_utils.h>
-#include <raygpu.h>
 #include <internals.hpp>
 const char shaderSource[] = "struct VertexInput {\n"
 "    @location(0) position: vec3f,\n"
@@ -569,7 +577,24 @@ size_t GetPixelSizeInBytes(PixelFormat format) {
     }
     return 0;
 }
+#if SUPPORT_GLFW == 1
+#include "platform/InitWindow_GLFW.c"
+#include "platform/glfw3webgpu.c"
+#endif
 
+#if SUPPORT_SDL2 == 1
+#include "platform/InitWindow_SDL2.c"
+#include "platform/sdl2webgpu.c"
+#endif
 
+#if SUPPORT_SDL3 == 1
+#include "platform/InitWindow_SDL3.c"
+#include "platform/sdl3webgpu.c"
+#endif
+
+#if SUPPORT_RGFW == 1
+#include "platform/InitWindow_RGFW.c"
+#include "platform/rgfwwebgpu.c"
+#endif
 
 // end file src/InitWindow.c

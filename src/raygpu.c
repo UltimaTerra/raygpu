@@ -3281,4 +3281,6 @@ RGAPI uint32_t getNextShaderID_shc(){
     return nextShaderID_shc++;
 }
 
-// end file src/raygpu.cpp
+
+
+// end file src/raygpu.c

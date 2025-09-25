@@ -1,4 +1,4 @@
-// begin file src/InitWindow_SDL3.cpp
+// begin file src/InitWindow_SDL3.c
 #include "SDL3/SDL_video.h"
 #define VK_NO_PROTOTYPES
 #include <SDL3/SDL.h>
@@ -482,4 +482,6 @@ void ToggleFullscreen_SDL3(cwoid){
 }
 
 
-// end file src/InitWindow_SDL3.cpp
+
+
+// end file src/InitWindow_SDL3.c

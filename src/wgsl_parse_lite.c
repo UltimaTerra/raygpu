@@ -1,3 +1,4 @@
+// begin file src/wgsl_parse_lite.c
 #include <config.h>
 #include <raygpu.h>
 #include <internals.hpp>
@@ -296,3 +297,5 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
 }
 
 #endif // simple backend
+
+// end file src/wgsl_parse_lite.c

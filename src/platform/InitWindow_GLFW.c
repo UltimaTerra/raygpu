@@ -1,4 +1,4 @@
-// begin file src/InitWindow_GLFW.cpp
+// begin file src/InitWindow_GLFW.c
 #include <raygpu.h>
 #define GLFW_INCLUDE_NONE
 #if SUPPORT_VULKAN_BACKEND == 1
@@ -587,4 +587,6 @@ int emscripten_to_glfw_key(const char *key_name) {
     return GLFW_KEY_UNKNOWN;
 }
 
-// end file src/InitWindow_GLFW.cpp
+
+
+// end file src/InitWindow_GLFW.c

@@ -160,4 +160,6 @@ WGPUSurface SDL3_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     return NULL;
 }
 
+
+
 // end file src/sdl3webgpu.c

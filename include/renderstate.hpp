@@ -1,4 +1,7 @@
 // begin file include/renderstate.hpp
+#ifndef RENDERSTATE_H
+#define RENDERSTATE_H
+
 #include <stdlib.h>
 #include <macros_and_constants.h>
 #include <raygpu.h>
@@ -389,4 +392,5 @@ typedef struct renderstate {
 
     bool closeFlag;
 } renderstate;
+#endif
 // end file include/renderstate.hpp

@@ -1,3 +1,4 @@
+// begin file src/glfw3webgpu.h
 #ifndef GLFW3_WEBGPU_H_INCLUDED
 #define GLFW3_WEBGPU_H_INCLUDED
 
@@ -13,3 +14,6 @@ WGPUSurface glfwCreateWindowWGPUSurface(WGPUInstance instance, GLFWwindow* windo
 #endif
 
 #endif // GLFW3_WEBGPU_H_INCLUDED
+
+
+// end file src/glfw3webgpu.h

@@ -409,39 +409,13 @@ if(SUPPORT_WGPU_BACKEND)
         "src/backend_wgpu.c"
     )
 endif()
-if(SUPPORT_SDL2)
-    list(APPEND RG_SOURCES "src/InitWindow_SDL2.cpp")
-    list(APPEND RG_SOURCES "src/sdl2webgpu.c")
+if(APPLE)
+    set_source_files_properties("src/InitWindow.c"
+        PROPERTIES
+        LANGUAGE OBJC
+    )
 endif()
-if(SUPPORT_SDL3)
-    list(APPEND RG_SOURCES "src/InitWindow_SDL3.c")
-    list(APPEND RG_SOURCES "src/sdl3webgpu.c")
-    if(APPLE)
-        set_source_files_properties("src/sdl3webgpu.c"
-            PROPERTIES
-            LANGUAGE OBJC
-        )
-    endif()
-endif()
-if(SUPPORT_RGFW)
-    list(APPEND RG_SOURCES "src/InitWindow_RGFW.cpp")
-    list(APPEND RG_SOURCES "src/rgfwwebgpu.c")
-endif()
-if(SUPPORT_GLFW)
-    list(APPEND RG_SOURCES "src/InitWindow_GLFW.c")
-    list(APPEND RG_SOURCES "src/glfw3webgpu.c")
-    if(SUPPORT_WGPU_BACKEND)
-        if(APPLE)
-            set_source_files_properties("src/glfw3webgpu.c"
-                PROPERTIES
-                LANGUAGE OBJC
-            )
-        endif()
-    endif()
-endif()
-if(SUPPORT_RGFW)
-    list(APPEND RG_SOURCES "src/rgfw_impl.c")
-endif()
+
 if (NOT EMSCRIPTEN)
     list(APPEND RG_SOURCES "src/glsl_support.cpp")
 endif()

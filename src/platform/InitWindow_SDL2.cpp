@@ -608,4 +608,6 @@ void ToggleFullscreen_SDL2(cwoid){
         //glfwSetWindowMonitor(g_renderstate.window, glfwGetPrimaryMonitor(), 0, 0, vm->width, vm->height, vm->refreshRate);
     }
 }
+
+
 // end file src/InitWindow_SDL2.cpp

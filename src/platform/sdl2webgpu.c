@@ -188,4 +188,6 @@ void usedefinedawnmacro___(void){ //Silence warning
     (void)x;
 }
 
+
+
 // end file src/sdl2webgpu.c
