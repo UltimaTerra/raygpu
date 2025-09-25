@@ -592,10 +592,12 @@ else()
 endif()
 list(APPEND raygpu_linked_deps spirv-reflect-static)
 
-target_link_libraries(${raygpu_core_library_name} PRIVATE ${raygpu_linked_deps})
-if(NOT EMSCRIPTEN) 
+target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
+
+if(NOT EMSCRIPTEN AND NOT SUPPORT_WGPU_BACKEND) 
     target_link_libraries(${raygpu_core_library_name} PUBLIC wgvk)
 endif()
+
 #add_executable(example "src/example.cpp")
 target_compile_features(${raygpu_core_library_name} PUBLIC cxx_std_20)
 if(NOT MSVC)

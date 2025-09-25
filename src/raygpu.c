@@ -540,6 +540,8 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
             memcpy(dest, entryPoints.names[i], MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1);
         }
     }
+    ret.reflectionInfo.attributes = getAttributesWGSL(sources);
+    ret.reflectionInfo.uniforms = getBindingsWGSL(sources);
     #elif SUPPORT_TINT_WGSL_PARSER == 1
     ShaderSources spirvSources = wgsl_to_spirv(sources);
     ret = LoadShaderModuleSPIRV(spirvSources);

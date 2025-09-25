@@ -342,15 +342,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     defaultWGSLSource.sources[0].sizeInBytes = strlen(shaderSource);
     defaultWGSLSource.sources[0].stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     //g_renderstate.defaultShader = LoadPipeline(shaderSource);
-    g_renderstate.defaultShader = LoadShaderSingleSource(
-        shaderSource
-        //,
-        //renderBatchVAO->attributes,
-        //renderBatchVAO->attributes_count,
-        //uniforms,
-        //sizeof(uniforms) / sizeof(ResourceTypeDescriptor),
-        //GetDefaultSettings()
-    );
+    g_renderstate.defaultShader = LoadShaderSingleSource(shaderSource);
 
     #else
     ShaderSources defaultSPIRVSource zeroinit;

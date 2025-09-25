@@ -221,6 +221,7 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
 
     int n = 0;
     const WgslSymbolInfo* syms = wgsl_resolver_binding_vars(R, &n);
+
     for (int i = 0; i < n; ++i) {
         const WgslSymbolInfo* s = syms + i;
         if (!s->name || !s->decl_node || s->decl_node->type != WGSL_NODE_GLOBAL_VAR) continue;
@@ -258,6 +259,7 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
         }
 
         if (!handled) {
+            
             if (gv->address_space && strcmp(gv->address_space, "uniform") == 0) {
                 desc.type = uniform_buffer;
             } else if (gv->address_space && strcmp(gv->address_space, "storage") == 0) {
@@ -268,7 +270,7 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
                 else if(gv->access_modifier && strcmp(gv->access_modifier, "write") == 0){
                     desc.access = writeonly;
                 }
-                else if(gv->access_modifier && strcmp(gv->access_modifier, "readwrite") == 0){
+                else if(gv->access_modifier && strcmp(gv->access_modifier, "read_write") == 0){
                     desc.access = readwrite;
                 }
                 else{

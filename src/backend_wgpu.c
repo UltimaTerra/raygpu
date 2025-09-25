@@ -911,6 +911,16 @@ void requestDeviceCallback(
 //    }
 //}
 
+char* NullTerminatedStringFromView_(WGPUStringView view){
+    size_t length = view.length == WGPU_STRLEN ? strlen(view.data) : view.length;
+    if(length == 0){
+        return NULL;
+    }
+    char* retData = (char*)RL_CALLOC(length, 1);
+    memcpy(retData, view.data, length);
+    return retData;
+}
+
 void uncapturedErrorCallback(
     const WGPUDevice *device, WGPUErrorType type, WGPUStringView message, void *_userdata1, void *_userdata2) {
     const char *errorTypeName = "";
@@ -935,8 +945,9 @@ void uncapturedErrorCallback(
         // abort();
         // rg_unreachable();
     }
-    // abort();
-    // TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, std::string(message.data, message.length).c_str());
+    char* snprintfCompatibleMessage = NullTerminatedStringFromView_(message);
+    TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, snprintfCompatibleMessage);
+    RL_FREE(snprintfCompatibleMessage);
     
     rg_trap();
 };
@@ -999,16 +1010,14 @@ void InitBackend() {
     WGPUChainedStruct *togglesChain = NULL;
     WGPUSType type;
 #if !defined(__EMSCRIPTEN__) && !defined(SUPPORT_VULKAN_BACKEND)
-    std::vector<const char *> enableToggleNames{};
-    std::vector<const char *> disabledToggleNames{};
-
-    WGPUDawnTogglesDescriptor toggles = {};
-    toggles.enabledToggles = enableToggleNames.data();
-    toggles.enabledToggleCount = enableToggleNames.size();
-    toggles.disabledToggles = disabledToggleNames.data();
-    toggles.disabledToggleCount = disabledToggleNames.size();
-
-    togglesChain = &toggles.chain;
+    // std::vector<const char *> enableToggleNames{};
+    // std::vector<const char *> disabledToggleNames{};
+    // WGPUDawnTogglesDescriptor toggles = {};
+    // toggles.enabledToggles = enableToggleNames.data();
+    // toggles.enabledToggleCount = enableToggleNames.size();
+    // toggles.disabledToggles = disabledToggleNames.data();
+    // toggles.disabledToggleCount = disabledToggleNames.size();
+    // togglesChain = &toggles.chain;
 #endif // __EMSCRIPTEN__
 
     // Setup base adapter options with toggles.

@@ -575,7 +575,7 @@ static WgslAstNode *parse_struct(Parser *P, WgslAstNode **opt_attrs, int attr_co
 static WgslAstNode *parse_global_var(Parser *P, WgslAstNode **attrs, int attr_count) {
     expect(P, TOK_VAR, "expected 'var'");
     char *addr_space = NULL;
-    char *access = NULL;
+    char access_text_cache[32] = {'\0'};
     if (match(P, TOK_LT)) {
         if (!check(P, TOK_IDENT))
             parse_error(P, "expected identifier inside '<>'");
@@ -600,11 +600,11 @@ static WgslAstNode *parse_global_var(Parser *P, WgslAstNode **attrs, int attr_co
                                  : 0;
         
         if(first_access){
-            access = first;
+            strcpy(access_text_cache, first);
         }else if(second_access){
-            access = second;
+            strcpy(access_text_cache, second);
         }else{
-            access = NULL;
+
         }
         if (first_addr) {
             addr_space = first;
@@ -632,7 +632,9 @@ static WgslAstNode *parse_global_var(Parser *P, WgslAstNode **attrs, int attr_co
     G->global_var.attr_count = attr_count;
     G->global_var.attrs = attrs;
     G->global_var.address_space = addr_space;
-    G->global_var.access_modifier  = access;
+    if(access_text_cache[0] != '\0'){
+        G->global_var.access_modifier = wgsl_strdup(access_text_cache);
+    }
     G->global_var.name = wgsl_strndup(name.start, (size_t)name.length);
     G->global_var.type = T;
     return G;
