@@ -8,9 +8,8 @@
 #define AdapterType rlAdapterType
 #include <raygpu.h>
 #undef Font
-#include "config.h"
 #include <c_fs_utils.h>
-#include <internals.hpp>
+#include <internals.h>
 const char shaderSource[] = "struct VertexInput {\n"
 "    @location(0) position: vec3f,\n"
 "    @location(1) uv: vec2f,\n"
@@ -148,16 +147,8 @@ const uint32_t default_frag_spv_data[] = {
 };
 const size_t default_frag_spv_data_len = 912;
 
-
-
-
-
-
-
-
 struct full_renderstate;
-
-#include <renderstate.hpp>
+#include <renderstate.h>
 
 
 void PollEvents(){

@@ -5,14 +5,15 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_error.h>
 #include <raygpu.h>
-#include <internals.hpp>
-#include <renderstate.hpp>
+#include <internals.h>
+#include <renderstate.h>
 #if SUPPORT_VULKAN_BACKEND == 1
-#include <external/volk.h>
-#include <vulkan/vulkan.h>
-#include <SDL3/SDL_vulkan.h>
-#include <wgvk_structs_impl.h>
+    #include <external/volk.h>
+    #include <vulkan/vulkan.h>
+    #include <SDL3/SDL_vulkan.h>
+    #include <wgvk_structs_impl.h>
 #elif SUPPORT_WGPU_BACKEND == 1 || defined(__EMSCRIPTEN__)
+
 #endif
 #include "sdl3webgpu.h"
 

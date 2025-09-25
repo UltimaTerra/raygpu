@@ -94,12 +94,12 @@
 #include <external/stb_image.h>
 #include <external/sinfl.h>
 #include <external/sdefl.h>
-#include <internals.hpp>
+#include <internals.h>
 #include <external/msf_gif.h>
 void ToggleFullscreenImpl(cwoid);
 #ifdef __EMSCRIPTEN__
 #endif  // __EMSCRIPTEN__
-#include <renderstate.hpp>
+#include <renderstate.h>
 
 //#include <enum_translation.h>
 

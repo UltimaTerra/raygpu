@@ -43,7 +43,7 @@
 #include <glslang/Public/resource_limits_c.h>
 #include <spirv_reflect.h>
 #include <raygpu.h>
-#include <internals.hpp>
+#include <internals.h>
 
 #ifdef GLSL_TO_WGSL
 #include <tint/tint.h>

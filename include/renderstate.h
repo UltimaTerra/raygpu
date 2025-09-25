@@ -1,4 +1,4 @@
-// begin file include/renderstate.hpp
+// begin file include/renderstate.h
 #ifndef RENDERSTATE_H
 #define RENDERSTATE_H
 
@@ -393,4 +393,4 @@ typedef struct renderstate {
     bool closeFlag;
 } renderstate;
 #endif
-// end file include/renderstate.hpp
+// end file include/renderstate.h

@@ -3,12 +3,12 @@
 #define GLFW_INCLUDE_NONE
 #if SUPPORT_VULKAN_BACKEND == 1
     #include <external/volk.h>
-    #include <renderstate.hpp>
+    #include <renderstate.h>
 #endif
 #if SUPPORT_WGPU_BACKEND == 1
     #include "wgpustate.inc"
 #endif
-#include <internals.hpp>
+#include <internals.h>
 #include <GLFW/glfw3.h>
 #include "glfw3webgpu.h"
 

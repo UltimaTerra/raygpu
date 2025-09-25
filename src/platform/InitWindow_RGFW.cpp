@@ -239,8 +239,8 @@ const std::array<short, 512> keyMappingRGFW_ = [](){
     #endif
 #endif
 #include <external/RGFW.h>
-#include <internals.hpp>
-#include <renderstate.hpp>
+#include <internals.h>
+#include <renderstate.h>
 #if SUPPORT_VULKAN_BACKEND == 1
     #include <wgvk_structs_impl.h>
 #endif

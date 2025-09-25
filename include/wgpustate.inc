@@ -6,4 +6,4 @@ typedef struct wgpustate{
     WGPUQueue queue;
 }wgpustate;
 
-#include "renderstate.hpp"
+#include "renderstate.h"

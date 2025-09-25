@@ -1,7 +1,7 @@
 // begin file src/wgsl_parse_lite.c
 #include <config.h>
 #include <raygpu.h>
-#include <internals.hpp>
+#include <internals.h>
 
 
 InOutAttributeInfo                                      getAttributesWGSL_Simple(ShaderSources sources);
