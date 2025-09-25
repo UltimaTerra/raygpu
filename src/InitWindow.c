@@ -1,11 +1,5 @@
 // begin file src/InitWindow.c
 #define Font rlFont
-#define Rectangle rlRectangle
-#define LoadImage rlLoadImage
-#define DrawText rlDrawText
-#define DrawTextEx rlDrawTextEx
-#define ShowCursor rlShowCursor
-#define AdapterType rlAdapterType
 #include <raygpu.h>
 #undef Font
 #include <c_fs_utils.h>
