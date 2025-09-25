@@ -552,7 +552,8 @@ StringToUniformMap* getBindingsGLSL(ShaderSources sources){
                         .length = (uint32_t)strlen(set->bindings[i]->name),
                     };
                     if(identifier.length <= MAX_BINDING_NAME_LENGTH){
-                        memcpy(identifier.name, set->bindings[i]->name, MAX_BINDING_NAME_LENGTH);
+                        memcpy(identifier.name, set->bindings[i]->name, identifier.length);
+                        identifier.name[identifier.length] = '\0';
                     }
                     StringToUniformMap_put(ret, identifier, insert);
                 }

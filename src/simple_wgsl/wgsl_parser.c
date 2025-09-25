@@ -633,6 +633,7 @@ static WgslAstNode *parse_global_var(Parser *P, WgslAstNode **attrs, int attr_co
     G->global_var.attrs = attrs;
     G->global_var.address_space = addr_space;
     if(access_text_cache[0] != '\0'){
+        access_text_cache[31] = '\0';
         G->global_var.access_modifier = wgsl_strdup(access_text_cache);
     }
     G->global_var.name = wgsl_strndup(name.start, (size_t)name.length);

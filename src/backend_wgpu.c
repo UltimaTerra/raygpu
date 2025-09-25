@@ -226,7 +226,9 @@ void UnloadTexture(Texture tex) {
         tex.id = NULL;
     }
 }
-void PresentSurface(FullSurface *fsurface) { wgpuSurfacePresent((WGPUSurface)fsurface->surface); }
+void PresentSurface(FullSurface *fsurface) {
+    wgpuSurfacePresent((WGPUSurface)fsurface->surface); 
+}
 
 static inline uint64_t bgEntryHash(WGPUBindGroupEntry bge) {
     const uint32_t rotation = (bge.binding * 7) & 63;
@@ -920,9 +922,10 @@ char* NullTerminatedStringFromView_(WGPUStringView view){
     memcpy(retData, view.data, length);
     return retData;
 }
-
+int ueccount = 0;
 void uncapturedErrorCallback(
     const WGPUDevice *device, WGPUErrorType type, WGPUStringView message, void *_userdata1, void *_userdata2) {
+    if(ueccount++ >= 5)return;
     const char *errorTypeName = "";
     switch (type) {
     case WGPUErrorType_Validation:
@@ -949,6 +952,7 @@ void uncapturedErrorCallback(
     TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, snprintfCompatibleMessage);
     RL_FREE(snprintfCompatibleMessage);
     
+    assert(false);
     rg_trap();
 };
 
@@ -1114,7 +1118,7 @@ void InitBackend() {
     // const char* backendString = backendTypeSpellingTable.at(info.backendType).c_str();
 
     // TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
-    TRACELOG(LOG_INFO, "Using adapter %s", info.device.data);
+    // TRACELOG(LOG_INFO, "Using adapter %s", info.device.data);
     // TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
     // TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture.c_str());
     // TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
@@ -1526,8 +1530,6 @@ Texture LoadTextureFromImage(Image img) {
     return ret;
 }
 void ResizeSurface(FullSurface *fsurface, int newWidth, int newHeight) {
-    newWidth *= 1;
-    newHeight *= 1;
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     fsurface->renderTarget.colorMultisample.width = newWidth;
@@ -1548,7 +1550,10 @@ void ResizeSurface(FullSurface *fsurface, int newWidth, int newHeight) {
         .alphaMode = WGPUCompositeAlphaMode_Opaque,
         .presentMode = (WGPUPresentMode)fsurface->surfaceConfig.presentMode,
     };
+    printf("%p\n", fsurface->surface);
+    //__builtin_dump_struct(&wsconfig, printf);
     wgpuSurfaceConfigure(fsurface->surface, &wsconfig);
+    //assert(false);
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
     // UnloadTexture(fsurface->frameBuffer.texture);

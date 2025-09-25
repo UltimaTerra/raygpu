@@ -150,7 +150,8 @@ EntryPointSet getEntryPointsWGSL_Simple(const char* shaderSourceWGSL) {
     uint32_t insertIndex = 0;
     for (int i = 0; i < n; ++i) {
         char* insert = eps.names[sw_to_stage_enum(arr[i].stage)];
-        if(arr[i].name && strlen(arr[i].name) <= MAX_SHADER_ENTRYPOINT_NAME_LENGTH){
+        assert(strlen(arr[i].name) < MAX_SHADER_ENTRYPOINT_NAME_LENGTH);
+        if(arr[i].name && strlen(arr[i].name) < MAX_SHADER_ENTRYPOINT_NAME_LENGTH){
             memcpy(insert, arr[i].name, strlen(arr[i].name));
         }
     }
@@ -284,8 +285,10 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
         BindingIdentifier identifier = {
             .length = (uint32_t)strlen(s->name),
         };
+        assert(identifier.length <= MAX_BINDING_NAME_LENGTH);
         if(identifier.length <= MAX_BINDING_NAME_LENGTH){
-            memcpy(identifier.name, s->name, MAX_BINDING_NAME_LENGTH);
+            memcpy(identifier.name, s->name, identifier.length);
+            identifier.name[identifier.length] = '\0';
         }
         StringToUniformMap_put(out, identifier, desc);
     }

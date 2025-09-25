@@ -531,13 +531,18 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
         }
         
         EntryPointSet entryPoints = getEntryPointsWGSL((const char*)sources.sources[i].data);
-        for(uint32_t i = 0;i < 16;i++){
+        for(uint32_t i = 0;i < WGPUShaderStageEnum_EnumCount;i++){
             //rassert(entryPoints[i].second.size() < 15, "Entrypoint name must be shorter than 15 characters");
             if(entryPoints.names[i][0] == '\0'){
                 continue;
             }
             char* dest = ret.reflectionInfo.ep[i].name;
             memcpy(dest, entryPoints.names[i], MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1);
+            if(dest[MAX_SHADER_ENTRYPOINT_NAME_LENGTH] != '\0'){
+                printf("%s\n", ret.reflectionInfo.ep[i].name);
+            }
+            assert(dest[MAX_SHADER_ENTRYPOINT_NAME_LENGTH] == '\0');
+            dest[MAX_SHADER_ENTRYPOINT_NAME_LENGTH] = '\0';
         }
     }
     ret.reflectionInfo.attributes = getAttributesWGSL(sources);

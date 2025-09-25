@@ -39,6 +39,7 @@ float calculateScrollScale(int deltaMode) {
 #include <wgvk_structs_impl.h>
 #endif
 void setupGLFWCallbacks(GLFWwindow* window);
+
 void ResizeCallback(GLFWwindow* window, int width, int height){
     
     TRACELOG(LOG_INFO, "GLFW's ResizeCallback called with %d x %d", width, height);
@@ -48,6 +49,7 @@ void ResizeCallback(GLFWwindow* window, int width, int height){
         return;
     }
     else {
+        emscripten_set_canvas_element_size("#canvas", width, height);
         ResizeSurface(&CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface, width, height);
         if((void*)window == (void*)g_renderstate.window){
             g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface.renderTarget;
@@ -63,7 +65,15 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset){
 
 #ifdef __EMSCRIPTEN__
 
-
+EM_BOOL EmscriptenResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent __attribute__((nonnull)), void *userData){
+    //printf("Emscripten resize callbacked:\n");
+    //printf("%d, %d\n", uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
+    //printf("%d, %d\n", uiEvent->documentBodyClientWidth, uiEvent->documentBodyClientHeight);
+    ResizeCallback(g_renderstate.window, uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
+    fflush(stdout);
+    
+    return EM_TRUE;
+}
 EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheelEvent, void *userData) {
     // Calculate scaling based on deltaMode
     float scaleX = calculateScrollScale(wheelEvent->deltaMode);
@@ -76,7 +86,7 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
     
     // Invoke the original scroll callback with scaled deltas
     //auto originalCallback = reinterpret_cast<decltype(scrollCallback)*>(userData);
-    ScrollCallback(NULL, deltaX, deltaY);
+    ScrollCallback(g_renderstate.window, deltaX, deltaY);
     
     return EM_TRUE; // Indicate that the event was handled
 };
@@ -84,12 +94,15 @@ EM_BOOL EmscriptenWheelCallback(int eventType, const EmscriptenWheelEvent* wheel
 #endif
 
 void cpcallback(GLFWwindow* window, double x, double y){
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->input_state.mousePos = CLITERAL(Vector2){(float)x, (float)y};
+    RGWindowImpl* associatedWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window);
+    //fprintf(stderr, "GLFWwindow is %p\n", window);
+    assert(associatedWindow);
+    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)x, (float)y};
 }
 
 #ifdef __EMSCRIPTEN__
 EM_BOOL EmscriptenMouseCallback(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData){
-    cpcallback(NULL, mouseEvent->targetX, mouseEvent->targetY);
+    cpcallback(g_renderstate.window, mouseEvent->targetX, mouseEvent->targetY);
     return true;
 };
 #endif
@@ -186,6 +199,7 @@ void setupGLFWCallbacks(GLFWwindow* window){
     emscripten_set_wheel_callback("#canvas",     NULL, 1, EmscriptenWheelCallback);
     emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, EmscriptenKeydownCallback);
     emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, EmscriptenKeyupCallback);
+    emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 1, EmscriptenResizeCallback);
     #endif
 }
 
@@ -407,7 +421,9 @@ WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
     if(instance == NULL){
         abort();
     }
-    return wgpuInstanceCreateSurface(instance, &surfaceDesc);
+    WGPUSurface value =  wgpuInstanceCreateSurface(instance, &surfaceDesc);
+    printf("Created WGPUSurface %p\n", value);
+    return value;
     #else
     float xscale, yscale;
     glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
