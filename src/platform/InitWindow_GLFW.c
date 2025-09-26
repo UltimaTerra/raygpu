@@ -49,13 +49,15 @@ void ResizeCallback(GLFWwindow* window, int width, int height){
         return;
     }
     else {
-        emscripten_set_canvas_element_size("#canvas", width, height);
+        //emscripten_set_canvas_element_size("#canvas", width, height);
+        //#ifndef __EMSCRIPTEN__
         ResizeSurface(&CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface, width, height);
         if((void*)window == (void*)g_renderstate.window){
             g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window)->surface.renderTarget;
         }
         Matrix newcamera = ScreenMatrix(width, height);
         g_renderstate.minimized = false;
+        //#endif
     }
 }
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset){
@@ -69,6 +71,8 @@ EM_BOOL EmscriptenResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent
     //printf("Emscripten resize callbacked:\n");
     //printf("%d, %d\n", uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
     //printf("%d, %d\n", uiEvent->documentBodyClientWidth, uiEvent->documentBodyClientHeight);
+    int width, height;
+    emscripten_get_canvas_element_size("#canvas", &width, &height);
     ResizeCallback(g_renderstate.window, uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
     fflush(stdout);
     

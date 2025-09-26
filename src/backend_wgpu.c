@@ -711,10 +711,7 @@ void GetNewTexture(FullSurface *fsurface) {
         wgpuSurfaceGetCurrentTexture((WGPUSurface)fsurface->surface, &surfaceTexture);
         if (surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal) {
             TRACELOG(LOG_DEBUG, "wgpuSurfaceGetCurrentTexture called with SuccessOptimal");
-            TRACELOG(LOG_DEBUG,
-                     "Acquired texture is %u x %u",
-                     wgpuTextureGetWidth(surfaceTexture.texture),
-                     wgpuTextureGetHeight(surfaceTexture.texture));
+            TRACELOG(LOG_DEBUG, "Acquired texture is %u x %u", wgpuTextureGetWidth(surfaceTexture.texture), wgpuTextureGetHeight(surfaceTexture.texture));
 
         } else if (surfaceTexture.status == WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal) {
             TRACELOG(LOG_DEBUG, "wgpuSurfaceGetCurrentTexture called with SuccessSubptimal");
@@ -734,6 +731,12 @@ void GetNewTexture(FullSurface *fsurface) {
         fsurface->renderTarget.texture.id = surfaceTexture.texture;
         fsurface->renderTarget.texture.width = wgpuTextureGetWidth(surfaceTexture.texture);
         fsurface->renderTarget.texture.height = wgpuTextureGetHeight(surfaceTexture.texture);
+        
+        if(fsurface->renderTarget.depth.width != fsurface->renderTarget.texture.width || fsurface->renderTarget.depth.height != fsurface->renderTarget.texture.height){
+            UnloadTexture(fsurface->renderTarget.depth);
+            fsurface->renderTarget.depth = LoadDepthTexture(fsurface->renderTarget.texture.width, fsurface->renderTarget.texture.height);
+        }
+
         if (fsurface->renderTarget.texture.view) {
             wgpuTextureViewRelease(fsurface->renderTarget.texture.view);
         }
@@ -918,14 +921,15 @@ char* NullTerminatedStringFromView_(WGPUStringView view){
     if(length == 0){
         return NULL;
     }
-    char* retData = (char*)RL_CALLOC(length, 1);
+    char* retData = (char*)RL_MALLOC(length + 1);
     memcpy(retData, view.data, length);
+    retData[length] = '\0';
     return retData;
 }
-int ueccount = 0;
+int ueccount_ = 0;
 void uncapturedErrorCallback(
     const WGPUDevice *device, WGPUErrorType type, WGPUStringView message, void *_userdata1, void *_userdata2) {
-    if(ueccount++ >= 5)return;
+    if(ueccount_++ >= 5)return;
     const char *errorTypeName = "";
     switch (type) {
     case WGPUErrorType_Validation:
@@ -952,8 +956,8 @@ void uncapturedErrorCallback(
     TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, snprintfCompatibleMessage);
     RL_FREE(snprintfCompatibleMessage);
     
-    assert(false);
-    rg_trap();
+    //assert(false);
+    //rg_trap();
 };
 
 static inline bool bcompat(WGPUBackendType backend) {
