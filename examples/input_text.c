@@ -8,6 +8,7 @@ bool editable = true;
 
 void mainloop(cwoid){
     BeginDrawing();
+    ClearBackground(BLACK);
     GuiCheckBox((Rectangle){100,100,70,70}, "Editable", &editable);
     GuiTextBox((Rectangle){100,200,400,70}, buffer, 100, editable);
     //for(int i = 0;i < 10;i++)

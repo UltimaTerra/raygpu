@@ -1,21 +1,20 @@
 #include <raygpu.h>
-const char fragSourceGLSL[] = R"(
-#version 450
-#extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed
-// Inputs from vertex shader.
-layout(location = 0) in vec2 frag_uv;
-layout(location = 1) in vec4 frag_color;
-// Output fragment color.
-layout(location = 0) out vec4 outColor;
-// Texture and sampler, bound separately.
-layout(binding = 1) uniform texture2D texture0;  // Texture (binding = 1)
-layout(binding = 2) uniform sampler texSampler;    // Sampler (binding = 2)
-void main() {
-    // Sample the texture using the combined sampler.
-    vec4 texColor = texture(sampler2D(texture0, texSampler), frag_uv);
-    outColor = (texColor * frag_color).yzxw + vec4(0.4f,0,0,0.4f);
-}
-)";
+const char fragSourceGLSL[] = 
+"#version 450\n"
+"#extension GL_ARB_separate_shader_objects : enable  // Enable separate sampler objects if needed\n"
+"// Inputs from vertex shader.\n"
+"layout(location = 0) in vec2 frag_uv;\n"
+"layout(location = 1) in vec4 frag_color;\n"
+"// Output fragment color.\n"
+"layout(location = 0) out vec4 outColor;\n"
+"// Texture and sampler, bound separately.\n"
+"layout(binding = 1) uniform texture2D texture0;  // Texture (binding = 1)\n"
+"layout(binding = 2) uniform sampler texSampler;    // Sampler (binding = 2)\n"
+"void main() {\n"
+"    // Sample the texture using the combined sampler.\n"
+"    vec4 texColor = texture(sampler2D(texture0, texSampler), frag_uv);\n"
+"    outColor = (texColor * frag_color).yzxw + vec4(0.4f,0,0,0.4f);\n"
+"}\n";
 
 int main(){
     InitWindow(800, 800, "Shaders example");
@@ -31,11 +30,11 @@ int main(){
     while(!WindowShouldClose()){
         BeginDrawing();
         ClearBackground(BLACK);
-        BeginPipelineMode(colorInverter.id);
-        SetPipelineUniformBuffer(colorInverter.id, 0, matrixbuffer);
-        SetPipelineTexture(colorInverter.id, 1, tex);
-        SetPipelineSampler(colorInverter.id, 2, sampler);
-        SetPipelineStorageBuffer(colorInverter.id, 3, matrixbuffers);
+        BeginShaderMode(colorInverter);
+        SetShaderUniformBuffer(colorInverter, 0, matrixbuffer);
+        SetShaderTexture(colorInverter, 1, tex);
+        SetShaderSampler(colorInverter, 2, sampler);
+        SetShaderStorageBuffer(colorInverter, 3, matrixbuffers);
         
         DrawTexturePro(
             tex,
@@ -46,7 +45,7 @@ int main(){
             WHITE
         );
         
-        EndPipelineMode();
+        EndShaderMode();
         DrawFPS(5, 5);
         EndDrawing();
     }

@@ -162,11 +162,12 @@ typedef struct Transform {
 } Transform;
 
 MAPI Matrix MatrixIdentity(void){
-    Matrix ret zeroinit;
-    ret.data[0] = 1;
-    ret.data[5] = 1;
-    ret.data[10] = 1;
-    ret.data[15] = 1;
+    Matrix ret = {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1
+    };
     return ret;
 }
 
@@ -724,8 +725,8 @@ MAPI Vector3 Vector3Transform(Vector3 v, Matrix mat)
     float z = v.z;
 
     result.x = mat.data[0]*x + mat.data[4]*y + mat.data[8]*z + mat.data[12];
-    result.y = mat.data[0]*x + mat.data[5]*y + mat.data[9]*z + mat.data[13];
-    result.z = mat.data[0]*x + mat.data[6]*y + mat.data[10]*z + mat.data[14];
+    result.y = mat.data[1]*x + mat.data[5]*y + mat.data[9]*z + mat.data[13];
+    result.z = mat.data[2]*x + mat.data[6]*y + mat.data[10]*z + mat.data[14];
 
     return result;
 }

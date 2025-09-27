@@ -13,8 +13,8 @@ int main(void){
     InitWindow(800, 600, "Texture Array");
 
     DescribedComputePipeline* cpl = LoadComputePipeline(computeSource);
-    Texture2DArray input = LoadTextureArray(100, 100, 100, RGBA8);
-    Texture2DArray output = LoadTextureArray(100, 100, 100, RGBA8);
+    Texture2DArray input = LoadTextureArray(100, 100, 100, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Texture2DArray output = LoadTextureArray(100, 100, 100, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     while(!WindowShouldClose()){
         BeginDrawing();
 

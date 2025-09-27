@@ -3056,8 +3056,7 @@ static inline bool find_directory_predicate(const cfs_path* path, void* user_dat
 
 /**
  * @brief Searches for a directory by name, starting from the current directory
- *        and searching outwards into parent directories. This is a direct C99
- *        port of the provided C++ function.
+ *        and searching outwards into parent directories. 
  *
  * @param directoryName The name of the directory to find (e.g., "data").
  * @param maxOutwardSearch The number of parent directories to search upwards. (0 = current dir only).

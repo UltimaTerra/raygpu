@@ -88,8 +88,8 @@ int main(){
     RenderSettings settings zeroinit;
     settings.depthTest = 1;
     settings.sampleCount = msaa ? 4 : 1;
-    settings.depthCompare = CompareFunction_LessEqual;
-    DescribedPipeline* pl = LoadPipelineForVAO(shaderSource, churchMesh.vao);
+    settings.depthCompare = WGPUCompareFunction_LessEqual;
+    Shader pl = LoadShaderSingleSource(shaderSource);
     Camera3D cam = CLITERAL(Camera3D){
         .position = CLITERAL(Vector3){20,20,30},
         .target = CLITERAL(Vector3){0,0,0},
@@ -109,13 +109,13 @@ int main(){
     //samplerDesc.maxAnisotropy = 1;
     //WGPUSampler sampler = wgpuDeviceCreateSampler(GetDevice(), &samplerDesc);
 
-    DescribedSampler sampler = LoadSampler(repeat, filter_linear);
+    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     Material defMaterial = LoadMaterialDefault();
     defMaterial.maps[MATERIAL_MAP_ALBEDO].texture = cdif;
     while(!WindowShouldClose()){
         BeginDrawing();
         ClearBackground(BLANK);
-        BeginPipelineMode(pl);
+        BeginShaderMode(pl);
         SetSampler(2, sampler);
         SetStorageBuffer(3, idenbuffer);
         SetStorageBuffer(4, libufs);
@@ -123,7 +123,7 @@ int main(){
         BeginMode3D(cam);
         DrawMesh(churchMesh, defMaterial, MatrixIdentity());
         EndMode3D();
-        EndPipelineMode();
+        EndShaderMode();
         DrawFPS(0,0);
         EndDrawing();
     }

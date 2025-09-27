@@ -1,3 +1,4 @@
+#include "mathutils.h"
 #include <raygpu.h>
 #include <string>
 #include <iostream>
@@ -33,12 +34,6 @@ void mainloop(){
     //EndPipelineMode();
     EndMode3D();
     Matrix mat = ScreenMatrix(GetScreenWidth(), GetScreenHeight());
-    //SetUniformBufferData(0, &mat, 64);
-    //UseNoTexture();
-    //UpdateBindGroup(&GetActivePipeline()->bindGroup);
-    //std::cout << vboptr - vboptr_base << "\n";
-    //DrawCircle(GetMouseX() + 100, GetMouseY(), 50.0f, WHITE);
-    //DrawCircle(GetMouseX() + 200, GetMouseY(), 50.0f, WHITE);
     EndRenderpass();
     BeginRenderpass();
     DrawCircle(GetMouseX(), GetMouseY(), 50.0f, WHITE);
@@ -50,14 +45,17 @@ void mainloop(){
     EndDrawing();
 }
 int main(){
-    //SetConfigFlags(FLAG_STDOUT_TO_FFMPEG | FLAG_HEADLESS);
+    SetConfigFlags(FLAG_VSYNC_HINT);
     
 
     InitWindow(1024, 800, "glTF Model Loading");
-    
+    #ifndef __EMSCRIPTEN__
     const char* ptr = FindDirectory("resources", 3);
     std::string resourceDirectoryPath = ptr ? ptr : "";
     TRACELOG(LOG_INFO, "Directory path: %s", resourceDirectoryPath.c_str());
+    #else
+    std::string resourceDirectoryPath = "/resources";
+    #endif
     //SetTargetFPS(60);
     
     //return 0;
@@ -65,7 +63,7 @@ int main(){
     carmodel = LoadModel((resourceDirectoryPath + "/old_car_new.glb").c_str());
     checker = LoadTextureFromImage(GenImageChecker(WHITE, BLACK, 100, 100, 10));
     cam = CLITERAL(Camera3D){
-        .position = CLITERAL(Vector3){20,30,45},
+        .position = CLITERAL(Vector3){20,5,45},
         .target = CLITERAL(Vector3){0,0,0},
         .up = CLITERAL(Vector3){0,1,0},
         .fovy = 45.0f

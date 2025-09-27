@@ -1,4 +1,6 @@
 // begin file src/models.c
+#include "mathutils.h"
+#include <stdio.h>
 #include <raygpu.h>
 #ifndef RL_CALLOC
 #define RL_CALLOC calloc
@@ -921,6 +923,23 @@ ModelAnimation *LoadModelAnimationsGLTF(const char *fileName, int *animCount){
     return animations;
 }
 
+// helper
+static inline size_t AccessorStride(const cgltf_accessor* a) {
+    size_t comp_sz =
+        (a->component_type == cgltf_component_type_r_8u  || a->component_type == cgltf_component_type_r_8)  ? 1 :
+        (a->component_type == cgltf_component_type_r_16u || a->component_type == cgltf_component_type_r_16) ? 2 :
+        (a->component_type == cgltf_component_type_r_32u || a->component_type == cgltf_component_type_r_32f)? 4 : 0;
+    size_t num_comp =
+        (a->type == cgltf_type_scalar)?1:(a->type==cgltf_type_vec2)?2:(a->type==cgltf_type_vec3)?3:(a->type==cgltf_type_vec4)?4:
+        (a->type==cgltf_type_mat2)?4:(a->type==cgltf_type_mat3)?9:(a->type==cgltf_type_mat4)?16:0;
+
+    size_t tight = comp_sz * num_comp;
+    size_t bv_stride = a->buffer_view && a->buffer_view->stride ? a->buffer_view->stride : 0;
+    return bv_stride ? bv_stride : tight;
+}
+
+
+
 Model LoadGLTF(const char *fileName)
 {
     /*********************************************************************************************
@@ -967,7 +986,7 @@ Model LoadGLTF(const char *fileName)
             {\
                 dstPtr[numComp*k + l] = (dstType)buffer[n + l];\
             }\
-            n += (int)(accesor->stride/sizeof(srcType));\
+            n += (int)(AccessorStride(accesor)/sizeof(srcType));\
         }\
     }
 
@@ -1149,9 +1168,33 @@ Model LoadGLTF(const char *fileName)
                 worldTransform[2], worldTransform[6], worldTransform[10], worldTransform[14],
                 worldTransform[3], worldTransform[7], worldTransform[11], worldTransform[15]
             };
+            //{
+            //    worldMatrix.m3 = 0;
+            //    worldMatrix.m7 = 0;
+            //    worldMatrix.m11 = 0;
+            //    worldMatrix.m12 = 0;
+            //    worldMatrix.m13 = 0;
+            //    worldMatrix.m14 = 0;
+            //}
+            //char dbgFN[32];
+            //snprintf(dbgFN, 32, "debug%d.txt", i);
+            //FILE* doutput = fopen(dbgFN, "w");
+            //printf("%f, %f, %f, %f\n", worldMatrix.m0, worldMatrix.m4, worldMatrix.m8, worldMatrix.m12);
+            //printf("%f, %f, %f, %f\n", worldMatrix.m1, worldMatrix.m5, worldMatrix.m9, worldMatrix.m13);
+            //printf("%f, %f, %f, %f\n", worldMatrix.m2, worldMatrix.m6, worldMatrix.m10, worldMatrix.m14);
+            //printf("%f, %f, %f, %f\n\n", worldMatrix.m3, worldMatrix.m7, worldMatrix.m11, worldMatrix.m15);
+            
+
+            
+            //worldMatrix = MatrixTranspose(worldMatrix);
 
             Matrix worldMatrixNormals = MatrixTranspose(MatrixInvert(worldMatrix));
-
+            //worldMatrixNormals.m12 = 0;
+            //worldMatrixNormals.m13 = 0;
+            //worldMatrixNormals.m14 = 0;
+            //if(worldMatrixNormals.m12 != 0 || worldMatrixNormals.m13 != 0 || worldMatrixNormals.m14 != 0){
+            //    abort();
+            //}
             for (unsigned int p = 0; p < mesh->primitives_count; p++)
             {
                 // NOTE: We only support primitives defined by triangles
@@ -1177,17 +1220,20 @@ Model LoadGLTF(const char *fileName)
                             model.meshes[meshIndex].vertices = (float*)RL_MALLOC(attribute->count*3*sizeof(float));
 
                             // Load 3 components of float data type into mesh.vertices
+                            //cgltf_accessor_unpack_floats(attribute, model.meshes[meshIndex].vertices, attribute->count);
                             LOAD_ATTRIBUTE(attribute, 3, float, model.meshes[meshIndex].vertices)
 
                             // Transform the vertices
                             float *vertices = model.meshes[meshIndex].vertices;
                             for (unsigned int k = 0; k < attribute->count; k++)
                             {
-                                //Vector3 vt = worldMatrix * CLITERAL(Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] };
+                                // Vector3 vt = worldMatrix * CLITERAL(Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] };
+                                // Vector3 vt = { vertices[3*(size_t)k], vertices[3*(size_t)k+1], vertices[3*(size_t)k+2]};
                                 Vector3 vt = Vector3Transform((Vector3){ vertices[3*k], vertices[3*k+1], vertices[3*k+2] }, worldMatrix);
-                                vertices[3*k] = vt.x;
-                                vertices[3*k+1] = vt.y;
-                                vertices[3*k+2] = vt.z;
+                                // fprintf(doutput, "%f, %f, %f\n", vt.x, vt.y, vt.z);
+                                vertices[3*(size_t)k] = vt.x;
+                                vertices[3*(size_t)k+1] = vt.y;
+                                vertices[3*(size_t)k+2] = vt.z;
                             }
                         }
                         else TRACELOG(LOG_WARNING, "MODEL: [%s] Vertices attribute data format not supported, use vec3 float", fileName);
@@ -1474,6 +1520,7 @@ Model LoadGLTF(const char *fileName)
 
                 meshIndex++;       // Move to next mesh
             }
+            // fclose(doutput);
         }
 
         // Load glTF meshes animation data
@@ -1639,17 +1686,17 @@ Model LoadGLTF(const char *fileName)
 
                 meshIndex++;       // Move to next mesh
             }
-
         }
 
         // Free all cgltf loaded data
         cgltf_free(data);
+        
     }
     else TRACELOG(LOG_WARNING, "MODEL: [%s] Failed to load glTF data", fileName);
 
     // WARNING: cgltf requires the file pointer available while reading data
     UnloadFileData(fileData);
-
+    
     return model;
 }
 
