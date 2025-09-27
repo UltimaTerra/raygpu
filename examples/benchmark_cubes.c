@@ -3,32 +3,33 @@
 #include <emscripten.h>
 #endif
 const char cubeShaderSource[] = 
-R"(struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) uv: vec2f,
-    @location(2) normal: vec3f,
-    @location(3) color: vec4f
-};
-struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) color: vec4f,
-    @location(1) normal: vec3f
-};
-@group(0) @binding(0) var <uniform> Perspective_View: mat4x4<f32>;
-@group(0) @binding(1) var texture0: texture_2d<f32>;
-@group(0) @binding(2) var texSampler: sampler;
-@group(0) @binding(3) var<storage> modelMatrix: array<vec4f>;
-@vertex fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    out.position = Perspective_View * vec4f(modelMatrix[instanceIdx].xyz + in.position, 1.0f);
-    out.normal = in.normal;
-    out.color = in.color;
-    return out;
-}
-@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    return vec4f((in.color * dot(in.normal, vec3f(-0.3,0.8,-0.55))).xyz, 1.0f);
-    
-})";
+"struct VertexInput {\n"
+"    @location(0) position: vec3<f32>,\n"
+"    @location(1) uv: vec2f,\n"
+"    @location(2) normal: vec3f,\n"
+"    @location(3) color: vec4f\n"
+"};\n"
+"struct VertexOutput {\n"
+"    @builtin(position) position: vec4f,\n"
+"    @location(0) color: vec4f,\n"
+"    @location(1) normal: vec3f\n"
+"};\n"
+"@group(0) @binding(0) var <uniform> Perspective_View: mat4x4<f32>;\n"
+"@group(0) @binding(1) var texture0: texture_2d<f32>;\n"
+"@group(0) @binding(2) var texSampler: sampler;\n"
+"@group(0) @binding(3) var<storage> modelMatrix: array<vec4f>;\n"
+"@vertex fn vs_main(@builtin(instance_index) instanceIdx: u32, in: VertexInput) -> VertexOutput {\n"
+"    var out: VertexOutput;\n"
+"    out.position = Perspective_View * vec4f(modelMatrix[instanceIdx].xyz + in.position, 1.0f);\n"
+"    out.normal = in.normal;\n"
+"    out.color = in.color;\n"
+"    return out;\n"
+"}\n"
+"@fragment fn fs_main(in: VertexOutput) -> @location(0) vec4f {\n"
+"    return vec4f((in.color * dot(in.normal, vec3f(-0.3,0.8,-0.55))).xyz, 1.0f);\n"
+"    \n"
+"}\n";
+
 Shader shader;
 Mesh cubeMesh;
 Camera3D cam;
