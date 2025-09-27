@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Powered by RayGPU</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/c.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <style>
+        :root {
+            --bar-h: 56px;
+            --code-h: 30vh;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: #000;
+            color: #fff;
+        }
+
+        body {
+            font: 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        }
+
+        /* Top bar */
+        #bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--bar-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: #0b0b0b;
+            border-bottom: 1px solid #1e1e1e;
+            z-index: 10;
+            user-select: none;
+        }
+
+        #brand {
+            font-weight: 600;
+            letter-spacing: .3px;
+        }
+
+        #fs {
+            border: 0;
+            padding: 10px 14px;
+            background: #fff;
+            color: #000;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            border-radius: 6px;
+        }
+
+        /* Canvas fills remaining space above code panel */
+        #wrap {
+            position: relative;
+            padding-top: var(--bar-h);
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: calc(100vh - var(--bar-h) - var(--code-h));
+            background: #000;
+        }
+
+        /* Code panel */
+        #code {
+            height: var(--code-h);
+            overflow: auto;
+            background: #0f0f0f;
+            border-top: 1px solid #1e1e1e;
+        }
+
+        #src {
+            margin: 0;
+            padding: 12px 16px;
+            white-space: pre;
+            overflow: auto;
+            font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+            color: #d1d5db;
+        }
+    </style>
+</head>
+
+<body>
+    <header id="bar">
+        <div id="brand">Powered by RayGPU</div>
+        <button id="fs" type="button">Fullscreen</button>
+    </header>
+
+    <main id="wrap">
+        <canvas id="canvas" tabindex="0"></canvas>
+        <section id="code" aria-label="Source code">
+            <pre>
+                <code class="language-c">
+                    <!--SRC_HERE-->
+                </code>
+            </pre>
+        </section>
+    </main>
+
+    <script>
+        // Emscripten picks up the canvas from Module.canvas.
+        var Module = {
+            canvas: (function () { return document.getElementById('canvas'); })()
+        };
+
+        // Fullscreen on the canvas only.
+        (function () {
+            var c = Module.canvas;
+            var btn = document.getElementById('fs');
+            function requestFS() {
+                var rfs = c.requestFullscreen || c.webkitRequestFullscreen || c.mozRequestFullScreen || c.msRequestFullscreen;
+                if (rfs) rfs.call(c);
+            }
+            btn.addEventListener('click', requestFS);
+        })();
+    </script>
+
+    {{{ SCRIPT }}}
+</body>
+
+</html>

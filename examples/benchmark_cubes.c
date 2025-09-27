@@ -1,10 +1,8 @@
 #include <raygpu.h>
-#include <vector>
-#include <algorithm>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
-const char shaderSource[] = 
+const char cubeShaderSource[] = 
 R"(struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) uv: vec2f,
@@ -34,20 +32,17 @@ struct VertexOutput {
 Shader shader;
 Mesh cubeMesh;
 Camera3D cam;
-std::vector<Vector4> instancetransforms;
+size_t instanceCount;
+Vector4* instancetransforms;
 void mainloop(){
     BeginDrawing();
     ClearBackground(BLANK);
-    //TRACELOG(LOG_WARNING, "Setting storig buffer");
-    //TRACELOG(LOG_WARNING, "pl %ull", pl);
-    //TRACELOG(LOG_WARNING, "GetActivePipeline %ull", GetActivePipeline());
-    //TRACELOG(LOG_WARNING, "Setting storig buffer");
 
     BeginShaderMode(shader);
     UseNoTexture();
     BeginMode3D(cam);
     BindShaderVertexArray(shader, cubeMesh.vao);
-    DrawArraysIndexedInstanced(RL_TRIANGLES, *cubeMesh.ibo, 36, instancetransforms.size());
+    DrawArraysIndexedInstanced(RL_TRIANGLES, *cubeMesh.ibo, 36, instanceCount);
     //DrawMeshInstanced(cubeMesh, Material{}, instancetransforms.data(), instancetransforms.size());
     EndMode3D();
     EndShaderMode();
@@ -71,21 +66,29 @@ int main(){
     SetTargetFPS(0);
     float scale = 1.0f;
     cubeMesh = GenMeshCube(scale, scale, scale);
-    cam = Camera3D{
-        .position = Vector3{0,70,0},
-        .target = Vector3{100,0,100},
-        .up = Vector3{0,1,0},
+    cam = CLITERAL(Camera3D){
+        .position = {0,70,0},
+        .target = {100,0,100},
+        .up = {0,1,0},
         .fovy = 60.0f
     };
-    shader = LoadShaderSingleSource(shaderSource);
-    auto smp = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
+    shader = LoadShaderSingleSource(cubeShaderSource);
+    DescribedSampler smp = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     SetShaderSampler(shader, 2, smp);
-    for(int i = -0;i < 2000;i++){
+    instanceCount = 2000 * 2000;
+    instancetransforms = RL_CALLOC(instanceCount, sizeof(Vector4));
+    size_t insertIndex = 0;
+    for(int i = 0;i < 2000;i++){
         for(int j = 0;j < 2000;j++){
-            instancetransforms.push_back(Vector4(i, std::sin(2 * M_PI * i / 10.0f) + 15.0f * -std::cos(2 * M_PI * j / 90.0f), j));
+            instancetransforms[insertIndex++] = (Vector4){
+                (float)i,
+                (float)(sin(2 * M_PI * i / 10.0) + 15.0 * -cos(2.0 * M_PI * j / 90.0)),
+                (float)j,
+                (float)0
+            };
         }
     }
-    DescribedBuffer* persistent = GenStorageBuffer(instancetransforms.data(), instancetransforms.size() * sizeof(Vector4));
+    DescribedBuffer* persistent = GenStorageBuffer(instancetransforms, instanceCount * sizeof(Vector4));
     SetShaderStorageBuffer(shader, 3, persistent);
     //TRACELOG(LOG_WARNING, "OOO: %llu", (unsigned long long)persistent.buffer);
     #ifndef __EMSCRIPTEN__

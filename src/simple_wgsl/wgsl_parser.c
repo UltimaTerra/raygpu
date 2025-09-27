@@ -309,10 +309,10 @@ static Token lx_next(Lexer *L) {
         if (c == '0' && (L->src[L->pos + 1] == 'x' || L->src[L->pos + 1] == 'X')) {
             lx_advance(L); /* '0' */
             lx_advance(L); /* 'x' or 'X' */
-            int have_hex = 0;
+            //int have_hex = 0;
             while (is_hex_digit_or_us(L->src[L->pos])) {
-                if (L->src[L->pos] != '_')
-                    have_hex = 1;
+                //if (L->src[L->pos] != '_')
+                //    have_hex = 1;
                 lx_advance(L);
             }
             /* optional unsigned suffix */

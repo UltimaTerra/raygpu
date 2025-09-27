@@ -877,6 +877,7 @@ RGAPI void BeginDrawing(){
     
     {
         FullSurface* surface = &CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface;
+        GetNewTexture(surface);
         RenderTexture sRTex = surface->renderTarget;
         Texture colorTarget = sRTex.texture;
         g_renderstate.renderExtentX = colorTarget.width;
@@ -884,7 +885,6 @@ RGAPI void BeginDrawing(){
         g_renderstate.renderExtentY = colorTarget.height;
         g_renderstate.height = colorTarget.height;
 
-        GetNewTexture(surface);
         RenderTexture_stack_push(&g_renderstate.renderTargetStack, CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface.renderTarget);
         g_renderstate.mainWindowRenderTarget = CreatedWindowMap_get(&g_renderstate.createdSubwindows, g_renderstate.window)->surface.renderTarget;
     }
@@ -1945,7 +1945,7 @@ RenderTexture LoadRenderTextureEx(uint32_t width, uint32_t height, PixelFormat c
     if(attachmentCount > 1){
         rassert(sampleCount == 1, "Multisampled and multi-Attachment tendertextures not supported yet");
         for(uint32_t i = 0;i < attachmentCount - 1;i++){
-            ret.moreColorAttachments[i] = LoadTexturePro(width, height, colorFormat, WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1);
+            ret.colorAttachments[i] = LoadTexturePro(width, height, colorFormat, WGPUTextureUsage_TextureBinding | WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, sampleCount, 1);
         }
     }
     ret.colorAttachmentCount = attachmentCount;

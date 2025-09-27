@@ -733,6 +733,7 @@ void GetNewTexture(FullSurface *fsurface) {
         fsurface->renderTarget.texture.height = wgpuTextureGetHeight(surfaceTexture.texture);
         
         if(fsurface->renderTarget.depth.width != fsurface->renderTarget.texture.width || fsurface->renderTarget.depth.height != fsurface->renderTarget.texture.height){
+            TRACELOG(LOG_WARNING, "Unforeseen rescale to %u x %u\n", fsurface->renderTarget.texture.width, fsurface->renderTarget.texture.height);
             UnloadTexture(fsurface->renderTarget.depth);
             fsurface->renderTarget.depth = LoadDepthTexture(fsurface->renderTarget.texture.width, fsurface->renderTarget.texture.height);
         }
@@ -1098,8 +1099,8 @@ void InitBackend() {
         .callback = requestAdapterCallback,
         .userdata1 = sample,
     };
-    WGPUFuture future = wgpuInstanceRequestAdapter(sample->instance, &adapterOptions, requestAdapterCallbackInfo);
-    WGPUFutureWaitInfo rafWinfo = {.future = future};
+
+    WGPUFutureWaitInfo rafWinfo = {.future = wgpuInstanceRequestAdapter(sample->instance, &adapterOptions, requestAdapterCallbackInfo)};
 
     wgpuInstanceWaitAny(sample->instance, 1, &rafWinfo, UINT32_MAX);
 
@@ -1110,22 +1111,38 @@ void InitBackend() {
     WGPUAdapterInfo info = {0};
     wgpuAdapterGetInfo(sample->adapter, &info);
 
-    //std::string deviceName = WGPUStringViewToString(info.device);
-    //std::string architecture = WGPUStringViewToString(info.architecture);
-    //std::string description = WGPUStringViewToString(info.description);
-    // std::string vendor = WGPUStringViewToString(info.vendor);
+    char* deviceName = NullTerminatedStringFromView_(info.device);
+    char* architecture = NullTerminatedStringFromView_(info.architecture);
+    char* description = NullTerminatedStringFromView_(info.description);
+    char* vendor = NullTerminatedStringFromView_(info.vendor);
 
     const char *adapterTypeString =
         info.adapterType == WGPUAdapterType_CPU
             ? "CPU"
             : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
-    // const char* backendString = backendTypeSpellingTable.at(info.backendType).c_str();
+    const char* backendString;
+    
+    switch(info.backendType){
+        case WGPUBackendType_D3D11: backendString = "DirectX 11";break;
+        case WGPUBackendType_D3D12: backendString = "DirectX 12";break;
+        case WGPUBackendType_Vulkan: backendString = "Vulkan";break;
+        case WGPUBackendType_OpenGL: backendString = "Desktop OpenGL";break;
+        case WGPUBackendType_OpenGLES: backendString = "OpenGL ES";break;
+        case WGPUBackendType_Metal: backendString = "Metal";break;
+        case WGPUBackendType_WebGPU: backendString = "WebGPU";break;
+        default: backendString = "?invalid WGPUBackendType";break;
+    }
+    
+    TRACELOG(LOG_INFO, "Using adapter %s %s", vendor, deviceName);
+    TRACELOG(LOG_INFO, "Using adapter %s", info.device.data);
+    TRACELOG(LOG_INFO, "Adapter description: %s", description);
+    TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture);
+    TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
 
-    // TRACELOG(LOG_INFO, "Using adapter %s %s", vendor.c_str(), deviceName.c_str());
-    // TRACELOG(LOG_INFO, "Using adapter %s", info.device.data);
-    // TRACELOG(LOG_INFO, "Adapter description: %s", description.c_str());
-    // TRACELOG(LOG_INFO, "Adapter architecture: %s", architecture.c_str());
-    // TRACELOG(LOG_INFO, "%s renderer running on %s", backendString, adapterTypeString);
+    RL_FREE(deviceName);
+    RL_FREE(architecture);
+    RL_FREE(description);
+    RL_FREE(vendor);
     //  Create device descriptor with callbacks and toggles
     {
         // WGPUSupportedFeatures features = {};
@@ -1565,20 +1582,9 @@ void ResizeSurface(FullSurface *fsurface, int newWidth, int newHeight) {
     UnloadTexture(fsurface->renderTarget.colorMultisample);
     UnloadTexture(fsurface->renderTarget.depth);
     if (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) {
-        fsurface->renderTarget.colorMultisample = LoadTexturePro(newWidth,
-                                                                 newHeight,
-                                                                 fromWGPUPixelFormat(fsurface->surfaceConfig.format),
-                                                                 WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc,
-                                                                 4,
-                                                                 1);
+        fsurface->renderTarget.colorMultisample = LoadTexturePro(newWidth, newHeight, fromWGPUPixelFormat(fsurface->surfaceConfig.format), WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc, 4, 1);
     }
-    fsurface->renderTarget.depth = LoadTexturePro(newWidth,
-                                                  newHeight,
-                                                  PIXELFORMAT_DEPTH_32_FLOAT,
-                                                  WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding |
-                                                      WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
-                                                  (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
-                                                  1);
+    fsurface->renderTarget.depth = LoadTexturePro(newWidth, newHeight, PIXELFORMAT_DEPTH_32_FLOAT, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1);
 }
 
 DescribedRenderpass LoadRenderpassEx(RenderSettings settings, bool colorClear, WGPUColor colorClearValue, bool depthClear, float depthClearValue) {
