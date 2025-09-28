@@ -326,12 +326,22 @@ if(SUPPORT_VULKAN_BACKEND)
     endif()
 endif()
 if(APPLE)
-    set(RAYGPU_USE_METAL ON)
-    set_source_files_properties("src/InitWindow.c" PROPERTIES LANGUAGE OBJC)
+    set_source_files_properties("src/InitWindow.c"
+        PROPERTIES
+        LANGUAGE OBJC
+    )
+    set_source_files_properties("src/glfw3webgpu.c"
+        PROPERTIES
+        LANGUAGE OBJC
+    )
 endif()
 
 if (NOT EMSCRIPTEN)
     list(APPEND RG_SOURCES "src/glsl_support.cpp")
+endif()
+
+if(APPLE)
+    set(RAYGPU_USE_METAL ON)
 endif()
 
 set(raygpu_core_library_name raygpu_core)
@@ -513,7 +523,6 @@ endif()
 
 # ----- Install targets for raygpu -----
 if(RAYGPU_ENABLE_INSTALL)
-<<<<<<< HEAD
   include(CMakePackageConfigHelpers)
 
   # Exported target names
@@ -572,47 +581,6 @@ if(RAYGPU_ENABLE_INSTALL)
     NAMESPACE ${RAYGPU_NAMESPACE}
     FILE "${CMAKE_CURRENT_BINARY_DIR}/raygpuTargets.cmake"
   )
-=======
-    include(CMakePackageConfigHelpers)
-    set(RAYGPU_INSTALL_EXPORT RaygpuTargets)
-    set(RAYGPU_NAMESPACE raygpu::)
-    install(
-        TARGETS raygpu
-        EXPORT ${RAYGPU_INSTALL_EXPORT}
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        INCLUDES DESTINATION include/raygpu
-    )
-    install(
-        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
-        DESTINATION include/raygpu
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-    )
-    set(RAYGPU_CONFIG_INSTALL_DIR lib/cmake/raygpu)
-    configure_package_config_file(
-        "${CMAKE_CURRENT_LIST_DIR}/cmake/raygpuConfig.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
-        INSTALL_DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
-        NO_SET_AND_CHECK_MACRO
-        NO_CHECK_REQUIRED_COMPONENTS_MACRO
-    )
-    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake" VERSION 0.1.0 COMPATIBILITY SameMajorVersion)
-    install(
-        FILES "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
-        DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
-    )
-    install(
-        EXPORT ${RAYGPU_INSTALL_EXPORT}
-        NAMESPACE ${RAYGPU_NAMESPACE}
-        DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
-    )
-    export(
-        EXPORT ${RAYGPU_INSTALL_EXPORT}
-        NAMESPACE ${RAYGPU_NAMESPACE}
-        FILE "${CMAKE_CURRENT_BINARY_DIR}/raygpuTargets.cmake"
-    )
->>>>>>> 5d9ada5d0 (Some CMake changes)
 endif()
 
 

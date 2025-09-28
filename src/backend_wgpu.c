@@ -1535,14 +1535,9 @@ void ResizeSurface(FullSurface *fsurface, int newWidth, int newHeight) {
         .alphaMode = WGPUCompositeAlphaMode_Opaque,
         .presentMode = (WGPUPresentMode)fsurface->surfaceConfig.presentMode,
     };
-    printf("%p\n", fsurface->surface);
-    //__builtin_dump_struct(&wsconfig, printf);
     wgpuSurfaceConfigure(fsurface->surface, &wsconfig);
-    //assert(false);
     fsurface->surfaceConfig.width = newWidth;
     fsurface->surfaceConfig.height = newHeight;
-    // UnloadTexture(fsurface->frameBuffer.texture);
-    // fsurface->frameBuffer.texture = Texture zeroinit;
     UnloadTexture(fsurface->renderTarget.colorMultisample);
     UnloadTexture(fsurface->renderTarget.depth);
     if (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) {
