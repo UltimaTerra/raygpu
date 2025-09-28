@@ -508,7 +508,7 @@ endforeach()
 
 target_include_directories(${raygpu_core_library_name} PUBLIC  
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>  
-    $<INSTALL_INTERFACE:include/raygpu>
+    $<INSTALL_INTERFACE:include/>
 )
 set(raygpu_linked_deps "")
 
@@ -644,14 +644,14 @@ if(RAYGPU_ENABLE_INSTALL)
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION include/raygpu
+    INCLUDES DESTINATION include
   )
 
   install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
-    DESTINATION include/raygpu
+    DESTINATION include
     FILES_MATCHING
-      PATTERN "*.h" PATTERN "*.hpp"
+      PATTERN "raygpu.h" PATTERN "config.h" PATTERN "macros_and_constants.h" PATTERN "mathutils.h"
   )
 
   set(RAYGPU_CONFIG_INSTALL_DIR lib/cmake/raygpu)
