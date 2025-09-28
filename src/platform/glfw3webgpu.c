@@ -8,6 +8,9 @@
 #if defined(_WIN32) || defined(WIN32) || defined(_WIN64) || defined(WIN64) 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #endif
+#if defined(RAYGPU_USE_METAL)
+#define GLFW_EXPOSE_NATIVE_COCOA
+#endif
 #if defined(RAYGPU_USE_X11)
 #define GLFW_EXPOSE_NATIVE_X11
 #endif
@@ -80,7 +83,7 @@ WGPUSurface glfwCreateWindowWGPUSurface(WGPUInstance instance, GLFWwindow* windo
         fromMetalLayer.chain.sType = WGPUSType_SurfaceSourceMetalLayer;
         fromMetalLayer.chain.next = NULL;
         fromMetalLayer.layer = metal_layer;
-
+        CGFloat scale = ns_window.backingScaleFactor;
         WGPUSurfaceDescriptor surfaceDescriptor;
         surfaceDescriptor.nextInChain = &fromMetalLayer.chain;
         surfaceDescriptor.label = (WGPUStringView){ NULL, WGPU_STRLEN };

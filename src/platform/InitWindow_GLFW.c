@@ -101,7 +101,7 @@ void cpcallback(GLFWwindow* window, double x, double y){
     RGWindowImpl* associatedWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window);
     //fprintf(stderr, "GLFWwindow is %p\n", window);
     assert(associatedWindow);
-    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)x, (float)y};
+    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)x * associatedWindow->scaleFactor, (float)y * associatedWindow->scaleFactor};
 }
 
 #ifdef __EMSCRIPTEN__
@@ -405,14 +405,7 @@ void ToggleFullscreen_GLFW(){
     #endif
 }
 WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle){
-    #if SUPPORT_VULKAN_BACKEND == 1
-    WGPUSurface retp = callocnew(WGPUSurfaceImpl);
-    glfwCreateWindowSurface(((WGPUInstance)GetInstance())->instance, (GLFWwindow*)windowHandle, NULL, &retp->surface);
-    float xscale, yscale;
-    glfwGetWindowContentScale((GLFWwindow*)windowHandle, &xscale, &yscale);
-    CreatedWindowMap_get(&g_renderstate.createdSubwindows, windowHandle)->scaleFactor = xscale;
-    return retp;
-    #elif defined(__EMSCRIPTEN__)
+    #if defined(__EMSCRIPTEN__)
     WGPUEmscriptenSurfaceSourceCanvasHTMLSelector fromCanvasHTMLSelector = {
         .chain = {
             .sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector
@@ -454,27 +447,16 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
 
     GLFWmonitor* mon = NULL;
     glfwSetErrorCallback(glfw_e_c_);
-
-
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     #ifndef __EMSCRIPTEN__        // Create the test window with no client API.
         glfwWindowHint(GLFW_RESIZABLE, (g_renderstate.windowFlags & FLAG_WINDOW_RESIZABLE) ? GLFW_TRUE : GLFW_FALSE);
-        //glfwWindowHint(GLFW_REFRESH_RATE, 144);
 
         if(g_renderstate.windowFlags & FLAG_FULLSCREEN_MODE){
             mon = glfwGetPrimaryMonitor();
-            //std::cout <<glfwGetVideoMode(mon)->refreshRate << std::endl;
-            //abort();
         }
     #endif
-    // glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
-    // glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
-    #ifdef __APPLE__
-        glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
-    #endif
+    
     window = (void*)glfwCreateWindow(width, height, title, mon, NULL);
-    //if(glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
-    //    glfwSetWindowPos((GLFWwindow*)window, 200, 1900);
     
     int wposx = 0, wposy = 0;
     #ifndef __EMSCRIPTEN__
@@ -498,6 +480,9 @@ SubWindow InitWindow_GLFW(int width, int height, const char* title){
     
     CreatedWindowMap_get(&g_renderstate.createdSubwindows,ret->handle)->input_state = CLITERAL(window_input_state){0};
     setupGLFWCallbacks((GLFWwindow*)ret->handle);
+    float xscale, yscale;
+    glfwGetWindowContentScale(window, &xscale, &yscale);
+    //ret->scaleFactor = 2;
     return ret;
 }
 SubWindow OpenSubWindow_GLFW(int width, int height, const char* title){

@@ -182,14 +182,13 @@ bool WindowShouldClose(cwoid){
 
 extern Texture2D texShapes;
 
-DescribedPipeline* LoadPipelineForVAO_Vk(const char* vsSource, const char* fsSource, const VertexArray* vao, const ResourceTypeDescriptor* uniforms, uint32_t uniformCount, RenderSettings settings);
-
 RGAPI void* InitWindow(int width, int height, const char* title){
     #if FORCE_HEADLESS == 1
     g_renderstate.windowFlags |= FLAG_HEADLESS;
-    #endif
-    //TODO: fix this, preferrably set correct format in InitWindow_SDL or GLFW
     g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
+    #endif
+    InitBackend();
+    //TODO: fix this, preferrably set correct format in InitWindow_SDL or GLFW
     if(g_renderstate.windowFlags & FLAG_STDOUT_TO_FFMPEG){
         if(IsATerminal(stdout)){
             TRACELOG(LOG_ERROR, "Refusing to pipe video output to terminal");
@@ -206,7 +205,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     TRACELOG(LOG_INFO, "Working directory: %s", cfs_path_c_str(&workingDirectory));
     g_renderstate.last_timestamps[0] = (int64_t)NanoTime();
     
-    InitBackend();
+    
     g_renderstate.width = width;
     g_renderstate.height = height;
     
@@ -243,8 +242,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
         CreatedWindowMap_put(&g_renderstate.createdSubwindows, createdWindow->handle, *createdWindow);
         createdWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle);
         createdWindow->surface = CompleteSurface(wSurface, (int)(width * createdWindow->scaleFactor), (int)(height * createdWindow->scaleFactor));
-        
-        
+              
         g_renderstate.window = (GLFWwindow*)createdWindow->handle;
 
         g_renderstate.mainWindow = createdWindow;
