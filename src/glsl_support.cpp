@@ -289,7 +289,7 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
         if(std::bitset<sizeof(WGPUShaderStage) * CHAR_BIT>(+sources.sources[i].stageMask).count() != 1){
             TRACELOG(LOG_ERROR, "Only single stages are supported for GLSL");
         }
-        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)std::countr_zero(uint32_t(sources.sources[i].stageMask));
+        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)countr_zero_u32(uint32_t(sources.sources[i].stageMask));
         shaders.emplace_back(ShaderStageToGlslanguage(stage), std::make_unique<glslang::TShader>(ShaderStageToGlslanguage(stage)));
         shaders.back().second->setEnvTarget(glslang::EshTargetSpv, defaultSpirvVersion);
     }
@@ -366,7 +366,7 @@ InOutAttributeInfo getAttributesGLSL(ShaderSources sources){
             WGPUVertexFormat format = fromGLVertexFormat(glattrib);
             rassert(attribname.size() <= MAX_VERTEX_ATTRIBUTE_NAME_LENGTH, "Vertex attribute name longer than MAX_VERTEX_ATTRIBUTE_NAME_LENGTH: %s", attribname.c_str());
 
-            if(!attribname.starts_with("gl_") && attribname.size() <= MAX_VERTEX_ATTRIBUTE_NAME_LENGTH){
+            if(!(attribname.find("gl_") != std::string::npos) && attribname.size() <= MAX_VERTEX_ATTRIBUTE_NAME_LENGTH){
                 ReflectionVertexAttribute* insert = ret.vertexAttributes + (attributeInsertionIndex++);
                 memcpy(insert->name, attribname.c_str(), attribname.size());
                 insert->name[attribname.size()] = '\0';
@@ -444,7 +444,7 @@ StringToUniformMap* getBindingsGLSL(ShaderSources sources){
             std::cout << sources.sources[i].stageMask << "\n";
             TRACELOG(LOG_FATAL, "Only single stages are supported for GLSL");
         }
-        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)std::countr_zero(uint32_t(sources.sources[i].stageMask));
+        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)countr_zero_u32(uint32_t(sources.sources[i].stageMask));
         shaders.emplace_back(ShaderStageToGlslanguage(stage), std::make_unique<glslang::TShader>(ShaderStageToGlslanguage(stage)));
         shaders.back().second->setEnvTarget(glslang::EShTargetSpv, defaultSpirvVersion);
     }
@@ -592,7 +592,7 @@ ShaderSources glsl_to_spirv(ShaderSources sources){
     ret.language = sourceTypeSPIRV;
 
     for(uint32_t i = 0;i < sources.sourceCount;i++){
-        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)std::countr_zero((uint32_t)sources.sources[i].stageMask);
+        WGPUShaderStageEnum stage = (WGPUShaderStageEnum)countr_zero_u32((uint32_t)sources.sources[i].stageMask);
         std::vector<uint32_t> stageToSpirv = glsl_to_spirv_single((const char*)sources.sources[i].data, ShaderStageToGlslanguage(stage));
         uint32_t* odata = (uint32_t*)std::calloc(stageToSpirv.size(), sizeof(uint32_t));
         std::copy(stageToSpirv.begin(), stageToSpirv.end(), odata);

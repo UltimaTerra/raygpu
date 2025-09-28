@@ -9,7 +9,6 @@
 #endif
 #include <internals.h>
 #include <wgpustate.inc>
-// #include "enum_translation.h"
 #define Matrix spvMatrix
 #include <spirv_reflect.h>
 #undef Matrix

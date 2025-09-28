@@ -101,8 +101,6 @@ void ToggleFullscreenImpl(cwoid);
 #endif  // __EMSCRIPTEN__
 #include <renderstate.h>
 
-//#include <enum_translation.h>
-
 renderstate g_renderstate = {0};
 
 #define swap_uint32(val) (((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) << 16) | ((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) >> 16))

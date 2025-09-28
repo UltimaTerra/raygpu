@@ -12,18 +12,18 @@ option(SUPPORT_RGFW "Enable windowing with RGFW" OFF)
 option(RAYGPU_BUILD_TESTS "Build test executables for raygpu" OFF)
 option(RAYGPU_BUILD_SHARED_LIBRARY "Build shared raygpu library" OFF)
 option(RAYGPU_ENABLE_INSTALL "Enable install targets for raygpu" OFF)
-
-if(NOT SUPPORT_WGPU_BACKEND)
-    option(SUPPORT_WGPU_BACKEND "Enable the WebGPU backend" OFF)
-    option(SUPPORT_WGSL_PARSER "Support WGSL parsing with tint" OFF)
-    option(SUPPORT_GLSL_PARSER "Support GLSL parsing with glslang" ON)
-    option(SUPPORT_VULKAN_BACKEND "Enable the Vulkan Backend" ON)
-else()
+if(EMSCRIPTEN OR SUPPORT_WGPU_BACKEND)
     option(SUPPORT_WGPU_BACKEND "Enable the WebGPU backend" ON)
     option(SUPPORT_WGSL_PARSER "Support WGSL parsing with tint" ON)
     option(SUPPORT_GLSL_PARSER "Support GLSL parsing with glslang" OFF)
     option(SUPPORT_VULKAN_BACKEND "Enable the Vulkan Backend" OFF)
+else()
+    option(SUPPORT_WGPU_BACKEND "Enable the WebGPU backend" OFF)
+    option(SUPPORT_WGSL_PARSER "Support WGSL parsing with tint" OFF)
+    option(SUPPORT_GLSL_PARSER "Support GLSL parsing with glslang" ON)
+    option(SUPPORT_VULKAN_BACKEND "Enable the Vulkan Backend" ON)
 endif()
+
 
 if(NOT MSVC AND NOT EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
@@ -91,17 +91,29 @@ else()
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-rtti")
 endif()
 
-if(NOT SUPPORT_GLFW)
-    set(DAWN_USE_GLFW OFF)
-    if(NOT SUPPORT_SDL2)
-        if(NOT SUPPORT_SDL3)
-            if(NOT SUPPORT_RGFW)
-                set(DAWN_USE_X11 OFF)
-                set(DAWN_USE_WAYLAND OFF)
-            endif()
-        endif()
+set(DAWN_USE_GLFW OFF) # raygpu provides its own WGPUSurface creation mechanism
+
+
+if(NOT SUPPORT_GLFW AND NOT SUPPORT_SDL2 AND NOT SUPPORT_SDL3 AND NOT SUPPORT_RGFW)
+    set(DAWN_USE_X11 OFF)
+    set(DAWN_USE_WAYLAND OFF)
+    option(RAYGPU_USE_X11 OFF)
+else()
+    find_package(PkgConfig QUIET)    
+    pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
+    if(WAYLAND_CLIENT_FOUND)
+        option(RAYGPU_USE_WAYLAND "" ON)
+        set(DAWN_USE_WAYLAND ON)
+    endif()
+    find_package(X11 QUIET)
+    if(X11_FOUND)
+        option(RAYGPU_USE_X11 "" ON)
+        option(DAWN_USE_X11 "" ON)
     endif()
 endif()
+
+
+
 
 if((SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER) AND NOT EMSCRIPTEN)
     set(DAWN_IS_IN_USE True)
@@ -132,8 +144,9 @@ if((SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER) AND NOT EMSCRIPTEN)
     option(DAWN_BUILD_PROTOBUF "" OFF)
     set(TINT_BUILD_SPV_WRITER ON CACHE BOOL "" FORCE)
     set(TINT_BUILD_HLSL_WRITER OFF CACHE BOOL "" FORCE)
-    #set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(DAWN_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
     set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
     set(DAWN_FETCH_DEPENDENCIES OFF CACHE BOOL "" FORCE)
     set(DAWN_ENABLE_OPENGLES OFF CACHE BOOL "" FORCE)
@@ -142,7 +155,6 @@ if((SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER) AND NOT EMSCRIPTEN)
     if(EMSCRIPTEN OR NOT RAYGPU_ENABLE_INSTALL)
         set(DAWN_ENABLE_INSTALL OFF CACHE BOOL "Enable install step for Dawn libraries" FORCE)
         set(TINT_ENABLE_INSTALL OFF CACHE BOOL "Enable install step for Tint libraries" FORCE)
-        set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
         set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
         set(TINT_BUILD_CMD_TOOLS OFF CACHE BOOL "" FORCE)
         set(TINT_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
@@ -152,15 +164,7 @@ if((SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER) AND NOT EMSCRIPTEN)
         set(BUILD_GMOCK ON CACHE BOOL "" FORCE)
     endif()
     
-    if(NOT SUPPORT_WGPU_BACKEND)
-        set(DAWN_USE_GLFW OFF)
-        if(SUPPORT_GLFW)
-            if(RAYGPU_USE_WAYLAND)
-                set(GLFW_BUILD_WAYLAND ON)
-            endif()
-            add_subdirectory("amalgamation/glfw-3.4")
-        endif()
-    endif()
+    
     if(UNIX AND NOT ANDROID)
         find_package(PkgConfig QUIET)    
         pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
@@ -192,18 +196,7 @@ if((SUPPORT_WGPU_BACKEND OR SUPPORT_WGSL_PARSER) AND NOT EMSCRIPTEN)
         FetchContent_MakeAvailable(dawn)
     endif()
 else()
-    set(DAWN_IS_IN_USE False)
-    find_package(PkgConfig QUIET)    
-    pkg_check_modules(WAYLAND_CLIENT QUIET wayland-client)
-    if(WAYLAND_CLIENT_FOUND)
-        option(RAYGPU_USE_WAYLAND "" ON)
-        set(DAWN_USE_WAYLAND ON)
-    endif()
-    find_package(X11 QUIET)
-    if(X11_FOUND)
-        option(RAYGPU_USE_X11 "" ON)
-        option(DAWN_USE_X11 "" ON)
-    endif()
+
 endif()
 
 
@@ -226,6 +219,8 @@ function(download_file_if_not_exists url filename)
 endfunction()
 if(NOT EMSCRIPTEN AND SUPPORT_GLSL_PARSER AND NOT TARGET glslang)
     option(ENABLE_OPT "Enable glslang spirv optimizations (requires spirv-tools)" OFF)
+    option(ENABLE_HLSL "Enable HLSL compilation" OFF)
+    option(ENABLE_SPVREMAPPER "" OFF)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/amalgamation/glslang)  
 endif()
 
@@ -246,94 +241,39 @@ if(SUPPORT_SDL3)
     #find_package(SDL3 QUIET)
     if(NOT SDL3_FOUND)
         
-        set(SDL_ALTIVEC OFF)
-        set(SDL_ARMNEON OFF)
-        set(SDL_ASAN OFF)
-        set(SDL_DIALOG OFF)
-        set(SDL_GPU OFF)
-        set(SDL_ASSEMBLY OFF)
+        list(APPEND SDL_DISABLED_FEATURES
+            ALTIVEC ARMNEON ASAN DIALOG GPU ASSEMBLY AVX AVX2 AVX512F BACKGROUNDING_SIGNAL
+            CCACHE CLANG_TIDY CLOCK_GETTIME DBUS DEPS_SHARED DIRECTX POWER JOYSTICK HAPTIC AUDIO DISKAUDIO DUMMYAUDIO
+            DUMMYCAMERA DUMMYVIDEO EXAMPLES EXAMPLES_LINK_SHARED FOREGROUNDING_SIGNAL
+            GCC_ATOMICS GPU_DXVK HIDAPI HIDAPI_JOYSTICK HIDAPI_LIBUSB PULSEAUDIO PIPEWIRE RENDER SENSOR HIDAPI_LIBUSB_SHARED
+            IBUS INSTALL INSTALL_TESTS JACK JACK_SHARED KMSDRM KMSDRM_SHARED LASX LIBICONV
+            LIBUDEV LIBURING LSX METAL MMX OFFSCREEN OPENGL OPENGLES OPENVR OSS RENDER_D3D
+            RENDER_D3D11 RENDER_D3D12 RENDER_GPU RENDER_METAL RENDER_VULKAN ROCKCHIP RPATH
+            RPI SNDIO SNDIO_SHARED SYSTEM_ICONV TESTS
+            TESTS_LINK_SHARED UNINSTALL VIRTUAL_JOYSTICK VIVANTE VULKAN WASAPI
+        )
+
+        # Disable all features in the list.
+        foreach(FEATURE ${SDL_DISABLED_FEATURES})
+            set(SDL_${FEATURE} OFF)
+        endforeach()
+        # Special case for assertions based on build type.
         if(CMAKE_BUILD_TYPE MATCHES "Debug")
             set(SDL_ASSERTIONS "3")
         else()
             set(SDL_ASSERTIONS "disabled")
         endif()
-        set(SDL_AVX OFF)
-        set(SDL_AVX2 OFF)
-        set(SDL_AVX512F OFF)
-        set(SDL_BACKGROUNDING_SIGNAL OFF)
-        set(SDL_CCACHE OFF)
-        set(SDL_CLANG_TIDY OFF)
-        set(SDL_CLOCK_GETTIME OFF)
+
+        # Enable Cocoa on Apple platforms.
         if(APPLE)
-          set(SDL_COCOA ON)
+            set(SDL_COCOA ON)
         else()
-          set(SDL_COCOA OFF)
+            set(SDL_COCOA OFF)
         endif()
-        set(SDL_DBUS OFF)
-        set(SDL_DEPS_SHARED OFF)
-        set(SDL_DIRECTX OFF)
-        set(SDL_DISKAUDIO OFF)
-        set(SDL_DUMMYAUDIO OFF)
-        set(SDL_DUMMYCAMERA OFF)
-        set(SDL_DUMMYVIDEO OFF)
-        set(SDL_EXAMPLES OFF)
-        set(SDL_EXAMPLES_LINK_SHARED OFF)
-        set(SDL_FOREGROUNDING_SIGNAL OFF)
-        set(SDL_GCC_ATOMICS OFF)
-        set(SDL_GPU_DXVK OFF)
-        set(SDL_HIDAPI OFF)
-        set(SDL_HIDAPI_JOYSTICK OFF)
-        set(SDL_HIDAPI_LIBUSB OFF)
-        set(SDL_HIDAPI_LIBUSB_SHARED OFF)
-        set(SDL_IBUS OFF)
-        set(SDL_INSTALL OFF)
-        set(SDL_INSTALL_TESTS OFF)
-        set(SDL_JACK OFF)
-        set(SDL_JACK_SHARED OFF)
-        set(SDL_KMSDRM OFF)
-        set(SDL_KMSDRM_SHARED OFF)
-        set(SDL_LASX OFF)
-        set(SDL_LIBICONV OFF)
-        set(SDL_LIBUDEV OFF)
-        set(SDL_LIBURING OFF)
-        set(SDL_LSX OFF)
-        set(SDL_METAL OFF)
-        set(SDL_MMX OFF)
-        set(SDL_OFFSCREEN OFF)
-        set(SDL_OPENGL OFF)
-        set(SDL_OPENGLES OFF)
-        set(SDL_OPENVR OFF)
-        set(SDL_OSS OFF)
-        set(SDL_RENDER_D3D OFF)
-        set(SDL_RENDER_D3D11 OFF)
-        set(SDL_RENDER_D3D12 OFF)
-        set(SDL_RENDER_GPU OFF)
-        set(SDL_RENDER_METAL OFF)
-        set(SDL_RENDER_VULKAN OFF)
-        set(SDL_ROCKCHIP OFF)
-        set(SDL_RPATH OFF)
-        set(SDL_RPI OFF)
-        set(SDL_SNDIO OFF)
-        set(SDL_SNDIO_SHARED OFF)
-        set(SDL_SSE OFF)
-        set(SDL_SSE2 OFF)
-        set(SDL_SSE3 OFF)
-        set(SDL_SSE4_1 OFF)
-        set(SDL_SSE4_2 OFF)
-        set(SDL_SYSTEM_ICONV OFF)
-        set(SDL_TESTS OFF)
-        set(SDL_TESTS_LINK_SHARED OFF)
-        set(SDL_UNINSTALL OFF)
-        set(SDL_VIRTUAL_JOYSTICK OFF)
-        set(SDL_VIVANTE OFF)
-        set(SDL_VULKAN OFF)
-        set(SDL_WASAPI OFF)
-    
         FetchContent_Declare(
             sdl3fetch
-            URL      https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.18.tar.gz
-            #URL      "${CMAKE_CURRENT_LIST_DIR}/../release-3.2.4.tar.gz"
-            DOWNLOAD_EXTRACT_TIMESTAMP True
+            URL "https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.22.tar.gz"
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         )
         set(SDL_STATIC ON)
         set(SDL_SHARED OFF)
@@ -345,6 +285,14 @@ if(ANDROID)
     include_directories("${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include")
 endif()
 
+if(NOT SUPPORT_WGPU_BACKEND)
+    set(DAWN_USE_GLFW OFF)
+endif()
+if(SUPPORT_GLFW)
+    set(GLFW_BUILD_WAYLAND ${RAYGPU_USE_WAYLAND})
+    set(GLFW_BUILD_X11 ${RAYGPU_USE_X11})
+    add_subdirectory("amalgamation/glfw-3.4")
+endif()
 
 
 set(RG_SOURCES
@@ -357,16 +305,14 @@ set(RG_SOURCES
     "src/msf_gif_impl.c"
     "src/rtext.c"
     "src/rshapes.c"
-    
     "src/models.c"
     "src/windows_stuff.c"
-    "include/enum_translation.h"
+    "src/backend_wgpu.c"
 )
 
 if(SUPPORT_VULKAN_BACKEND)
-    if(SUPPORT_WGSL_PARSER)
-        set(WGVK_BUILD_WGSL_SUPPORT ON)
-    endif()
+    set(WGVK_BUILD_WGSL_SUPPORT ${SUPPORT_WGSL_PARSER})
+    
     if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../WGVK")
         FetchContent_Declare(
             wgvk
@@ -378,50 +324,14 @@ if(SUPPORT_VULKAN_BACKEND)
     else()
         add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../WGVK" ${CMAKE_CURRENT_BINARY_DIR}/wgvk-build)
     endif()
-    #target_compile_features(wgvk_standalone PRIVATE c_std_23)
-    
-    if(RAYGPU_BUILD_SHARED_LIBRARY)
-        #target_compile_definitions(wgvk_standalone PRIVATE RG_EXPORTS=1)
-        if(SUPPORT_WGSL_PARSER)
-            #target_compile_definitions(tint_c_api PRIVATE RG_EXPORTS=1)
-        endif()
-    else()
-        #target_compile_definitions(wgvk_standalone PRIVATE RG_STATIC=1)
-        if(SUPPORT_WGSL_PARSER)
-            #target_compile_definitions(tint_c_api PRIVATE RG_STATIC=1)
-        endif()
-    endif()
-    
-    if(SUPPORT_WGSL_PARSER)
-        #cst_bundle_libraries(wgvk_full wgvk_standalone tint_lang_wgsl_reader tint_lang_spirv_writer tint_c_api)
-        add_executable(wgsl_compiler "src/wgsl_compiler.c")
-        target_link_libraries(wgsl_compiler PUBLIC tint_c_api tint_lang_wgsl_inspector tint_lang_wgsl_reader tint_lang_spirv_writer)
-    else()
-        #cst_bundle_libraries(wgvk_full wgvk_standalone)
-    endif()
-    
-    list(APPEND RG_SOURCES "src/backend_wgpu.c")
-
-    
-endif()
-if(SUPPORT_WGPU_BACKEND)
-    list(APPEND RG_SOURCES
-        "src/backend_wgpu.c"
-    )
 endif()
 if(APPLE)
-    set_source_files_properties("src/InitWindow.c"
-        PROPERTIES
-        LANGUAGE OBJC
-    )
+    set(RAYGPU_USE_METAL ON)
+    set_source_files_properties("src/InitWindow.c" PROPERTIES LANGUAGE OBJC)
 endif()
 
 if (NOT EMSCRIPTEN)
     list(APPEND RG_SOURCES "src/glsl_support.cpp")
-endif()
-
-if(DAWN_ENABLE_METAL AND SUPPORT_WGPU_BACKEND)
-    set(RAYGPU_USE_METAL ON)
 endif()
 
 set(raygpu_core_library_name raygpu_core)
@@ -475,21 +385,6 @@ if(MSVC)
     target_compile_definitions(${raygpu_core_library_name} PUBLIC _USE_MATH_DEFINES=1)
 endif()
 
-if(NOT MSVC AND NOT EMSCRIPTEN)
-    #foreach(source_file IN LISTS RG_SOURCES)
-    #    set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fno-inline")
-    #endforeach()
-    #if(CMAKE_BUILD_TYPE MATCHES Debug)
-    #    foreach(source_file IN LISTS RG_SOURCES)
-    #        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-fsanitize=address,undefined")
-    #    endforeach()
-    #endif()
-    #if(CMAKE_BUILD_TYPE MATCHES Release)
-    #    foreach(source_file IN LISTS RG_SOURCES)
-    #        set_source_files_properties(${source_file} PROPERTIES COMPILE_FLAGS "-g")
-    #    endforeach()
-    #endif()
-endif()
 set(SUPPRESS_WARNINGS_SOURCE_FILES
     "src/stb_impl.c"
     "src/rtext.c"
@@ -498,10 +393,8 @@ set(SUPPRESS_WARNINGS_SOURCE_FILES
 )
 foreach(file ${SUPPRESS_WARNINGS_SOURCE_FILES})
     if (MSVC)
-        # Suppress all warnings in MSVC
         set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "/W0")
     else()
-        # Suppress all warnings in GCC/Clang
         set_source_files_properties(${file} PROPERTIES COMPILE_FLAGS "-w")
     endif()
 endforeach()
@@ -552,12 +445,6 @@ else()
         list(APPEND raygpu_linked_deps SDL3::SDL3)
     endif()
     if(SUPPORT_GLFW)
-        if(NOT DAWN_IS_IN_USE)
-            find_package(glfw QUIET)
-            if(NOT glfw_FOUND)
-                add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/amalgamation/glfw-3.4")
-            endif()
-        endif()
         list(APPEND raygpu_linked_deps glfw)
     endif()
     if(SUPPORT_GLSL_PARSER)
@@ -568,17 +455,13 @@ list(APPEND raygpu_linked_deps spirv-reflect-static)
 
 target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
 
-if(NOT EMSCRIPTEN AND NOT SUPPORT_WGPU_BACKEND) 
+if(NOT SUPPORT_WGPU_BACKEND) 
     target_link_libraries(${raygpu_core_library_name} PUBLIC wgvk)
 endif()
 
-#add_executable(example "src/example.cpp")
-target_compile_features(${raygpu_core_library_name} PUBLIC cxx_std_20)
+
 if(NOT MSVC)
     target_compile_options(${raygpu_core_library_name} PUBLIC "-Wno-gnu-anonymous-struct" "-Wno-nested-anon-types")
-    if(NOT ENABLE_RTTI)
-    target_compile_options(${raygpu_core_library_name} PRIVATE "-fno-rtti")
-    endif()
 endif()
 
 #target_compile_features(example PUBLIC cxx_std_20)
@@ -630,6 +513,7 @@ endif()
 
 # ----- Install targets for raygpu -----
 if(RAYGPU_ENABLE_INSTALL)
+<<<<<<< HEAD
   include(CMakePackageConfigHelpers)
 
   # Exported target names
@@ -688,6 +572,47 @@ if(RAYGPU_ENABLE_INSTALL)
     NAMESPACE ${RAYGPU_NAMESPACE}
     FILE "${CMAKE_CURRENT_BINARY_DIR}/raygpuTargets.cmake"
   )
+=======
+    include(CMakePackageConfigHelpers)
+    set(RAYGPU_INSTALL_EXPORT RaygpuTargets)
+    set(RAYGPU_NAMESPACE raygpu::)
+    install(
+        TARGETS raygpu
+        EXPORT ${RAYGPU_INSTALL_EXPORT}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        INCLUDES DESTINATION include/raygpu
+    )
+    install(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+        DESTINATION include/raygpu
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+    )
+    set(RAYGPU_CONFIG_INSTALL_DIR lib/cmake/raygpu)
+    configure_package_config_file(
+        "${CMAKE_CURRENT_LIST_DIR}/cmake/raygpuConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake"
+        INSTALL_DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+        NO_SET_AND_CHECK_MACRO
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    )
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake" VERSION 0.1.0 COMPATIBILITY SameMajorVersion)
+    install(
+        FILES "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/raygpuConfigVersion.cmake"
+        DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+    )
+    install(
+        EXPORT ${RAYGPU_INSTALL_EXPORT}
+        NAMESPACE ${RAYGPU_NAMESPACE}
+        DESTINATION ${RAYGPU_CONFIG_INSTALL_DIR}
+    )
+    export(
+        EXPORT ${RAYGPU_INSTALL_EXPORT}
+        NAMESPACE ${RAYGPU_NAMESPACE}
+        FILE "${CMAKE_CURRENT_BINARY_DIR}/raygpuTargets.cmake"
+    )
+>>>>>>> 5d9ada5d0 (Some CMake changes)
 endif()
 
 
