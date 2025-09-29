@@ -1,8 +1,7 @@
 // begin file src/glfw3webgpu.c
 #include "glfw3webgpu.h"
-
 #include <webgpu/webgpu.h>
-
+#include <stdio.h>
 #include <GLFW/glfw3.h>
 
 #if defined(_WIN32) || defined(WIN32) || defined(_WIN64) || defined(WIN64) 
@@ -136,7 +135,7 @@ WGPUSurface glfwCreateWindowWGPUSurface(WGPUInstance instance, GLFWwindow* windo
 #endif // GLFW_EXPOSE_NATIVE_EMSCRIPTEN
 
     default:
-        // Unsupported platform
+        fprintf(stderr, "No suitable GLFW platform macro enabled. Returning nullptr for surface, this will almost certainly lead to a crash");
         return NULL;
     }
 }

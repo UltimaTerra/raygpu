@@ -3,37 +3,20 @@
 [![Window/Linux/MacOS build](https://github.com/manuel5975p/raygpu/actions/workflows/cmake-multi-platform.yml/badge.svg)](https://github.com/manuel5975p/raygpu/actions/workflows/cmake-multi-platform.yml)
 
 
-A fast and simple [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) or [Vulkan](https://www.vulkan.org/) based graphics library for **C and C++**, inspired by and based on [raylib](https://github.com/raysan5/raylib/). Primarily targeting WebGPU for browsers and desktop through [Dawn](https://dawn.googlesource.com/dawn), it also supports a direct and lightweight Vulkan backend.
+RayGPU is a fast and simple Graphics Library written in C99, inspired by and based on [raylib](https://github.com/raysan5/raylib/). It targets Vulkan 1.1 or Vulkan 1.3 through [WGVK](https://github.com/manuel5975p/WGVK/) and WebGPU through [Dawn](https://dawn.googlesource.com/dawn). 
 
+It is designed to be easily buildable with short compile times, combining the user-friendly functions of raylib with the modern, feature-rich Vulkan and WebGPU backends.
 - [Getting Started](#getting-started)
 - [Building](#building)
 - [OpenGL compatibility](#opengl-compatibility-and-similarity)
 - [Examples and snippets](#more-advanced-examples)
 ___
-### Why WebGPU
-[WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) is a new graphics API meant to give portable access to GPU features. <br> 
-[Dawn](https://github.com/google/dawn) is a chromium's implementation of the webgpu api, supporting the following backends
-- DirectX 11/12 
-- Vulkan (includes Android)
-- OpenGL
-- Metal (includes iOS)
-- Most importantly, [browsers](https://caniuse.com/webgpu).
-
-It also includes a [specification of WGSL](https://www.w3.org/TR/WGSL/), a shading language that will can translated into any native shading language, like MSL, HLSL, GLSL and most importantly SPIR-V. This library includes an optional GLSL parser, making GLSL another option for input to be translated.
-
-Mobile support is done with SDL, Web support for C++/ wasm programs is done by [Emscripten](https://emscripten.org/). 
-- **Pros**
-  - Full support for OpenGL(ES), Vulkan, DirectX 12 and Metal
-  - Compute shaders and storage buffers **on all platforms**
-  - Multi-windowing support
-  - True Headless Support (glfw, sdl, xlib etc. all **not** required)
-  - Highly portable, rendering backend is discovered at runtime
-- **Cons**
-  - Not as lightweight and ubiquitous as OpenGL
-  - No support for platforms older than OpenGLES 3
 ## Notable Differences to [raylib](https://github.com/raysan5/raylib/)
 - Rendertextures are **not** upside down
 - VSync: Support for `FLAG_VSYNC_LOWLATENCY_HINT` to create a tearless Mailbox swapchain with a fallback to regular vsync if not supported
+- Full support for multiple windows
+- Full support for headless context, taking screenshots and exporting videos
+___
 
 # Roadmap and Demos
 - [x] Basic Windowing [Example](https://github.com/manuel5975p/raygpu/tree/master/examples/core_window.c)
@@ -51,7 +34,7 @@ Mobile support is done with SDL, Web support for C++/ wasm programs is done by [
 - [X] Support for GLSL as an input
 - [ ] Proper animation support
 - [ ] IQM / VOX support
-
+- [ ] Support in foreign frameworks such as Unreal Engine through BeginTextureMode(\<some UE texture\>)
 
 ##### Tested on
 - Linux 
@@ -60,9 +43,14 @@ Mobile support is done with SDL, Web support for C++/ wasm programs is done by [
   - Vulkan
   - OpenGL/ES
   - AMD and NVidia
+  - Google Chrome
 - Windows
-  - DX12 
+  - DX12
+  - Google Chrome
   - Vulkan
+- MacOS 
+  - Native Metal
+  - Safari
 # Getting Started
 For instructions on building or using this project, see [Building](#building) <br>
 For shaders and buffers, see [Shaders and Buffers](#shaders-and-buffers)
@@ -108,6 +96,18 @@ int main(){
 }
 ```
 ## Building
+### Minimal compile command
+
+
+Compiling a raygpu program for Web is as easy as running 
+```bash
+emcc --use-port=emdawnwebgpu examples/core_shapes.c raygpu/src/*.c -I raygpu/include -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1
+```
+Make sure you have a recent version of emscripten installed.
+___
+
+### CMake
+
 The primarily supported way to build is through CMake. Using the vulkan backend with GLSL Shaders and GLFW is also buildable with a plain Makefile.
 
 The CMake config supports a couple of options, namely
@@ -128,6 +128,7 @@ Those options can be appended to a cmake command line like this example:
 **Omitting both the `SUPPORT_WGPU_BACKEND` and `SUPPORT_WGSL_BACKEND` drastically reduces build-time, as dawn and tint are not built!**
 
 For more info on cmake, scroll down to [the CMake section](#cmake)
+
 
 #### Makefile
 ```
@@ -163,7 +164,11 @@ FetchContent_MakeAvailable(raygpu_git)
 target_link_libraries(<your target> PUBLIC raygpu)
 ```
 ___
-#### Building for Linux
+#### Building for Linux or MacOS
+
+Linux requires
+- Ubuntu/Debian: `sudo apt install libvulkan-dev`
+- Arch / Manjaro: `sudo pacman -S vulkan-headers vulkan-swrast`
 ```bash
 git clone https://github.com/manuel5975p/raygpu.git
 cd raygpu
@@ -182,30 +187,20 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022"
 ```
 See the complete [list of generators](https://cmake.org/cmake/help/latest/manual/cmake-generators.7.html) for older Visual Studio versions.
-#### Building for MacOS
-As I am unable to build this library on MacOS, all I can point to here are the instructions for Linux.
 
 #### Building for Web
-Because the WebGPU spec and API is still in its final development phases, there is currently a mismatch between Emscripten's and Dawn's webgpu headers. Building with emscripten therefore involves some extra steps.
-
-1. If you don't have the emscripten sdk (emsdk) installed already, follow [its installation steps](https://emscripten.org/docs/getting_started/downloads.html). It might be wise to update your current toolchain too.
-
-2. Now that you have emsdk installed, get an additional checkout of **emscripten, not emsdk** onto your system. This is available [here](https://github.com/emscripten-core/emscripten). 
-
-3. In the additional emscripten source tree, create a file named `.emscripten`, with the following contents:
-```
-LLVM_ROOT = '/path/to/emsdk/upstream/bin'
-BINARYEN_ROOT = '/path/to/emsdk/upstream'
-NODE_JS = '/path/to/emsdk/node/<your_node_version>/bin/node'
-```
-where `/path/to/emsdk/` is the path to your emsdk directory.
-
-4. Run `./bootstrap`
-
-5. Finally, when building this project, use the command
+Building for web simply requires 
+- Using the WebGPU backend
+- Having [emscripten](https://emscripten.org/docs/getting_started/downloads.html) installed
 ```bash
-emcmake cmake -DDAWN_EMSCRIPTEN_TOOLCHAIN="path/to/emscripten" ..
+git clone https://github.com/manuel5975p/raygpu.git
+cd raygpu
+mkdir build && cd build
+emcmmake cmake ..- DSUPPORT_WGPU_BACKEND=ON -DCMAKE_BUILD_TYPE=Release
 ```
+
+<br>
+<br>
 
 # OpenGL Compatibility and Similarity
 ## Shaders and Buffers
@@ -319,3 +314,24 @@ int main(void){
 ```
 ___
 More examples can be found in [here](https://github.com/manuel5975p/raygpu/tree/master/examples).
+### Why WebGPU
+[WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API) is a new graphics API meant to give portable access to GPU features. <br> 
+[Dawn](https://github.com/google/dawn) is a chromium's implementation of the webgpu api, supporting the following backends
+- DirectX 11/12 
+- Vulkan (includes Android)
+- OpenGL
+- Metal (includes iOS)
+- Most importantly, [browsers](https://caniuse.com/webgpu).
+
+It also includes a [specification of WGSL](https://www.w3.org/TR/WGSL/), a shading language that will can translated into any native shading language, like MSL, HLSL, GLSL and most importantly SPIR-V. This library includes an optional GLSL parser, making GLSL another option for input to be translated.
+
+Mobile support is done with SDL, Web support for C++/ wasm programs is done by [Emscripten](https://emscripten.org/). 
+- **Pros**
+  - Full support for OpenGL(ES), Vulkan, DirectX 12 and Metal
+  - Compute shaders and storage buffers **on all platforms**
+  - Multi-windowing support
+  - True Headless Support (glfw, sdl, xlib etc. all **not** required)
+  - Highly portable, rendering backend is discovered at runtime
+- **Cons**
+  - Not as lightweight and ubiquitous as OpenGL
+  - No support for platforms older than OpenGLES 3

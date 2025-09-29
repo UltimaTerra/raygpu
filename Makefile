@@ -241,7 +241,10 @@ SRC_C = src/sinfl_impl.c \
         src/cgltf_impl.c \
         src/windows_stuff.c \
         src/rtext.c \
+        src/wgsl_parse_lite.c \
         src/raygpu.c \
+        src/models.c \
+        src/rshapes.c \
         src/backend_wgpu.c \
         src/InitWindow.c \
         $(DL_DIR)/wgvk.c \
