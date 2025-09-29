@@ -158,41 +158,59 @@ do {                                                                            
 
 typedef uint32_t Bool32;
 
-#define COUNTR_ZERO_NBITS(T) ((int)(sizeof(T) * 8)) // or CHAR_BIT?
+#pragma once
+#include <stdint.h>
+#include <limits.h>
+
+#define COUNTR_ZERO_NBITS(T) ((int)(sizeof(T) * CHAR_BIT))
 
 #if defined(__GNUC__) || defined(__clang__)
     #define COUNTR_ZERO_BUILTIN_U32(x) ((x) == 0 ? 32 : __builtin_ctz((uint32_t)(x)))
     #define COUNTR_ZERO_BUILTIN_U64(x) ((x) == 0 ? 64 : __builtin_ctzll((uint64_t)(x)))
     #define COUNTR_ZERO_BUILTIN_U16(x) ((x) == 0 ? 16 : __builtin_ctz((uint16_t)(x)))
-    #define COUNTR_ZERO_BUILTIN_U8(x)  ((x) == 0 ? 8  : __builtin_ctz((uint8_t)(x)))
+    #define COUNTR_ZERO_BUILTIN_U8(x)  ((x) == 0 ?  8 : __builtin_ctz((uint8_t)(x)))
 #elif defined(_MSC_VER)
     #include <intrin.h>
     #pragma intrinsic(_BitScanForward)
-    #pragma intrinsic(_BitScanForward64)
+
     static inline int countr_zero_msvc_u32(uint32_t x) {
         unsigned long index;
         if (_BitScanForward(&index, x)) return (int)index;
         return 32;
     }
-    static inline int countr_zero_msvc_u64(uint64_t x) {
-        unsigned long index;
-        if (_BitScanForward64(&index, x)) return (int)index;
-        return 64;
-    }
-    #define COUNTR_ZERO_BUILTIN_U32(x) countr_zero_msvc_u32(x)
-    #define COUNTR_ZERO_BUILTIN_U64(x) countr_zero_msvc_u64(x)
-    #define COUNTR_ZERO_BUILTIN_U16(x) countr_zero_fallback_u16(x)
-    #define COUNTR_ZERO_BUILTIN_U8(x)  countr_zero_fallback_u8(x)
+
+    #if defined(_M_X64) || defined(_WIN64)
+        #pragma intrinsic(_BitScanForward64)
+        static inline int countr_zero_msvc_u64(uint64_t x) {
+            unsigned long index;
+            if (_BitScanForward64(&index, x)) return (int)index;
+            return 64;
+        }
+    #else
+        static inline int countr_zero_msvc_u64(uint64_t x) {
+            unsigned long index;
+            uint32_t lo = (uint32_t)x;
+            if (_BitScanForward(&index, lo)) return (int)index;
+            uint32_t hi = (uint32_t)(x >> 32);
+            if (_BitScanForward(&index, hi)) return (int)index + 32;
+            return 64;
+        }
+    #endif
+
+    #define COUNTR_ZERO_BUILTIN_U32(x) countr_zero_msvc_u32((uint32_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U64(x) countr_zero_msvc_u64((uint64_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U16(x) countr_zero_fallback_u16((uint16_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U8(x)  countr_zero_fallback_u8 ((uint8_t)(x))
 #else
-    #define COUNTR_ZERO_BUILTIN_U32(x) countr_zero_fallback_u32(x)
-    #define COUNTR_ZERO_BUILTIN_U64(x) countr_zero_fallback_u64(x)
-    #define COUNTR_ZERO_BUILTIN_U16(x) countr_zero_fallback_u16(x)
-    #define COUNTR_ZERO_BUILTIN_U8(x)  countr_zero_fallback_u8(x)
+    #define COUNTR_ZERO_BUILTIN_U32(x) countr_zero_fallback_u32((uint32_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U64(x) countr_zero_fallback_u64((uint64_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U16(x) countr_zero_fallback_u16((uint16_t)(x))
+    #define COUNTR_ZERO_BUILTIN_U8(x)  countr_zero_fallback_u8 ((uint8_t)(x))
 #endif
 
-// Fallback portable implementation
-#define DEFINE_COUNTR_ZERO_FALLBACK_IMPL(T, WIDTH) \
-static inline int countr_zero_fallback_##T(T x) { \
+// Fallback portable implementation with short names
+#define DEFINE_COUNTR_ZERO_FALLBACK_IMPL(SHORT, TYPE, WIDTH) \
+static inline int countr_zero_fallback_##SHORT(TYPE x) { \
     if (x == 0) return WIDTH; \
     int n = 0; \
     while ((x & 1) == 0) { \
@@ -201,20 +219,21 @@ static inline int countr_zero_fallback_##T(T x) { \
     } \
     return n; \
 }
-DEFINE_COUNTR_ZERO_FALLBACK_IMPL(uint8_t, 8)
-DEFINE_COUNTR_ZERO_FALLBACK_IMPL(uint16_t, 16)
-DEFINE_COUNTR_ZERO_FALLBACK_IMPL(uint32_t, 32)
-DEFINE_COUNTR_ZERO_FALLBACK_IMPL(uint64_t, 64)
+
+DEFINE_COUNTR_ZERO_FALLBACK_IMPL(u8,  uint8_t,  8)
+DEFINE_COUNTR_ZERO_FALLBACK_IMPL(u16, uint16_t, 16)
+DEFINE_COUNTR_ZERO_FALLBACK_IMPL(u32, uint32_t, 32)
+DEFINE_COUNTR_ZERO_FALLBACK_IMPL(u64, uint64_t, 64)
 
 static inline int countr_zero_u8 (uint8_t  x) { return COUNTR_ZERO_BUILTIN_U8 (x); }
 static inline int countr_zero_u16(uint16_t x) { return COUNTR_ZERO_BUILTIN_U16(x); }
 static inline int countr_zero_u32(uint32_t x) { return COUNTR_ZERO_BUILTIN_U32(x); }
 static inline int countr_zero_u64(uint64_t x) { return COUNTR_ZERO_BUILTIN_U64(x); }
 
-static inline int countr_zero_i8 (int8_t  x)  { return countr_zero_u8 ((uint8_t)x ); }
-static inline int countr_zero_i16(int16_t x)  { return countr_zero_u16((uint16_t)x); }
-static inline int countr_zero_i32(int32_t x)  { return countr_zero_u32((uint32_t)x); }
-static inline int countr_zero_i64(int64_t x)  { return countr_zero_u64((uint64_t)x); }
+static inline int countr_zero_i8 (int8_t  x) { return countr_zero_u8 ((uint8_t)x); }
+static inline int countr_zero_i16(int16_t x) { return countr_zero_u16((uint16_t)x); }
+static inline int countr_zero_i32(int32_t x) { return countr_zero_u32((uint32_t)x); }
+static inline int countr_zero_i64(int64_t x) { return countr_zero_u64((uint64_t)x); }
 
 // Bit-scan intrinsics
 
