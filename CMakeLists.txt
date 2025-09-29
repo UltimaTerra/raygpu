@@ -474,7 +474,7 @@ if(NOT MSVC)
     target_compile_options(${raygpu_core_library_name} PUBLIC "-Wno-gnu-anonymous-struct" "-Wno-nested-anon-types")
 endif()
 
-#target_compile_features(example PUBLIC cxx_std_20)
+target_compile_features(${raygpu_core_library_name} PUBLIC cxx_std_20)
 #target_link_libraries(example PUBLIC raygpu)
 #if(CMAKE_BUILD_TYPE MATCHES Debug)
 if(RAYGPU_USE_LLD)
