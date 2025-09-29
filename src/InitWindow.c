@@ -239,12 +239,12 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
         #ifdef MAIN_WINDOW_GLFW
         SubWindow createdWindow = InitWindow_GLFW((int)ctx->windowWidth, (int)ctx->windowHeight, ctx->windowTitle);
         #elif defined(MAIN_WINDOW_SDL3)
-        SubWindow createdWindow = InitWindow_SDL3(width, height, title);
+        SubWindow createdWindow = InitWindow_SDL3((int)ctx->windowWidth, (int)ctx->windowHeight, ctx->windowTitle);
         #elif defined(MAIN_WINDOW_RGFW)
-        SubWindow createdWindow = InitWindow_RGFW(width, height, title);
+        SubWindow createdWindow = InitWindow_RGFW((int)ctx->windowWidth, (int)ctx->windowHeight, ctx->windowTitle);
         #else
         Initialize_SDL2();
-        SubWindow createdWindow = InitWindow_SDL2(width, height, title);
+        SubWindow createdWindow = InitWindow_SDL2((int)ctx->windowWidth, (int)ctx->windowHeight, ctx->windowTitle);
         #endif
         
         WGPUSurface wSurface = (WGPUSurface)CreateSurfaceForWindow(createdWindow);
