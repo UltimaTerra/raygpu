@@ -512,6 +512,18 @@ endif()
 
 cst_bundle_libraries(raygpu ${raygpu_core_library_name} ${raygpu_linked_deps})
 
+# Don't link to raygpu_core at all - raygpu already contains its objects
+# Just propagate the interface properties manually:
+target_include_directories(raygpu PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>  
+    $<INSTALL_INTERFACE:include/>
+)
+
+get_target_property(core_compile_defs ${raygpu_core_library_name} INTERFACE_COMPILE_DEFINITIONS)
+if(core_compile_defs)
+    target_compile_definitions(raygpu PUBLIC ${core_compile_defs})
+endif()
+
 if(DEFINED ENV{HOMEBREW_PREFIX})
     # Construct the RPATH using the environment variable
     set(HOMEBREW_LIB_RPATH "$ENV{HOMEBREW_PREFIX}/lib")
