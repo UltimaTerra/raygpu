@@ -1000,14 +1000,14 @@ void bw_deviceLostCallback(const WGPUDevice *device, WGPUDeviceLostReason reason
     if (message.length == WGPU_STRLEN) {
         size_t len = strlen(message.data);
         if(len < sizeof(messages) - 1){
-            memcpy(messages, message.data, message.length);
-            messages[message.length] = '\0';
+            memcpy(messages, message.data, len);
+            messages[len] = '\0';
         }
     } else {
         size_t len = message.length;
         if(len < sizeof(messages) - 1){
-            memcpy(messages, message.data, message.length);
-            messages[message.length] = '\0';
+            memcpy(messages, message.data, len);
+            messages[len] = '\0';
         }
     }
     TRACELOG(LOG_FATAL, "Device lost because of %s: %s", reasonName, messages);
@@ -1043,51 +1043,123 @@ static void onDevice(
         TRACELOG(LOG_ERROR, "Device failed: %.*s\n", (int)message.length, message.data);
     }
 }
-static void initResumeEntry(wgpustate* state);
-static void InitBackend_DoTheRest(wgpustate* sample);
-static void initAdapterAndDevice(wgpustate* state){
+
+
+static bool initResumeEntry      (InitContext_Impl _ctx);
+static bool InitBackend_DoTheRest(InitContext_Impl _ctx);
+
+
+InitContext_Impl g_init_context_;
+
+#if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+
+static bool kickDeviceRequest(double t, void* ctx){
+    (void)t; (void)ctx;
+    initResumeEntry(g_init_context_);
+    return false;
+}
+static bool kickFinalizeAndContinue(double t, void* ctx){
+    (void)t; (void)ctx;
+    InitBackend_DoTheRest(g_init_context_);
+    return false;
+}
+
+#endif
+
+static bool animationFrameWaitForAdapter(double time, void* _ctx){
+    if(((struct wgpustate*)g_init_context_.wgpustate)->adapter){
+        // Adapter ready. request frame to finish init and call continuation point
+        #if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+        emscripten_request_animation_frame_loop(kickDeviceRequest, NULL);
+        #else
+        initResumeEntry(g_init_context_);
+        #endif
+        return false;
+    }
+    else{
+        return true; // Keep calling it
+    }
+ }
+
+ static bool animationFrameWaitForDevice(double time, void* _ctx){
+    if(((struct wgpustate*)g_init_context_.wgpustate)->device){
+        // Device ready. request frame to finish init and call continuation point
+        #if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+        emscripten_request_animation_frame_loop(kickFinalizeAndContinue, NULL);
+        #else
+        InitBackend_DoTheRest(g_init_context_);
+        #endif
+        return false;
+    }
+    else{
+        return true; // Keep calling it
+    }
+}
+static bool initAdapterAndDevice(InitContext_Impl _ctx){
+    InitContext_Impl* ctx = &_ctx;
+
     WGPURequestAdapterOptions requestAdapterOptions = {
         .backendType = requestedBackend,
-        .forceFallbackAdapter = requestedAdapterType == WGPUAdapterType_CPU,
+        .forceFallbackAdapter = (requestedAdapterType == WGPUAdapterType_CPU),
         .featureLevel = bcompat(requestedBackend) ? WGPUFeatureLevel_Compatibility : WGPUFeatureLevel_Core
     };
     switch (requestedAdapterType) {
-    case WGPUAdapterType_CPU:
-        requestAdapterOptions.forceFallbackAdapter = true;
-        break;
-    case WGPUAdapterType_DiscreteGPU: //[[fallthrough]];
-    case WGPUAdapterType_IntegratedGPU:
-        requestAdapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
-        break;
-    default:
-        break;
+        case WGPUAdapterType_CPU:
+            requestAdapterOptions.forceFallbackAdapter = true;
+            break;
+        case WGPUAdapterType_DiscreteGPU: /* fallthrough */
+        case WGPUAdapterType_IntegratedGPU:
+            requestAdapterOptions.powerPreference = WGPUPowerPreference_HighPerformance;
+            break;
+        default:
+            break;
     }
-    
 
     WGPURequestAdapterCallbackInfo requestAdapterCallbackInfo = {
-        .callback = onAdapter,
-        .mode = WGPUCallbackMode_AllowSpontaneous,
-        .userdata1 = (void*)state,
+        .callback  = onAdapter,
+    #if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+        .mode      = WGPUCallbackMode_AllowSpontaneous,
+    #else
+        .mode      = WGPUCallbackMode_WaitAnyOnly,
+    #endif
+        .userdata1 = ctx->wgpustate,
     };
+
+    wgpustate* state = (wgpustate*)(ctx->wgpustate);
+
     WGPUFuture arfuture = wgpuInstanceRequestAdapter(state->instance, &requestAdapterOptions, requestAdapterCallbackInfo);
+
+#if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+    (void)arfuture;
+    g_init_context_ = _ctx;
+    emscripten_request_animation_frame_loop(animationFrameWaitForAdapter, NULL);
+    return true;
+#else
     WGPUFutureWaitInfo arFutureWaitInfo = {
-        .future = arfuture,
+        .future    = arfuture,
         .completed = 0
     };
-    WGPUWaitStatus arWaitStatue = wgpuInstanceWaitAny(state->instance, 1, &arFutureWaitInfo, UINT32_MAX);
-    initResumeEntry(state);
+    WGPUWaitStatus arWaitStatus = wgpuInstanceWaitAny(state->instance, 1, &arFutureWaitInfo, UINT32_MAX);
+    (void)arWaitStatus; // status is logged in callbacks if needed
+    initResumeEntry(_ctx);
+    return true;
+#endif
 }
-static void initResumeEntry(wgpustate* state){
+
+
+static bool initResumeEntry(InitContext_Impl _ctx){
+    InitContext_Impl* ctx = &_ctx;
+
     WGPUFeatureName fnames[2] = {
         WGPUFeatureName_ClipDistances,
         WGPUFeatureName_Float32Filterable,
     };
 
     WGPUDeviceDescriptor deviceDesc = {
-        #ifndef __EMSCRIPTEN__
+    #ifndef __EMSCRIPTEN__
         .requiredFeatureCount = 2,
         .requiredFeatures = fnames,
-        #endif
+    #endif
         .deviceLostCallbackInfo = {
             .callback = bw_deviceLostCallback,
             .mode = WGPUCallbackMode_AllowSpontaneous
@@ -1098,49 +1170,85 @@ static void initResumeEntry(wgpustate* state){
     };
 
     WGPURequestDeviceCallbackInfo rdCallback = {
+    #if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+        .mode = WGPUCallbackMode_AllowSpontaneous,
+    #else
         .mode = WGPUCallbackMode_WaitAnyOnly,
-        .callback = requestDeviceCallback,
-        .userdata1 = state
+    #endif
+        .callback = onDevice,
+        .userdata1 = ctx->wgpustate
     };
+
+    wgpustate* state = (wgpustate*)(ctx->wgpustate);
     WGPUFuture rdFuture = wgpuAdapterRequestDevice(state->adapter, &deviceDesc, rdCallback);
-    WGPUFutureWaitInfo rdFutureWaitInfo = {.future = rdFuture};
-    wgpuInstanceWaitAny(state->instance, 1, &rdFutureWaitInfo, UINT32_MAX);
-    InitBackend_DoTheRest(state);
+
+#if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+    (void)rdFuture;
+    g_init_context_ = _ctx;
+    emscripten_request_animation_frame_loop(animationFrameWaitForDevice, NULL);
+    return true;
+#else
+    WGPUFutureWaitInfo rdFutureWaitInfo = { .future = rdFuture, .completed = 0 };
+    (void)wgpuInstanceWaitAny(state->instance, 1, &rdFutureWaitInfo, UINT32_MAX);
+    InitBackend_DoTheRest(_ctx);
+    return true;
+#endif
 }
 
-void InitBackend() {
+
+void InitBackend(InitContext_Impl _ctx) {
     g_wgpustate = (wgpustate){0};
+    InitContext_Impl* ctx = &_ctx;
     wgpustate *state = &g_wgpustate;
-    state->instance = wgpuCreateInstance(NULL);
-    initAdapterAndDevice(state);
-}
-static void InitBackend_DoTheRest(wgpustate* state){
+    WGPUInstanceFeatureName instanceFeatures[2] = {
+        WGPUInstanceFeatureName_TimedWaitAny,
+        WGPUInstanceFeatureName_ShaderSourceSPIRV
+    };
+    WGPUInstanceDescriptor idesc = {
+        #if !defined(__EMSCRIPTEN__) || defined(ASSUME_EM_ASYNCIFY) 
+        .requiredFeatureCount = 1,
+        .requiredFeatures = instanceFeatures
+        #endif
+    };
 
+    state->instance = wgpuCreateInstance(&idesc);
+    _ctx.wgpustate = (void*)state;
+    initAdapterAndDevice(_ctx);
+
+}
+static bool InitBackend_DoTheRest(InitContext_Impl _ctx){
+    InitContext_Impl* ctx = &_ctx;
+
+    wgpustate* state = (wgpustate*)(ctx->wgpustate);
     if (state->adapter == NULL) {
         TRACELOG(LOG_FATAL, "Adapter is null\n");
+        return false;
     }
-    WGPUAdapterInfo info = {0};
+
+    WGPUAdapterInfo info = (WGPUAdapterInfo){0};
     wgpuAdapterGetInfo(state->adapter, &info);
 
-    char* deviceName = NullTerminatedStringFromView_(info.device);
-    char* architecture = NullTerminatedStringFromView_(info.architecture);
+    char* deviceName  = NullTerminatedStringFromView_(info.device);
+    char* architecture= NullTerminatedStringFromView_(info.architecture);
     char* description = NullTerminatedStringFromView_(info.description);
-    char* vendor = NullTerminatedStringFromView_(info.vendor);
+    char* vendor      = NullTerminatedStringFromView_(info.vendor);
 
-    const char *adapterTypeString = (info.adapterType == WGPUAdapterType_CPU) ? "CPU" : (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
-    const char* backendString;
-    
+    const char *adapterTypeString =
+        (info.adapterType == WGPUAdapterType_CPU) ? "CPU" :
+        (info.adapterType == WGPUAdapterType_IntegratedGPU ? "Integrated GPU" : "Dedicated GPU");
+
+    const char* backendString = "?invalid WGPUBackendType";
     switch(info.backendType){
-        case WGPUBackendType_D3D11: backendString = "DirectX 11";break;
-        case WGPUBackendType_D3D12: backendString = "DirectX 12";break;
-        case WGPUBackendType_Vulkan: backendString = "Vulkan";break;
-        case WGPUBackendType_OpenGL: backendString = "Desktop OpenGL";break;
-        case WGPUBackendType_OpenGLES: backendString = "OpenGL ES";break;
-        case WGPUBackendType_Metal: backendString = "Metal";break;
-        case WGPUBackendType_WebGPU: backendString = "WebGPU";break;
-        default: backendString = "?invalid WGPUBackendType";break;
+        case WGPUBackendType_D3D11:   backendString = "DirectX 11";    break;
+        case WGPUBackendType_D3D12:   backendString = "DirectX 12";    break;
+        case WGPUBackendType_Vulkan:  backendString = "Vulkan";        break;
+        case WGPUBackendType_OpenGL:  backendString = "Desktop OpenGL";break;
+        case WGPUBackendType_OpenGLES:backendString = "OpenGL ES";     break;
+        case WGPUBackendType_Metal:   backendString = "Metal";         break;
+        case WGPUBackendType_WebGPU:  backendString = "WebGPU";        break;
+        default: break;
     }
-    
+
     TRACELOG(LOG_INFO, "Using adapter %s %s", vendor, deviceName);
     TRACELOG(LOG_INFO, "Using adapter %s", info.device.data);
     TRACELOG(LOG_INFO, "Adapter description: %s", description);
@@ -1151,37 +1259,29 @@ static void InitBackend_DoTheRest(wgpustate* state){
     RL_FREE(architecture);
     RL_FREE(description);
     RL_FREE(vendor);
-    WGPULimits adapterLimits = {0};
+
+    WGPULimits adapterLimits = (WGPULimits){0};
+    WGPULimits slimits       = (WGPULimits){0};
     wgpuAdapterGetLimits(state->adapter, &adapterLimits);
-
-    {
-        TraceLog(LOG_INFO, "Platform could support %u bindings per bindgroup", (unsigned)adapterLimits.maxBindingsPerBindGroup);
-        TraceLog(LOG_INFO, "Platform could support %u bindgroups", (unsigned)adapterLimits.maxBindGroups);
-        TraceLog(LOG_INFO,
-                 "Platform could support buffers up to %llu megabytes",
-                 (unsigned long long)adapterLimits.maxBufferSize / (1000000ull));
-        TraceLog(LOG_INFO,
-                 "Platform could support textures up to %u x %u",
-                 (unsigned)adapterLimits.maxTextureDimension2D,
-                 (unsigned)adapterLimits.maxTextureDimension2D);
-        TraceLog(LOG_INFO, "Platform could support %u VBO slots", (unsigned)adapterLimits.maxVertexBuffers);
-    }
-
-
-    
-    WGPULimits slimits = {0};
     wgpuDeviceGetLimits(state->device, &slimits);
+
+    TraceLog(LOG_INFO, "Adapter could support %u bindings per bindgroup", (unsigned)adapterLimits.maxBindingsPerBindGroup);
+    TraceLog(LOG_INFO, "Adapter could support %u bindgroups", (unsigned)adapterLimits.maxBindGroups);
+    TraceLog(LOG_INFO, "Adapter could support buffers up to %llu megabytes", (unsigned long long)(adapterLimits.maxBufferSize / 1000000ull));
+    TraceLog(LOG_INFO, "Adapter could support textures up to %u x %u", (unsigned)adapterLimits.maxTextureDimension2D, (unsigned)adapterLimits.maxTextureDimension2D);
+    TraceLog(LOG_INFO, "Adapter could support %u VBO slots", (unsigned)adapterLimits.maxVertexBuffers);
 
     TraceLog(LOG_INFO, "Device supports %u bindings per bindgroup", (unsigned)slimits.maxBindingsPerBindGroup);
     TraceLog(LOG_INFO, "Device supports %u bindgroups", (unsigned)slimits.maxBindGroups);
-    TraceLog(LOG_INFO, "Device supports buffers up to %llu megabytes", (unsigned long long)slimits.maxBufferSize / (1000000ull));
-    TraceLog(LOG_INFO,
-             "Device supports textures up to %u x %u",
-             (unsigned)slimits.maxTextureDimension2D,
-             (unsigned)slimits.maxTextureDimension2D);
+    TraceLog(LOG_INFO, "Device supports buffers up to %llu megabytes", (unsigned long long)(slimits.maxBufferSize / 1000000ull));
+    TraceLog(LOG_INFO, "Device supports textures up to %u x %u", (unsigned)slimits.maxTextureDimension2D, (unsigned)slimits.maxTextureDimension2D);
     TraceLog(LOG_INFO, "Device supports %u VBO slots", (unsigned)slimits.maxVertexBuffers);
+
     state->queue = wgpuDeviceGetQueue(state->device);
+    ctx->continuationPoint(_ctx);
+    return true;
 }
+
 
 const char *TextureFormatName(WGPUTextureFormat fmt);
 bool negotiateSurfaceFormatAndPresentMode_called = false;

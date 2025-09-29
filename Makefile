@@ -151,14 +151,7 @@ endif
 ###############################################################################
 # Source Files
 ###############################################################################
-SRC_CPP = src/InitWindow.cpp \
-          src/InitWindow_GLFW.cpp \
-          src/glsl_support.cpp \
-          src/models.cpp \
-          src/backend_wgpu.cpp \
-          src/raygpu.cpp \
-          src/rshapes.cpp \
-          src/shader_parse.cpp
+SRC_CPP = src/glsl_support.cpp
 
 SRC_GLSL = amalgamation/glslang/glslang/MachineIndependent/parseConst.cpp \
            amalgamation/glslang/glslang/MachineIndependent/Versions.cpp \
@@ -248,6 +241,9 @@ SRC_C = src/sinfl_impl.c \
         src/cgltf_impl.c \
         src/windows_stuff.c \
         src/rtext.c \
+        src/raygpu.c \
+        src/backend_wgpu.c \
+        src/InitWindow.c \
         $(DL_DIR)/wgvk.c \
         src/stb_impl.c \
         amalgamation/SPIRV-Reflect/spirv_reflect.c

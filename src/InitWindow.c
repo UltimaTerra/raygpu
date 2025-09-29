@@ -182,17 +182,26 @@ bool WindowShouldClose(cwoid){
 
 extern Texture2D texShapes;
 
-RGAPI void* InitWindow(int width, int height, const char* title){
+void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx);
+
+RGAPI void* InitWindowEx(InitContext_Impl _ctx){
+    InitContext_Impl* ctx = &_ctx;
+
     #if FORCE_HEADLESS == 1
     g_renderstate.windowFlags |= FLAG_HEADLESS;
     g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
     #endif
-    InitBackend();
-    //TODO: fix this, preferrably set correct format in InitWindow_SDL or GLFW
+    ctx->continuationPoint = InitWindowEx_ContinuationPoint;
+    InitBackend(_ctx);
+    
+    return NULL;
+}
+void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
+    InitContext_Impl* ctx = &_ctx;
     if(g_renderstate.windowFlags & FLAG_STDOUT_TO_FFMPEG){
         if(IsATerminal(stdout)){
             TRACELOG(LOG_ERROR, "Refusing to pipe video output to terminal");
-            TRACELOG(LOG_ERROR, "Try <program> | ffmpeg -y -f rawvideo -pix_fmt rgba -s %ux%u -r 60 -i - -vf format=yuv420p out.mp4", width, height);
+            TRACELOG(LOG_ERROR, "Try <program> | ffmpeg -y -f rawvideo -pix_fmt rgba -s %ux%u -r 60 -i - -vf format=yuv420p out.mp4", ctx->windowWidth, ctx->windowHeight);
             exit(1);
         }
         SetTraceLogFile(stderr);
@@ -206,8 +215,8 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     g_renderstate.last_timestamps[0] = (int64_t)NanoTime();
     
     
-    g_renderstate.width = width;
-    g_renderstate.height = height;
+    g_renderstate.width  = ctx->windowWidth;
+    g_renderstate.height = ctx->windowHeight;
     
     g_renderstate.whitePixel = LoadTextureFromImage(GenImageChecker(CLITERAL(Color){255,255,255,255}, CLITERAL(Color){255,255,255,255}, 1, 1, 0));
     texShapes = g_renderstate.whitePixel;
@@ -228,7 +237,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     if(!(g_renderstate.windowFlags & FLAG_HEADLESS)){
         #if SUPPORT_GLFW == 1 || SUPPORT_SDL2 == 1 || SUPPORT_SDL3 == 1 || SUPPORT_RGFW == 1
         #ifdef MAIN_WINDOW_GLFW
-        SubWindow createdWindow = InitWindow_GLFW((int)width, (int)height, title);
+        SubWindow createdWindow = InitWindow_GLFW((int)ctx->windowWidth, (int)ctx->windowHeight, ctx->windowTitle);
         #elif defined(MAIN_WINDOW_SDL3)
         SubWindow createdWindow = InitWindow_SDL3(width, height, title);
         #elif defined(MAIN_WINDOW_RGFW)
@@ -241,7 +250,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
         WGPUSurface wSurface = (WGPUSurface)CreateSurfaceForWindow(createdWindow);
         CreatedWindowMap_put(&g_renderstate.createdSubwindows, createdWindow->handle, *createdWindow);
         createdWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, createdWindow->handle);
-        createdWindow->surface = CompleteSurface(wSurface, (int)(width * createdWindow->scaleFactor), (int)(height * createdWindow->scaleFactor));
+        createdWindow->surface = CompleteSurface(wSurface, (int)(ctx->windowWidth * createdWindow->scaleFactor), (int)(ctx->windowHeight * createdWindow->scaleFactor));
               
         g_renderstate.window = (GLFWwindow*)createdWindow->handle;
 
@@ -250,7 +259,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     }else{
         g_renderstate.frameBufferFormat = PIXELFORMAT_UNCOMPRESSED_B8G8R8A8;
         CreatedWindowMap_put(&g_renderstate.createdSubwindows, NULL, CLITERAL(RGWindowImpl){0});
-        CreatedWindowMap_get(&g_renderstate.createdSubwindows, NULL)->surface = CreateHeadlessSurface(width, height, g_renderstate.frameBufferFormat);
+        CreatedWindowMap_get(&g_renderstate.createdSubwindows, NULL)->surface = CreateHeadlessSurface(ctx->windowWidth, ctx->windowHeight, g_renderstate.frameBufferFormat);
     }
     
 
@@ -272,12 +281,12 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     //arraySetter(shaderInputs.per_vertex_sizes, {3,2,4});
     //arraySetter(shaderInputs.uniform_minsizes, {64, 0, 0, 0});
     //uarraySetter(shaderInputs.uniform_types, {uniform_buffer, texture2d, sampler, storage_buffer});
-    Texture2D colorTexture = LoadTextureEx(width, height, g_renderstate.frameBufferFormat, true);
+    Texture2D colorTexture = LoadTextureEx(ctx->windowWidth, ctx->windowHeight, g_renderstate.frameBufferFormat, true);
     //g_wgpustate.mainWindowRenderTarget.texture = colorTexture;
     if(g_renderstate.windowFlags & FLAG_MSAA_4X_HINT)
-        g_renderstate.mainWindowRenderTarget.colorMultisample = LoadTexturePro(width, height, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 4, 1);
-    Texture2D depthTexture = LoadTexturePro(width,
-                                  height,
+        g_renderstate.mainWindowRenderTarget.colorMultisample = LoadTexturePro(ctx->windowWidth, ctx->windowHeight, g_renderstate.frameBufferFormat, WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc, 4, 1);
+    Texture2D depthTexture = LoadTexturePro(ctx->windowWidth,
+                                  ctx->windowHeight,
                                   PIXELFORMAT_DEPTH_32_FLOAT,
                                   WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
                                   (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
@@ -286,8 +295,8 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     g_renderstate.mainWindowRenderTarget.depth = depthTexture;
     //init_full_renderstate(g_renderstate.rstate, shaderSource, attrs, 4, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), (WGPUTextureView)colorTexture.view, (WGPUTextureView)g_renderstate.mainWindowRenderTarget.depth.view);
     TRACELOG(LOG_INFO, "Renderstate inited");
-    g_renderstate.renderExtentX = width;
-    g_renderstate.renderExtentY = height;
+    g_renderstate.renderExtentX = ctx->windowWidth;
+    g_renderstate.renderExtentY = ctx->windowHeight;
     
 
     LoadFontDefault();
@@ -360,7 +369,7 @@ RGAPI void* InitWindow(int width, int height, const char* title){
     }
     BufferData(g_renderstate.quadindicesCache, indices, 6 * quadCount * sizeof(uint32_t));
     RL_FREE(indices);
-    Matrix m = ScreenMatrix(width, height);
+    Matrix m = ScreenMatrix(ctx->windowWidth, ctx->windowHeight);
     //static_assert(sizeof(Matrix) == 64, "non 4 byte floats? or what");
 
     MatrixBufferPair_stack_push(&g_renderstate.matrixStack, CLITERAL(MatrixBufferPair){0});
@@ -381,16 +390,31 @@ RGAPI void* InitWindow(int width, int height, const char* title){
         SetTargetFPS(0);
     
     #endif
-    #ifndef __EMSCRIPTEN__
-    return NULL;
-    #else
-    return NULL;
-    #endif
-}
-/**
-  @return WGPUSurface or WGPUSurface (void*)
 
- */
+    if(ctx->finalContinuationPoint){
+        ctx->finalContinuationPoint();
+    }
+    return NULL;
+}
+#if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
+    void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY();
+#else
+    static void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY(){}
+#endif
+
+
+RGAPI void* InitWindow(int width, int height, const char* title){
+    
+    InitContext_Impl ctx = {
+        .windowTitle = title,
+        .windowWidth = width,
+        .windowHeight = height,
+        .finalContinuationPoint = PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY,
+    };
+
+    return InitWindowEx(ctx);
+}
+
 RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window){
     WGPUSurface surfacePtr = NULL;
     window->scaleFactor = 1; // default

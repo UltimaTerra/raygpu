@@ -1021,9 +1021,22 @@ typedef struct RGWindowImpl{
 typedef struct RGWindowImpl* SubWindow;
 typedef struct GLFWwindow GLFWwindow;
 
+// Web-specific garbage to return control to the browser and resume initialization
+struct InitContext_Impl;
+typedef void* (*ContinuationPoint)(struct InitContext_Impl);
+typedef struct InitContext_Impl{
+    const char* windowTitle;
+    int windowWidth, windowHeight;
+    ContinuationPoint continuationPoint;
+    void(*finalContinuationPoint)(void);
+    void* wgpustate;
+}InitContext_Impl;
+
+
 EXTERN_C_BEGIN
     RGAPI void* InitWindow(int width, int height, const char* title);
-    RGAPI void InitBackend(cwoid);
+    RGAPI void* InitWindowEx(InitContext_Impl _ctx);
+    RGAPI void InitBackend(InitContext_Impl _ctx);
     RGAPI void requestAnimationFrameLoopWithJSPI(void (*callback)(void), int /* unused */, int/* unused */);
     RGAPI void requestAnimationFrameLoopWithJSPIArg(void (*callback)(void*), void* userData, int/* unused */, int/* unused */);
     RGAPI void SetWindowShouldClose(cwoid);

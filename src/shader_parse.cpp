@@ -25,7 +25,7 @@
 
 #include <config.h>
 #include <raygpu.h>
-#include <internals.hpp>
+#include <internals.h>
 
 
 

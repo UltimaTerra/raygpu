@@ -73,7 +73,7 @@ EM_BOOL EmscriptenResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent
     //printf("%d, %d\n", uiEvent->documentBodyClientWidth, uiEvent->documentBodyClientHeight);
     int width, height;
     emscripten_get_canvas_element_size("#canvas", &width, &height);
-    ResizeCallback(g_renderstate.window, uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
+    ResizeCallback(g_renderstate.window, width, height);
     fflush(stdout);
     
     return EM_TRUE;
@@ -101,7 +101,11 @@ void cpcallback(GLFWwindow* window, double x, double y){
     RGWindowImpl* associatedWindow = CreatedWindowMap_get(&g_renderstate.createdSubwindows, window);
     //fprintf(stderr, "GLFWwindow is %p\n", window);
     assert(associatedWindow);
-    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)x * associatedWindow->scaleFactor, (float)y * associatedWindow->scaleFactor};
+    #ifdef __EMSCRIPTEN__
+    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)x, (float)y};
+    #else
+    associatedWindow->input_state.mousePos = CLITERAL(Vector2){(float)(x * associatedWindow->scaleFactor), (float)(y * associatedWindow->scaleFactor)};
+    #endif
 }
 
 #ifdef __EMSCRIPTEN__

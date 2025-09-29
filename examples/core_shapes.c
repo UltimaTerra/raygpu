@@ -1,4 +1,9 @@
 #include <raygpu.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+
 Texture tex = {0};
 void mainloop(){
     BeginDrawing();
@@ -13,9 +18,7 @@ void mainloop(){
     DrawFPS(0, 0);
     EndDrawing();
 }
-int main(void){
-    //SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(800, 600, "Shapes Example");
+void main_continuationPoint(){
     tex = LoadTextureFromImage(GenImageChecker(WHITE, BLACK, 100, 100, 10));
 
     #ifndef __EMSCRIPTEN__
@@ -26,4 +29,13 @@ int main(void){
     #else
     emscripten_set_main_loop(mainloop, 0, 0);
     #endif
+}
+int main(void){
+    InitContext_Impl ctx = {
+        .windowTitle = "Shapes Example",
+        .windowWidth = 800,
+        .windowHeight = 600,
+        .finalContinuationPoint = main_continuationPoint
+    };
+    InitWindowEx(ctx);
 }
