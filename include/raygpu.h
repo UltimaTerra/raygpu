@@ -19,10 +19,13 @@
 #include <macros_and_constants.h>
 #include <mathutils.h>
 #ifdef __EMSCRIPTEN__
-#include <emscripten/html5.h>
-#include <emscripten/emscripten.h>
-#define emscripten_set_main_loop requestAnimationFrameLoopWithJSPI
-#define emscripten_set_main_loop_arg requestAnimationFrameLoopWithJSPIArg
+    #include <emscripten/html5.h>
+    #include <emscripten/emscripten.h>
+    
+    #if defined(ASSUME_EM_ASYNCIFY)
+        #define emscripten_set_main_loop requestAnimationFrameLoopWithJSPI
+        #define emscripten_set_main_loop_arg requestAnimationFrameLoopWithJSPIArg
+    #endif
 #endif
 #define RL_FREE free
 
