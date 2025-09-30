@@ -5,6 +5,7 @@ if(APPLE)
     enable_language(OBJC)
     enable_language(OBJCXX)
 endif()
+option(RAYGPU_GENERATE_PYTHON_BINDINGS "Generate python binding (dynamic library) with pybind" OFF)
 option(SUPPORT_SDL2 "Enable windowing with SDL2" OFF)
 option(SUPPORT_SDL3 "Enable windowing with SDL3" OFF)
 option(SUPPORT_GLFW "Enable windowing with GLFW" OFF)
@@ -224,11 +225,6 @@ if(NOT EMSCRIPTEN AND SUPPORT_GLSL_PARSER AND NOT TARGET glslang)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/amalgamation/glslang)  
 endif()
 
-option(SPIRV_REFLECT_STATIC_LIB "" ON)
-option(SPIRV_REFLECT_EXECUTABLE "" OFF)
-option(SPIRV_REFLECT_EXAMPLES "" OFF)
-option(SPIRV_REFLECT_BUILD_TESTS "" OFF)
-add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/amalgamation/SPIRV-Reflect")
 if(SUPPORT_SDL2)
     FetchContent_Declare(
         sdl2fetch
@@ -352,6 +348,7 @@ else()
     add_library(${raygpu_core_library_name} STATIC ${RG_SOURCES})
     target_compile_definitions(${raygpu_core_library_name} PUBLIC RG_STATIC=1)
 endif()
+target_include_directories(${raygpu_core_library_name} PRIVATE ${CMAKE_CURRENT_LIST_DIR}/amalgamation/SPIRV-Reflect)
 if(RAYGPU_USE_X11)
     target_compile_definitions(${raygpu_core_library_name} PUBLIC RAYGPU_USE_X11=1)
     target_link_libraries(${raygpu_core_library_name} PUBLIC X11::X11)
@@ -409,6 +406,7 @@ foreach(file ${SUPPRESS_WARNINGS_SOURCE_FILES})
     endif()
 endforeach()
 
+
 target_include_directories(${raygpu_core_library_name} PUBLIC  
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>  
     $<INSTALL_INTERFACE:include/>
@@ -461,7 +459,6 @@ else()
         list(APPEND raygpu_linked_deps glslang)
     endif()
 endif()
-list(APPEND raygpu_linked_deps spirv-reflect-static)
 
 target_link_libraries(${raygpu_core_library_name} PUBLIC ${raygpu_linked_deps})
 
@@ -524,6 +521,11 @@ if(core_compile_defs)
     target_compile_definitions(raygpu PUBLIC ${core_compile_defs})
 endif()
 
+
+target_link_libraries(raygpu INTERFACE raygpu_core)
+
+
+
 if(DEFINED ENV{HOMEBREW_PREFIX})
     # Construct the RPATH using the environment variable
     set(HOMEBREW_LIB_RPATH "$ENV{HOMEBREW_PREFIX}/lib")
@@ -544,7 +546,7 @@ if(RAYGPU_ENABLE_INSTALL)
   # 1) Install libraries
   install(
     TARGETS
-      raygpu
+      raygpu raygpu_core wgvk glslang
     EXPORT ${RAYGPU_INSTALL_EXPORT}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib

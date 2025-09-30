@@ -10,7 +10,11 @@
 #include <internals.h>
 #include <wgpustate.inc>
 #define Matrix spvMatrix
-#include <spirv_reflect.h>
+#if SUPPORT_WGPU_BACKEND == 1
+    #include <spirv_reflect.c>
+#else
+    #include <spirv_reflect.h>
+#endif
 #undef Matrix
 wgpustate g_wgpustate = {0};
 
