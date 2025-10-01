@@ -3,9 +3,16 @@
 #include <emscripten.h>
 #endif
 
-
 Texture tex = {0};
-void mainloop(){
+
+
+// This function only runs once
+void setup(){
+    tex = LoadTextureFromImage(GenImageChecker(WHITE, BLACK, 100, 100, 10));
+}
+
+// This function gets called repeatedly
+void render(){
     BeginDrawing();
     ClearBackground((Color) {20,50,50,255});
         
@@ -15,27 +22,18 @@ void mainloop(){
     DrawCircleV(GetMousePosition(), 20, CLITERAL(Color){255,0,0,255});
     DrawCircle(600, 300, 200, CLITERAL(Color){255,0,0,100});
     
-    DrawFPS(0, 0);
+    DrawFPS(5, 5);
     EndDrawing();
 }
-void main_continuationPoint(){
-    tex = LoadTextureFromImage(GenImageChecker(WHITE, BLACK, 100, 100, 10));
 
-    #ifndef __EMSCRIPTEN__
-    while(!WindowShouldClose()){
-        mainloop();
-    }
-    
-    #else
-    emscripten_set_main_loop(mainloop, 0, 0);
-    #endif
-}
 int main(void){
-    InitContext_Impl ctx = {
+    ProgramInfo program = {
         .windowTitle = "Shapes Example",
         .windowWidth = 800,
         .windowHeight = 600,
-        .finalContinuationPoint = main_continuationPoint
+        .setupFunction = setup,
+        .renderFunction = render
     };
-    InitWindowEx(ctx);
+    InitProgram(program);
+    //InitWindowEx(ctx);
 }

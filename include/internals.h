@@ -1353,6 +1353,18 @@ RGAPI WGPUSurface CreateSurfaceForWindow_SDL3(void* windowHandle);
 RGAPI WGPUSurface CreateSurfaceForWindow_GLFW(void* windowHandle);
 RGAPI WGPUSurface CreateSurfaceForWindow_RGFW(void* windowHandle);
 
+struct InitContext_Impl;
+typedef void* (*ContinuationPoint)(struct InitContext_Impl);
+typedef struct InitContext_Impl{
+    const char* windowTitle;
+    int windowWidth, windowHeight;
+    ContinuationPoint continuationPoint;
+    void(*finalContinuationPoint)(SetupFunction, RenderFunction);
+    void* wgpustate;
+    SetupFunction setupFunction;
+    RenderFunction renderFunction;
+}InitContext_Impl;
+
 static inline WGPUFilterMode toWGPUFilterMode(TextureFilter fm){
     switch(fm){
         case TEXTURE_FILTER_BILINEAR: return WGPUFilterMode_Linear;

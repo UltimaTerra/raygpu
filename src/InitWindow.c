@@ -182,8 +182,10 @@ bool WindowShouldClose(cwoid){
 
 extern Texture2D texShapes;
 
-void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx);
 
+void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx);
+RGAPI void* InitWindowEx(InitContext_Impl _ctx);
+RGAPI void InitBackend(InitContext_Impl _ctx);
 RGAPI void* InitWindowEx(InitContext_Impl _ctx){
     InitContext_Impl* ctx = &_ctx;
 
@@ -392,18 +394,18 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
     #endif
 
     if(ctx->finalContinuationPoint){
-        ctx->finalContinuationPoint();
+        ctx->finalContinuationPoint(ctx->setupFunction, ctx->renderFunction);
     }
     return NULL;
 }
 #if defined(__EMSCRIPTEN__) && !defined(ASSUME_EM_ASYNCIFY)
-    void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY();
+    void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY(SetupFunction x, RenderFunction y);
 #else
-    static void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY(){}
+    static void PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY(SetupFunction x, RenderFunction y){(void)x;(void)y;}
 #endif
 
 
-RGAPI void* InitWindow(int width, int height, const char* title){
+RGAPI void InitWindow(int width, int height, const char* title){
     
     InitContext_Impl ctx = {
         .windowTitle = title,
@@ -412,7 +414,30 @@ RGAPI void* InitWindow(int width, int height, const char* title){
         .finalContinuationPoint = PLEASE_READ_THE_BUILD_INSTRUCTIONS_FOR_WEB_ON_GITHUB___YOU_CANT_USE_REGULAR_InitWindow_WITHOUT_ASYNCIFY,
     };
 
-    return InitWindowEx(ctx);
+    InitWindowEx(ctx);
+}
+
+static void InitProgram_continuationPoint(SetupFunction x, RenderFunction y){
+    x();
+    #ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(y, 0, 0);
+    #else
+    while(!WindowShouldClose()){
+        y();
+    }
+    #endif
+}
+
+RGAPI void InitProgram(ProgramInfo program){
+    InitContext_Impl ctx = {
+        .windowTitle  = program.windowTitle,
+        .windowWidth  = program.windowWidth,
+        .windowHeight = program.windowHeight,
+        .setupFunction = program.setupFunction,
+        .renderFunction = program.renderFunction,
+        .finalContinuationPoint = InitProgram_continuationPoint,
+    };
+    InitWindowEx(ctx);
 }
 
 RGAPI WGPUSurface CreateSurfaceForWindow(SubWindow window){
