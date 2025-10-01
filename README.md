@@ -11,7 +11,7 @@ RayGPU is a fast and simple Graphics Library written in C99, inspired by and bas
 
 | ![Basic Shapes](resources/core_shapes.png) | ![Example2](resources/compute.png) | ![Example3](resources/benchmark_cubes.png) |
 |---------------------------------------|---------------------------------------|---------------------------------------|
-| [Basic Shapes](https://manuel5975p.github.io/core_shapes.html)      | [Compute Shader Particles](https://manuel5975p.github.io/compute.html)      | [Instancing Benchmark](https://manuel5975p.github.io/benchmark_cubes.html)      |
+| [Basic Shapes](https://manuel5975p.github.io/core_shapes.html)      | [Compute Shader Particles](https://manuel5975p.github.io/compute.html)      | [Instancing Benchmark (4 **Million** Cubes!)](https://manuel5975p.github.io/benchmark_cubes.html)      |
 
 
 It is designed to be easily buildable with short compile times, combining the user-friendly functions of raylib with the modern, feature-rich Vulkan and WebGPU backends.
