@@ -101,7 +101,7 @@ DescribedBuffer* positionsnew;
 
 constexpr bool headless = false;
 
-constexpr size_t parts = (1 << 14);
+constexpr size_t parts = (1 << 16);
 void mainloop(void){
     BeginDrawing();
     BeginComputepass();
@@ -125,12 +125,7 @@ void mainloop(void){
         TakeScreenshot(b);
     }
 }
-int main(){
-    SetConfigFlags(FLAG_VSYNC_HINT);
-    InitWindow(1600, 900, "Compute Shader");
-    SetTargetFPS(60);
-    
-    
+void setup(){
     std::mt19937_64 gen(53);
     std::uniform_real_distribution<float> dis(-1,1);
     std::normal_distribution<float> ndis(0.6,0.2);
@@ -175,12 +170,15 @@ int main(){
     #elif SUPPORT_GLSL_PARSER == 1
     rpl = LoadShaderFromMemory(vertexSource, fragmentSource);
     #endif
-    #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(mainloop, 0, 0);
-    #else
-    while(!WindowShouldClose()){
-        mainloop();
-    }
-    #endif
-    return 0;
+}
+int main(){
+    SetConfigFlags(FLAG_VSYNC_HINT);
+    ProgramInfo program = {
+        .windowWidth = 1600,
+        .windowHeight = 900,
+        .setupFunction = setup,
+        .renderFunction = mainloop
+    };
+
+    InitProgram(program);
 }

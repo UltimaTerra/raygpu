@@ -1030,8 +1030,8 @@ typedef void(*RenderFunction)();
 typedef struct ProgramInfo{
     const char* windowTitle;
     int windowWidth, windowHeight;
-    void (*setupFunction)(void);
-    void (*renderFunction)(void);
+    SetupFunction setupFunction ;
+    RenderFunction renderFunction;
 }ProgramInfo;
 
 EXTERN_C_BEGIN
