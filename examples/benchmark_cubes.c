@@ -44,7 +44,6 @@ void mainloop(){
     BeginMode3D(cam);
     BindShaderVertexArray(shader, cubeMesh.vao);
     DrawArraysIndexedInstanced(RL_TRIANGLES, *cubeMesh.ibo, 36, instanceCount);
-    //DrawMeshInstanced(cubeMesh, Material{}, instancetransforms.data(), instancetransforms.size());
     EndMode3D();
     EndShaderMode();
     DrawFPS(0, 10);
@@ -59,12 +58,7 @@ void mainloop(){
     }
     EndDrawing();
 }
-
-int main(){
-    //SetConfigFlags(FLAG_MSAA_4X_HINT);
-    //SetConfigFlags(FLAG_FULLSCREEN_MODE);
-    InitWindow(2560, 1440, "Cube Benchmark");
-    SetTargetFPS(0);
+void setup(){
     float scale = 1.0f;
     cubeMesh = GenMeshCube(scale, scale, scale);
     cam = CLITERAL(Camera3D){
@@ -91,12 +85,14 @@ int main(){
     }
     DescribedBuffer* persistent = GenStorageBuffer(instancetransforms, instanceCount * sizeof(Vector4));
     SetShaderStorageBuffer(shader, 3, persistent);
-    //TRACELOG(LOG_WARNING, "OOO: %llu", (unsigned long long)persistent.buffer);
-    #ifndef __EMSCRIPTEN__
-    while(!WindowShouldClose()){
-        mainloop();
-    }
-    #else
-    emscripten_set_main_loop(mainloop, 0, 0);
-    #endif
+}
+
+int main(){
+    ProgramInfo prog = {
+        .windowWidth = 1600,
+        .windowHeight = 900,
+        .setupFunction = setup,
+        .renderFunction = mainloop,
+    };
+    InitProgram(prog);
 }
