@@ -1,4 +1,4 @@
-// begin file include/tint_c_api.h
+// begin file src/internal_include/tint_c_api.h
 #ifndef TINT_C_API_H
 #define TINT_C_API_H
 
@@ -16,4 +16,5 @@ RGAPI tc_SpirvBlob wgslToSpirv(const WGPUShaderSourceWGSL* source);
 RGAPI void reflectionInfo_wgsl_free(WGPUReflectionInfo* reflectionInfo);
 
 #endif
-// end file include/tint_c_api.h
+
+// end file src/internal_include/tint_c_api.h

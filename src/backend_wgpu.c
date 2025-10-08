@@ -7,8 +7,8 @@
 #else
 #include <webgpu/webgpu.h>
 #endif
-#include <internals.h>
-#include <wgpustate.inc>
+#include "internal_include/internals.h"
+#include "internal_include/wgpustate.inc"
 #define Matrix spvMatrix
 #if SUPPORT_WGPU_BACKEND == 1
     #include <spirv_reflect.c>
@@ -2025,11 +2025,11 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst,
     }
     vertexState.buffers = layouts_converted;
     vertexState.constantCount = 0;
-    vertexState.entryPoint = CLITERAL(WGPUStringView){shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name, strlen(shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Vertex].name)};
+    vertexState.entryPoint = CLITERAL(WGPUStringView){shaderModule->reflectionInfo.ep[RGShaderStageEnum_Vertex].name, strlen(shaderModule->reflectionInfo.ep[RGShaderStageEnum_Vertex].name)};
     pipelineDesc.vertex = vertexState;
 
-    fragmentState.module = shaderModule->stages[WGPUShaderStageEnum_Fragment].module;
-    fragmentState.entryPoint = CLITERAL(WGPUStringView){shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name, strlen(shaderModule->reflectionInfo.ep[WGPUShaderStageEnum_Fragment].name)};
+    fragmentState.module = shaderModule->stages[RGShaderStageEnum_Fragment].module;
+    fragmentState.entryPoint = CLITERAL(WGPUStringView){shaderModule->reflectionInfo.ep[RGShaderStageEnum_Fragment].name, strlen(shaderModule->reflectionInfo.ep[RGShaderStageEnum_Fragment].name)};
     fragmentState.constantCount = 0;
     fragmentState.constants = NULL;
 
@@ -2218,9 +2218,9 @@ LoadComputePipelineEx(const char *shaderCode, const ResourceTypeDescriptor *unif
     pldesc.bindGroupLayouts = (WGPUBindGroupLayout *)&ret->bglayout.layout;
     WGPUPipelineLayout playout = wgpuDeviceCreatePipelineLayout((WGPUDevice)GetDevice(), &pldesc);
     ret->shaderModule = LoadShaderModule(sources);
-    desc.compute.module = (WGPUShaderModule)ret->shaderModule.stages[WGPUShaderStageEnum_Compute].module;
+    desc.compute.module = (WGPUShaderModule)ret->shaderModule.stages[RGShaderStageEnum_Compute].module;
 
-    desc.compute.entryPoint = CLITERAL(WGPUStringView){ret->shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Compute].name, strlen(ret->shaderModule.reflectionInfo.ep[WGPUShaderStageEnum_Compute].name)};
+    desc.compute.entryPoint = CLITERAL(WGPUStringView){ret->shaderModule.reflectionInfo.ep[RGShaderStageEnum_Compute].name, strlen(ret->shaderModule.reflectionInfo.ep[RGShaderStageEnum_Compute].name)};
     desc.layout = playout;
     WGPUDevice device = (WGPUDevice)GetDevice();
     ret->pipeline = wgpuDeviceCreateComputePipeline((WGPUDevice)GetDevice(), &desc);
@@ -2672,13 +2672,13 @@ EntryPointSet getEntryPointsSPIRV(const uint32_t *shaderSourceSPIRV, uint32_t wo
         int idx = -1;
         switch (st) {
         case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
-            idx = WGPUShaderStageEnum_Vertex;
+            idx = RGShaderStageEnum_Vertex;
             break;
         case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:
-            idx = WGPUShaderStageEnum_Fragment;
+            idx = RGShaderStageEnum_Fragment;
             break;
         case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:
-            idx = WGPUShaderStageEnum_Compute;
+            idx = RGShaderStageEnum_Compute;
             break;
         #if SUPPORT_VULKAN_BACKEND == 1
         case SPV_REFLECT_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
@@ -3011,6 +3011,9 @@ const char* TextureFormatName(WGPUTextureFormat fmt) {
         return "?? Unknown WGPUTextureFormat value ??";
     }
 }
+
+
+
 
 
 

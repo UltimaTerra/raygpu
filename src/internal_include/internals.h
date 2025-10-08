@@ -1,4 +1,4 @@
-// begin file include/internals.hpp
+// begin file src/internal_include/internals.h
 /*
  * MIT License
  * 
@@ -1657,4 +1657,5 @@ static inline WGPUAddressMode toWGPUAddressMode(TextureWrap am){
 
 #endif
 
-// end file include/internals.hpp
+
+// end file src/internal_include/internals.h

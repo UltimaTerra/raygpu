@@ -6,9 +6,9 @@
     #include <renderstate.h>
 #endif
 #if SUPPORT_WGPU_BACKEND == 1
-    #include "wgpustate.inc"
+    #include "../internal_include/wgpustate.inc"
 #endif
-#include <internals.h>
+#include "../internal_include/internals.h"
 #include <GLFW/glfw3.h>
 #include "glfw3webgpu.h"
 

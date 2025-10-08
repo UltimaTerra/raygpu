@@ -3027,4 +3027,7 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 }
 
 
+
+
+
 // end file src/models.c

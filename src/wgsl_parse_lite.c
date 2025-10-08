@@ -1,7 +1,7 @@
 // begin file src/wgsl_parse_lite.c
 #include <config.h>
 #include <raygpu.h>
-#include <internals.h>
+#include "internal_include/internals.h"
 
 
 InOutAttributeInfo                                      getAttributesWGSL_Simple(ShaderSources sources);
@@ -300,5 +300,8 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
 }
 
 #endif // simple backend
+
+
+
 
 // end file src/wgsl_parse_lite.c

@@ -29,7 +29,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <macros_and_constants.h>
-#include <c_fs_utils.h>
+#include "internal_include/c_fs_utils.h"
 #include <stddef.h>
 #include <raygpu.h>
 #include <stdint.h>
@@ -92,12 +92,12 @@
 #include <external/stb_image.h>
 #include <external/sinfl.h>
 #include <external/sdefl.h>
-#include <internals.h>
+#include "internal_include/internals.h"
 #include <external/msf_gif.h>
 void ToggleFullscreenImpl(cwoid);
 #ifdef __EMSCRIPTEN__
 #endif  // __EMSCRIPTEN__
-#include <renderstate.h>
+#include "internal_include/renderstate.h"
 
 VLAStack g_vlastack = {0};
 renderstate g_renderstate = {0};
@@ -3342,6 +3342,9 @@ RGAPI uint32_t getNextShaderID_shc(){
     }
     return nextShaderID_shc++;
 }
+
+
+
 
 
 

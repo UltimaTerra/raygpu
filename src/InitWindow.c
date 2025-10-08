@@ -2,8 +2,8 @@
 #define Font rlFont
 #include <raygpu.h>
 #undef Font
-#include <c_fs_utils.h>
-#include <internals.h>
+#include "internal_include/c_fs_utils.h"
+#include "internal_include/internals.h"
 const char shaderSource[] = "struct VertexInput {\n"
 "    @location(0) position: vec3f,\n"
 "    @location(1) uv: vec2f,\n"
@@ -142,7 +142,7 @@ const uint32_t default_frag_spv_data[] = {
 const size_t default_frag_spv_data_len = 912;
 
 struct full_renderstate;
-#include <renderstate.h>
+#include "internal_include/renderstate.h"
 
 
 void PollEvents(){
@@ -337,7 +337,7 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
     //g_renderstate.defaultShader = LoadPipelineForVAOEx(defaultGLSLSource, renderBatchVAO, uniforms, sizeof(uniforms) / sizeof(ResourceTypeDescriptor), GetDefaultSettings());
     g_renderstate.defaultShader = LoadShaderFromMemory(vertexSourceGLSL, fragmentSourceGLSL);
     #elif SUPPORT_WGSL_PARSER == 1
-    ShaderSources defaultWGSLSource zeroinit;
+    ShaderSources defaultWGSLSource = {0};
     defaultWGSLSource.sourceCount = 1;
     defaultWGSLSource.sources[0].data = shaderSource;
     defaultWGSLSource.sources[0].sizeInBytes = strlen(shaderSource);
@@ -346,7 +346,7 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
     g_renderstate.defaultShader = LoadShaderSingleSource(shaderSource);
 
     #else
-    ShaderSources defaultSPIRVSource zeroinit;
+    ShaderSources defaultSPIRVSource = {0};
     defaultSPIRVSource.sourceCount = 2;
     defaultSPIRVSource.sources[0].data = default_vert_spv_data;
     defaultSPIRVSource.sources[0].sizeInBytes = default_vert_spv_data_len;
@@ -631,5 +631,8 @@ size_t GetPixelSizeInBytes(PixelFormat format) {
 #include "platform/InitWindow_RGFW.c"
 #include "platform/rgfwwebgpu.c"
 #endif
+
+
+
 
 // end file src/InitWindow.c
