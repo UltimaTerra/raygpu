@@ -40,20 +40,220 @@
 
 
 
-//template<typename T>
-//struct rl_free_deleter{
-//    void operator()(T* t)const noexcept{
-//        RL_FREE(t);
-//    }
-//};
-//
-//template<typename T, typename... Args>
-//std::unique_ptr<T, rl_free_deleter<T>> rl_make_unique(Args&&... args) {
-//    void* ptr = RL_MALLOC(sizeof(T));
-//    if (!ptr) return std::unique_ptr<T, rl_free_deleter<T>>(nullptr);
-//    new (ptr) T(std::forward<Args>(args)...);
-//    return std::unique_ptr<T, rl_free_deleter<T>>(reinterpret_cast<T*>(ptr));
-//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include <webgpu/webgpu.h>
+
+// Note: Flag enums like RGBufferUsage are defined with values matching WGPU, so a direct cast is sufficient.
+// The functions are provided for consistency and type safety.
+
+static inline WGPUBlendFactor RG_to_WGPU_BlendFactor(RGBlendFactor factor) {
+    switch (factor) {
+        case RGBlendFactor_Zero: return WGPUBlendFactor_Zero;
+        case RGBlendFactor_One: return WGPUBlendFactor_One;
+        case RGBlendFactor_Src: return WGPUBlendFactor_Src;
+        case RGBlendFactor_OneMinusSrc: return WGPUBlendFactor_OneMinusSrc;
+        case RGBlendFactor_SrcAlpha: return WGPUBlendFactor_SrcAlpha;
+        case RGBlendFactor_OneMinusSrcAlpha: return WGPUBlendFactor_OneMinusSrcAlpha;
+        case RGBlendFactor_Dst: return WGPUBlendFactor_Dst;
+        case RGBlendFactor_OneMinusDst: return WGPUBlendFactor_OneMinusDst;
+        case RGBlendFactor_DstAlpha: return WGPUBlendFactor_DstAlpha;
+        case RGBlendFactor_OneMinusDstAlpha: return WGPUBlendFactor_OneMinusDstAlpha;
+        case RGBlendFactor_SrcAlphaSaturated: return WGPUBlendFactor_SrcAlphaSaturated;
+        case RGBlendFactor_Constant: return WGPUBlendFactor_Constant;
+        case RGBlendFactor_OneMinusConstant: return WGPUBlendFactor_OneMinusConstant;
+        case RGBlendFactor_Src1: return WGPUBlendFactor_Src1;
+        case RGBlendFactor_OneMinusSrc1: return WGPUBlendFactor_OneMinusSrc1;
+        case RGBlendFactor_Src1Alpha: return WGPUBlendFactor_Src1Alpha;
+        case RGBlendFactor_OneMinusSrc1Alpha: return WGPUBlendFactor_OneMinusSrc1Alpha;
+        default: return WGPUBlendFactor_Undefined;
+    }
+}
+
+static inline WGPUBlendOperation RG_to_WGPU_BlendOperation(RGBlendOperation op) {
+    switch (op) {
+        case RGBlendOperation_Add: return WGPUBlendOperation_Add;
+        case RGBlendOperation_Subtract: return WGPUBlendOperation_Subtract;
+        case RGBlendOperation_ReverseSubtract: return WGPUBlendOperation_ReverseSubtract;
+        case RGBlendOperation_Min: return WGPUBlendOperation_Min;
+        case RGBlendOperation_Max: return WGPUBlendOperation_Max;
+        default: return WGPUBlendOperation_Undefined;
+    }
+}
+
+static inline WGPUCompareFunction RG_to_WGPU_CompareFunction(RGCompareFunction func) {
+    switch (func) {
+        case RGCompareFunction_Never: return WGPUCompareFunction_Never;
+        case RGCompareFunction_Less: return WGPUCompareFunction_Less;
+        case RGCompareFunction_Equal: return WGPUCompareFunction_Equal;
+        case RGCompareFunction_LessEqual: return WGPUCompareFunction_LessEqual;
+        case RGCompareFunction_Greater: return WGPUCompareFunction_Greater;
+        case RGCompareFunction_NotEqual: return WGPUCompareFunction_NotEqual;
+        case RGCompareFunction_GreaterEqual: return WGPUCompareFunction_GreaterEqual;
+        case RGCompareFunction_Always: return WGPUCompareFunction_Always;
+        default: return WGPUCompareFunction_Undefined;
+    }
+}
+
+static inline WGPUFrontFace RG_to_WGPU_FrontFace(RGFrontFace face) {
+    switch (face) {
+        case RGFrontFace_CCW: return WGPUFrontFace_CCW;
+        case RGFrontFace_CW: return WGPUFrontFace_CW;
+        default: return WGPUFrontFace_Undefined;
+    }
+}
+
+static inline WGPUIndexFormat RG_to_WGPU_IndexFormat(IndexFormat format) {
+    switch (format) {
+        case IndexFormat_Uint16: return WGPUIndexFormat_Uint16;
+        case IndexFormat_Uint32: return WGPUIndexFormat_Uint32;
+        default: return WGPUIndexFormat_Undefined;
+    }
+}
+
+static inline WGPULoadOp RG_to_WGPU_LoadOp(RGLoadOp op) {
+    switch (op) {
+        case RGLoadOp_Clear: return WGPULoadOp_Clear;
+        case RGLoadOp_Load: return WGPULoadOp_Load;
+        default: return WGPULoadOp_Undefined;
+    }
+}
+
+static inline WGPUStoreOp RG_to_WGPU_StoreOp(RGStoreOp op) {
+    switch (op) {
+        case RGStoreOp_Store: return WGPUStoreOp_Store;
+        case RGStoreOp_Discard: return WGPUStoreOp_Discard;
+        default: return WGPUStoreOp_Undefined;
+    }
+}
+
+static inline WGPUVertexStepMode RG_to_WGPU_VertexStepMode(RGVertexStepMode mode) {
+    switch (mode) {
+        case RGVertexStepMode_Vertex: return WGPUVertexStepMode_Vertex;
+        case RGVertexStepMode_Instance: return WGPUVertexStepMode_Instance;
+        case RGVertexStepMode_VertexBufferNotUsed: return WGPUVertexStepMode_Undefined;
+        default: return (WGPUVertexStepMode)0; // Or some other default
+    }
+}
+
+static inline WGPUBufferUsage RG_to_WGPU_BufferUsage(RGBufferUsage usage) {
+    WGPUBufferUsage wgpu_usage = WGPUBufferUsage_None;
+    if (usage & RGBufferUsage_MapRead)       wgpu_usage |= WGPUBufferUsage_MapRead;
+    if (usage & RGBufferUsage_MapWrite)      wgpu_usage |= WGPUBufferUsage_MapWrite;
+    if (usage & RGBufferUsage_CopySrc)       wgpu_usage |= WGPUBufferUsage_CopySrc;
+    if (usage & RGBufferUsage_CopyDst)       wgpu_usage |= WGPUBufferUsage_CopyDst;
+    if (usage & RGBufferUsage_Index)         wgpu_usage |= WGPUBufferUsage_Index;
+    if (usage & RGBufferUsage_Vertex)        wgpu_usage |= WGPUBufferUsage_Vertex;
+    if (usage & RGBufferUsage_Uniform)       wgpu_usage |= WGPUBufferUsage_Uniform;
+    if (usage & RGBufferUsage_Storage)       wgpu_usage |= WGPUBufferUsage_Storage;
+    if (usage & RGBufferUsage_Indirect)      wgpu_usage |= WGPUBufferUsage_Indirect;
+    if (usage & RGBufferUsage_QueryResolve)  wgpu_usage |= WGPUBufferUsage_QueryResolve;
+    return wgpu_usage;
+}
+
+static inline WGPUTextureUsage RG_to_WGPU_TextureUsage(RGTextureUsage usage) {
+    WGPUTextureUsage wgpu_usage = WGPUTextureUsage_None;
+    if (usage & RGTextureUsage_CopySrc)          wgpu_usage |= WGPUTextureUsage_CopySrc;
+    if (usage & RGTextureUsage_CopyDst)          wgpu_usage |= WGPUTextureUsage_CopyDst;
+    if (usage & RGTextureUsage_TextureBinding)   wgpu_usage |= WGPUTextureUsage_TextureBinding;
+    if (usage & RGTextureUsage_StorageBinding)   wgpu_usage |= WGPUTextureUsage_StorageBinding;
+    if (usage & RGTextureUsage_RenderAttachment) wgpu_usage |= WGPUTextureUsage_RenderAttachment;
+    return wgpu_usage;
+}
+
+static inline WGPUShaderStage RG_to_WGPU_ShaderStage(RGShaderStage stage) {
+    WGPUShaderStage wgpu_stage = WGPUShaderStage_None;
+    if (stage & RGShaderStage_Vertex)   wgpu_stage |= WGPUShaderStage_Vertex;
+    if (stage & RGShaderStage_Fragment) wgpu_stage |= WGPUShaderStage_Fragment;
+    if (stage & RGShaderStage_Compute)  wgpu_stage |= WGPUShaderStage_Compute;
+    return wgpu_stage;
+}
+
+static inline WGPUVertexFormat RG_to_WGPU_VertexFormat(RGVertexFormat format) {
+    switch(format) {
+        case RGVertexFormat_Uint8x2: return WGPUVertexFormat_Uint8x2;
+        case RGVertexFormat_Uint8x4: return WGPUVertexFormat_Uint8x4;
+        case RGVertexFormat_Sint8x2: return WGPUVertexFormat_Sint8x2;
+        case RGVertexFormat_Sint8x4: return WGPUVertexFormat_Sint8x4;
+        case RGVertexFormat_Unorm8x2: return WGPUVertexFormat_Unorm8x2;
+        case RGVertexFormat_Unorm8x4: return WGPUVertexFormat_Unorm8x4;
+        case RGVertexFormat_Snorm8x2: return WGPUVertexFormat_Snorm8x2;
+        case RGVertexFormat_Snorm8x4: return WGPUVertexFormat_Snorm8x4;
+        case RGVertexFormat_Uint16x2: return WGPUVertexFormat_Uint16x2;
+        case RGVertexFormat_Uint16x4: return WGPUVertexFormat_Uint16x4;
+        case RGVertexFormat_Sint16x2: return WGPUVertexFormat_Sint16x2;
+        case RGVertexFormat_Sint16x4: return WGPUVertexFormat_Sint16x4;
+        case RGVertexFormat_Unorm16x2: return WGPUVertexFormat_Unorm16x2;
+        case RGVertexFormat_Unorm16x4: return WGPUVertexFormat_Unorm16x4;
+        case RGVertexFormat_Snorm16x2: return WGPUVertexFormat_Snorm16x2;
+        case RGVertexFormat_Snorm16x4: return WGPUVertexFormat_Snorm16x4;
+        case RGVertexFormat_Float16x2: return WGPUVertexFormat_Float16x2;
+        case RGVertexFormat_Float16x4: return WGPUVertexFormat_Float16x4;
+        case RGVertexFormat_Float32: return WGPUVertexFormat_Float32;
+        case RGVertexFormat_Float32x2: return WGPUVertexFormat_Float32x2;
+        case RGVertexFormat_Float32x3: return WGPUVertexFormat_Float32x3;
+        case RGVertexFormat_Float32x4: return WGPUVertexFormat_Float32x4;
+        case RGVertexFormat_Uint32: return WGPUVertexFormat_Uint32;
+        case RGVertexFormat_Uint32x2: return WGPUVertexFormat_Uint32x2;
+        case RGVertexFormat_Uint32x3: return WGPUVertexFormat_Uint32x3;
+        case RGVertexFormat_Uint32x4: return WGPUVertexFormat_Uint32x4;
+        case RGVertexFormat_Sint32: return WGPUVertexFormat_Sint32;
+        case RGVertexFormat_Sint32x2: return WGPUVertexFormat_Sint32x2;
+        case RGVertexFormat_Sint32x3: return WGPUVertexFormat_Sint32x3;
+        case RGVertexFormat_Sint32x4: return WGPUVertexFormat_Sint32x4;
+        default: return (WGPUVertexFormat)~0;
+    }
+}
+static inline RGPresentMode WGPU_to_RG_PresentMode(WGPUPresentMode pm){
+    switch(pm){
+        case WGPUPresentMode_Undefined: return RGPresentMode_Undefined;
+        case WGPUPresentMode_Fifo: return RGPresentMode_Fifo;
+        case WGPUPresentMode_FifoRelaxed: return RGPresentMode_FifoRelaxed;
+        case WGPUPresentMode_Immediate: return RGPresentMode_Immediate;
+        case WGPUPresentMode_Mailbox: return RGPresentMode_Mailbox;
+    }
+}
+
+static inline WGPUPresentMode RG_to_WGPU_PresentMode(RGPresentMode pm){
+    switch(pm){
+        case RGPresentMode_Undefined: return WGPUPresentMode_Undefined;
+        case RGPresentMode_Fifo: return WGPUPresentMode_Fifo;
+        case RGPresentMode_FifoRelaxed: return WGPUPresentMode_FifoRelaxed;
+        case RGPresentMode_Immediate: return WGPUPresentMode_Immediate;
+        case RGPresentMode_Mailbox: return WGPUPresentMode_Mailbox;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 static inline uint32_t bitcount32(uint32_t x){
@@ -118,17 +318,18 @@ RGAPI InOutAttributeInfo getAttributes    (ShaderSources sources);
 
 RGAPI DescribedBuffer* UpdateVulkanRenderbatch();
 void PushUsedBuffer(void* nativeBuffer);
+
 typedef struct VertexBufferLayout{
     uint64_t arrayStride;
-    WGPUVertexStepMode stepMode;
+    RGVertexStepMode stepMode;
     size_t attributeCount;
-    WGPUVertexAttribute* attributes; //NOT owned, points into data owned by VertexBufferLayoutSet::attributePool with an offset
+    RGVertexAttribute* attributes; //NOT owned, points into data owned by VertexBufferLayoutSet::attributePool with an offset
 }VertexBufferLayout;
 
 typedef struct VertexBufferLayoutSet{
     uint32_t number_of_buffers;
     VertexBufferLayout* layouts;    
-    WGPUVertexAttribute* attributePool;
+    RGVertexAttribute* attributePool;
 }VertexBufferLayoutSet;
 
 static inline PixelFormat fromWGPUPixelFormat(WGPUTextureFormat format) {
@@ -379,6 +580,42 @@ static inline bool vertexArCompare(const AttributeAndResidence* a, uint32_t aCou
     }
     return true;
 }
+
+static inline bool WGPUBlendState_eq(const WGPUBlendState* a, const WGPUBlendState* b){
+    return 
+    
+    a->alpha.dstFactor == b->alpha.dstFactor &&
+    a->alpha.srcFactor == b->alpha.srcFactor &&
+    a->alpha.operation == b->alpha.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    true;
+}
+static inline bool RGBlendState_eq(const RGBlendState* a, const RGBlendState* b){
+    return 
+    
+    a->alpha.dstFactor == b->alpha.dstFactor &&
+    a->alpha.srcFactor == b->alpha.srcFactor &&
+    a->alpha.operation == b->alpha.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    a->color.operation == b->color.operation &&
+    true;
+}
+
+static inline bool RenderSettings_eq(const RenderSettings* a, const RenderSettings* b){
+    return
+        a->depthTest    == b->depthTest     && 
+        a->faceCull     == b->faceCull      && 
+        a->sampleCount  == b->sampleCount   && 
+        a->lineWidth    == b->lineWidth     && 
+        RGBlendState_eq(&a->blendState, &b->blendState)    && 
+        a->frontFace    == b->frontFace     && 
+        a->depthCompare == b->depthCompare  &&
+    true;
+}
+
 static inline bool ModifiablePipelineState_eq(const ModifiablePipelineState msp1_, const ModifiablePipelineState msp2_){
     const ModifiablePipelineState* msp1 = &msp1_;
     const ModifiablePipelineState* msp2 = &msp2_;
@@ -693,7 +930,7 @@ static inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const Attribu
         result.layouts = (VertexBufferLayout*)RL_CALLOC(number_of_buffers, sizeof(VertexBufferLayout));
     }
     if (number_of_attribs > 0) {
-        result.attributePool = (WGPUVertexAttribute*)RL_CALLOC(number_of_attribs, sizeof(WGPUVertexAttribute));
+        result.attributePool = (RGVertexAttribute*)RL_CALLOC(number_of_attribs, sizeof(RGVertexAttribute));
     }
 
     if ((number_of_buffers > 0 && result.layouts == NULL) || (number_of_attribs > 0 && result.attributePool == NULL)) {
@@ -721,11 +958,11 @@ static inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const Attribu
         }
     }
 
-    WGPUVertexAttribute* current_pool_pointer = result.attributePool;
+    RGVertexAttribute* current_pool_pointer = result.attributePool;
     for (uint32_t i = 0; i < number_of_buffers; ++i) {
         result.layouts[i].attributeCount = attribute_counts[i];
         result.layouts[i].attributes = current_pool_pointer;
-        result.layouts[i].stepMode = WGPUVertexStepMode_Undefined;
+        result.layouts[i].stepMode = RGVertexStepMode_VertexBufferNotUsed;
         current_pool_pointer += attribute_counts[i];
     }
 
@@ -742,7 +979,7 @@ static inline VertexBufferLayoutSet getBufferLayoutRepresentation2(const Attribu
 
             layout->arrayStride += attributeSize(attributes[i].attr.format);
 
-            if (layout->stepMode != WGPUVertexStepMode_Undefined && layout->stepMode != attributes[i].stepMode) {
+            if (layout->stepMode != RGVertexStepMode_VertexBufferNotUsed && layout->stepMode != attributes[i].stepMode) {
             }
             layout->stepMode = attributes[i].stepMode;
         }
@@ -783,47 +1020,74 @@ static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* 
     return LOCATION_NOT_FOUND;
 }
 
-static inline ShaderSources singleStage(const char* code, ShaderSourceType language, WGPUShaderStageEnum stage){
+static inline ShaderSources singleStage(const char* code, ShaderSourceType language, RGShaderStageEnum stage){
     ShaderSources sources zeroinit;
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
     sources.sources[0].sizeInBytes = strlen(code);
-    sources.sources[0].stageMask = (1u << stage);
+    sources.sources[0].stageMask = (RGShaderStage)(1u << stage);
     return sources;
 }
 
-static inline ShaderSources dualStage(const char* code, ShaderSourceType language, WGPUShaderStageEnum stage1, WGPUShaderStageEnum stage2){
+static inline ShaderSources dualStage(const char* code, ShaderSourceType language, RGShaderStageEnum stage1, RGShaderStageEnum stage2){
     ShaderSources sources zeroinit;
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
     sources.sources[0].sizeInBytes = strlen(code);
-    sources.sources[0].stageMask = ((WGPUShaderStage)(1u << (uint32_t)(stage1)) | (1u << (uint32_t)(stage2)));
+    sources.sources[0].stageMask = ((RGShaderStage)((1u << (uint32_t)(stage1)) | (1u << (uint32_t)(stage2))));
     return sources;
 }
 
 
-static inline ShaderSources dualStageDualSource(const char* code1, const char* code2, ShaderSourceType language, WGPUShaderStageEnum stage1, WGPUShaderStageEnum stage2){
+static inline ShaderSources dualStageDualSource(const char* code1, const char* code2, ShaderSourceType language, RGShaderStageEnum stage1, RGShaderStageEnum stage2){
     ShaderSources sources zeroinit;
     sources.language = language;
     sources.sourceCount = 2;
     sources.sources[0].data = code1;
     sources.sources[0].sizeInBytes = strlen(code1);
-    sources.sources[0].stageMask = ((WGPUShaderStage)(1ull << (uint32_t)(+stage1)));
+    sources.sources[0].stageMask = ((RGShaderStage)(1ull << (uint32_t)(+stage1)));
 
     sources.sources[1].data = code2;
     sources.sources[1].sizeInBytes = strlen(code2);
-    sources.sources[1].stageMask = ((WGPUShaderStage)(1ull << (uint32_t)(+stage2)));
+    sources.sources[1].stageMask = ((RGShaderStage)((1ull << (uint32_t)(+stage2))));
  
     return sources;
 }
+
+#define VLA_STACK_SIZE (1 << 20)
+#define VLA_ALLOCATION_COUNT (64)
+typedef struct VLAStack{
+    uint32_t currentAllocationIndex;
+    uint32_t currentDataOffset;
+    uint32_t allocationSizes[VLA_ALLOCATION_COUNT];
+    char data[VLA_STACK_SIZE];
+}VLAStack;
+
+static inline void* VLAStack_alloc(VLAStack* stack, uint32_t size){
+    rassert(stack->currentDataOffset + size < VLA_STACK_SIZE, "VLAStack is out of memory");
+    rassert(stack->currentAllocationIndex < VLA_STACK_SIZE - 1, "VLAStack has too many allocations");
+    void* ret = (void*)(stack->data + stack->currentDataOffset);
+    stack->currentDataOffset += size;
+    stack->allocationSizes[stack->currentAllocationIndex++] = size;
+    return ret;
+}
+
+static inline void VLAStack_free(VLAStack* stack, void* data){
+    uint32_t size = stack->allocationSizes[stack->currentAllocationIndex - 1];
+    rassert(stack->data + (stack->currentDataOffset - size) == data, "Corrupted");
+    stack->currentDataOffset -= size;
+    stack->currentAllocationIndex--;
+}
+
+extern VLAStack g_vlastack;
 
 void detectShaderLanguage(ShaderSources* sources);
 RGAPI ShaderSourceType detectShaderLanguageSingle(const void* sourceptr, size_t size);
 StringToUniformMap* getBindingsGLSL(ShaderSources source);
 typedef struct EntryPointSet{
-    char names[WGPUShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
+    char names[RGShaderStageEnum_EnumCount][MAX_SHADER_ENTRYPOINT_NAME_LENGTH + 1];
 }EntryPointSet;
 DescribedShaderModule LoadShaderModule(ShaderSources source);
 
@@ -842,7 +1106,7 @@ static inline VertexBufferLayoutSet getBufferLayoutRepresentation(const Attribut
 }
 typedef struct BufferEntry{
     DescribedBuffer* buffer;
-    WGPUVertexStepMode stepMode;
+    RGVertexStepMode stepMode;
 } BufferEntry;
 
 typedef struct VertexArray{
@@ -891,7 +1155,7 @@ static int compareAttributes(const void* a, const void* b) {
 }
 
 static void VertexArray_add(VertexArray* vao, DescribedBuffer* buffer, uint32_t shaderLocation,
-                            WGPUVertexFormat fmt, uint32_t offset, WGPUVertexStepMode stepmode) {
+                            RGVertexFormat fmt, uint32_t offset, RGVertexStepMode stepmode) {
     // Search for existing attribute by shaderLocation
     AttributeAndResidence* it = NULL;
     for (size_t i = 0; i < vao->attributes_count; ++i) {
@@ -913,7 +1177,7 @@ static void VertexArray_add(VertexArray* vao, DescribedBuffer* buffer, uint32_t 
             int bufferIt_idx = -1;
             for (size_t i = 0; i < vao->buffers_count; ++i) {
                 if (vao->buffers[i].buffer->buffer == buffer->buffer && vao->buffers[i].stepMode == stepmode) {
-                    bufferIt_idx = i;
+                    bufferIt_idx = (int)i;
                     break;
                 }
             }
@@ -959,7 +1223,7 @@ static void VertexArray_add(VertexArray* vao, DescribedBuffer* buffer, uint32_t 
         TRACELOG(LOG_DEBUG, "Attribute at shader location %u updated.", shaderLocation);
     } else {
         // Attribute does not exist, add as new
-        AttributeAndResidence insert = {0};
+        AttributeAndResidence insert = {};
         insert.enabled = true;
         bool bufferFound = false;
 

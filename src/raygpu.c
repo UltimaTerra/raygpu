@@ -24,12 +24,10 @@
  */
 
 #include <config.h>
-#include <webgpu/webgpu.h>
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <webgpu/webgpu.h>
 #include <macros_and_constants.h>
 #include <c_fs_utils.h>
 #include <stddef.h>
@@ -101,6 +99,7 @@ void ToggleFullscreenImpl(cwoid);
 #endif  // __EMSCRIPTEN__
 #include <renderstate.h>
 
+VLAStack g_vlastack = {0};
 renderstate g_renderstate = {0};
 
 #define swap_uint32(val) (((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) << 16) | ((((((uint32_t)(val)) << 8) & 0xFF00FF00 ) | ((((uint32_t)(val)) >> 8) & 0xFF00FF)) >> 16))
@@ -287,7 +286,7 @@ RGAPI VertexArray* LoadVertexArray(){
     VertexArray* ret = callocnew(VertexArray);
     return ret;
 }
-RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, WGPUVertexFormat format, uint32_t offset, WGPUVertexStepMode stepmode){
+RGAPI void VertexAttribPointer(VertexArray* array, DescribedBuffer* buffer, uint32_t attribLocation, RGVertexFormat format, uint32_t offset, RGVertexStepMode stepmode){
     VertexArray_add(array, buffer, attribLocation, format, offset, stepmode);
 }
 RGAPI void BindVertexArray(VertexArray* va){
@@ -348,7 +347,7 @@ RGAPI void DrawArraysIndexed(PrimitiveType drawMode, DescribedBuffer indexBuffer
     if(activeShaderImpl->bindGroup.needsUpdate){
         RenderPassSetBindGroup(GetActiveRenderPass(), 0, &activeShaderImpl->bindGroup);
     }
-    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, IndexFormat_Uint32, 0);
     RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, 1, 0, 0, 0);
 }
 RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer indexBuffer, uint32_t vertexCount, uint32_t instanceCount){
@@ -357,7 +356,7 @@ RGAPI void DrawArraysIndexedInstanced(PrimitiveType drawMode, DescribedBuffer in
     BindShader(activeShader, drawMode);
     
     RenderPassSetBindGroup(GetActiveRenderPass(), 0, &activeShaderImpl->bindGroup);
-    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, WGPUIndexFormat_Uint32, 0);
+    RenderPassSetIndexBuffer(GetActiveRenderPass(), &indexBuffer, IndexFormat_Uint32, 0);
     RenderPassDrawIndexed(GetActiveRenderPass(), vertexCount, instanceCount, 0, 0, 0);
 }
 
@@ -522,14 +521,14 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
         WGPUShaderModule module = wgpuDeviceCreateShaderModule((WGPUDevice)GetDevice(), &mDesc);
         WGPUShaderStage sourceStageMask = sources.sources[i].stageMask;
         
-        for(uint32_t i = 0;i < WGPUShaderStageEnum_EnumCount;++i){
+        for(uint32_t i = 0;i < RGShaderStageEnum_EnumCount;++i){
             if(((uint32_t)(sourceStageMask)) & (1u << i)){
                 ret.stages[i].module = module;
             }
         }
         
         EntryPointSet entryPoints = getEntryPointsWGSL((const char*)sources.sources[i].data);
-        for(uint32_t i = 0;i < WGPUShaderStageEnum_EnumCount;i++){
+        for(uint32_t i = 0;i < RGShaderStageEnum_EnumCount;i++){
             //rassert(entryPoints[i].second.size() < 15, "Entrypoint name must be shorter than 15 characters");
             if(entryPoints.names[i][0] == '\0'){
                 continue;
@@ -640,20 +639,20 @@ RGAPI void DisableDepthTest(cwoid){
 }
 RGAPI void BeginBlendMode(rlBlendMode blendMode) {
     // Get a reference to the blend state part of the current settings
-    WGPUBlendState* blendState = &g_renderstate.currentSettings.blendState;
+    RGBlendState* blendState = &g_renderstate.currentSettings.blendState;
     
     // Default common operation
-    blendState->color.operation = (WGPUBlendOperation_Add);
-    blendState->alpha.operation = (WGPUBlendOperation_Add);
+    blendState->color.operation = (RGBlendOperation_Add);
+    blendState->alpha.operation = (RGBlendOperation_Add);
 
     switch (blendMode) {
         case BLEND_ALPHA:
             // Alpha blend: SrcColor * SrcAlpha + DstColor * (1 - SrcAlpha)
             // Alpha blend: SrcAlpha * 1 + DstAlpha * (1 - SrcAlpha)
-            blendState->color.srcFactor = (WGPUBlendFactor_SrcAlpha);
-            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState->alpha.srcFactor = (WGPUBlendFactor_One); // Often One or SrcAlpha
-            blendState->alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->color.srcFactor = (RGBlendFactor_SrcAlpha);
+            blendState->color.dstFactor = (RGBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (RGBlendFactor_One); // Often One or SrcAlpha
+            blendState->alpha.dstFactor = (RGBlendFactor_OneMinusSrcAlpha);
             // Operation is already BlendOperation_Add
             break;
 
@@ -663,10 +662,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // This matches glBlendFunc(GL_SRC_ALPHA, GL_ONE) and glBlendEquation(GL_FUNC_ADD)
             // Often, additive alpha is just (One, One) or preserves dest alpha (Zero, One)
             // Let's assume (SrcAlpha, One) for color and (One, One) for alpha for brightness.
-            blendState->color.srcFactor = (WGPUBlendFactor_SrcAlpha);
-            blendState->color.dstFactor = (WGPUBlendFactor_One);
-            blendState->alpha.srcFactor = (WGPUBlendFactor_One); // Could be SrcAlpha or Zero depending on desired alpha result
-            blendState->alpha.dstFactor = (WGPUBlendFactor_One); // Could be One or Zero
+            blendState->color.srcFactor = (RGBlendFactor_SrcAlpha);
+            blendState->color.dstFactor = (RGBlendFactor_One);
+            blendState->alpha.srcFactor = (RGBlendFactor_One); // Could be SrcAlpha or Zero depending on desired alpha result
+            blendState->alpha.dstFactor = (RGBlendFactor_One); // Could be One or Zero
             // Operation is already BlendOperation_Add
             break;
 
@@ -676,10 +675,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Matches glBlendFuncSeparate(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE) commonly used for multiply
             // The original code used glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA) which would affect alpha too.
             // Let's implement the common separate logic for better results.
-            blendState->color.srcFactor = (WGPUBlendFactor_Dst);
-            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState->alpha.srcFactor = (WGPUBlendFactor_Zero); // Keeps destination alpha
-            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
+            blendState->color.srcFactor = (RGBlendFactor_Dst);
+            blendState->color.dstFactor = (RGBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (RGBlendFactor_Zero); // Keeps destination alpha
+            blendState->alpha.dstFactor = (RGBlendFactor_One);
             // Operation is already BlendOperation_Add
             break;
 
@@ -687,10 +686,10 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Add colors blend: SrcColor * 1 + DstColor * 1
             // Alpha blend: SrcAlpha * 1 + DstAlpha * 1
             // Matches glBlendFunc(GL_ONE, GL_ONE) and glBlendEquation(GL_FUNC_ADD)
-            blendState->color.srcFactor = (WGPUBlendFactor_One);
-            blendState->color.dstFactor = (WGPUBlendFactor_One);
-            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
+            blendState->color.srcFactor = (RGBlendFactor_One);
+            blendState->color.dstFactor = (RGBlendFactor_One);
+            blendState->alpha.srcFactor = (RGBlendFactor_One);
+            blendState->alpha.dstFactor = (RGBlendFactor_One);
             // Operation is already BlendOperation_Add
             break;
 
@@ -701,22 +700,22 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             // Alpha blend: DstAlpha * 1 - SrcAlpha * 1 (or Add alpha?)
             // Matches glBlendFunc(GL_ONE, GL_ONE) and glBlendEquation(GL_FUNC_SUBTRACT)
             // Applying SUBTRACT operation to both color and alpha based on glBlendEquation.
-            blendState->color.srcFactor = (WGPUBlendFactor_One);
-            blendState->color.dstFactor = (WGPUBlendFactor_One);
-            blendState->color.operation = (WGPUBlendOperation_Subtract); // Or ReverseSubtract depending on desired outcome
-            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState->alpha.dstFactor = (WGPUBlendFactor_One);
-            blendState->alpha.operation = (WGPUBlendOperation_Subtract); // Apply to alpha too, mimicking glBlendEquation
+            blendState->color.srcFactor = (RGBlendFactor_One);
+            blendState->color.dstFactor = (RGBlendFactor_One);
+            blendState->color.operation = (RGBlendOperation_Subtract); // Or ReverseSubtract depending on desired outcome
+            blendState->alpha.srcFactor = (RGBlendFactor_One);
+            blendState->alpha.dstFactor = (RGBlendFactor_One);
+            blendState->alpha.operation = (RGBlendOperation_Subtract); // Apply to alpha too, mimicking glBlendEquation
             break;
 
         case BLEND_ALPHA_PREMULTIPLY:
             // Premultiplied alpha blend: SrcColor * 1 + DstColor * (1 - SrcAlpha)
             // Alpha blend: SrcAlpha * 1 + DstAlpha * (1 - SrcAlpha)
             // Matches glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA) and glBlendEquation(GL_FUNC_ADD)
-            blendState->color.srcFactor = (WGPUBlendFactor_One);
-            blendState->color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-            blendState->alpha.srcFactor = (WGPUBlendFactor_One);
-            blendState->alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
+            blendState->color.srcFactor = (RGBlendFactor_One);
+            blendState->color.dstFactor = (RGBlendFactor_OneMinusSrcAlpha);
+            blendState->alpha.srcFactor = (RGBlendFactor_One);
+            blendState->alpha.dstFactor = (RGBlendFactor_OneMinusSrcAlpha);
             // Operation is already BlendOperation_Add
             break;
 
@@ -762,6 +761,60 @@ RGAPI void EndMode3D(){
     SetUniformBufferData(0, GetMatrixPtr(), sizeof(Matrix));
 }
 
+RGAPI void SetShaderValue(Shader shader, int uniformLoc, const void *value, int uniformType)
+{
+    if (uniformLoc == -1) return;
+
+    // Determine the size of the uniform data based on its type
+    size_t size = 0;
+    switch (uniformType) {
+        case SHADER_UNIFORM_FLOAT: size = sizeof(float); break;
+        case SHADER_UNIFORM_VEC2: size = sizeof(float)*2; break;
+        case SHADER_UNIFORM_VEC3: size = sizeof(float)*3; break;
+        case SHADER_UNIFORM_VEC4: size = sizeof(float)*4; break;
+        case SHADER_UNIFORM_INT: size = sizeof(int); break;
+        case SHADER_UNIFORM_IVEC2: size = sizeof(int)*2; break;
+        case SHADER_UNIFORM_IVEC3: size = sizeof(int)*3; break;
+        case SHADER_UNIFORM_IVEC4: size = sizeof(int)*4; break;
+        case SHADER_UNIFORM_SAMPLER2D: size = sizeof(int); break; // Special case for textures
+        default: TRACELOG(LOG_WARNING, "SHADER: Unsupported uniform type for SetShaderValue"); return;
+    }
+
+    if (uniformType == SHADER_UNIFORM_SAMPLER2D)
+    {
+        // For texture samplers, the value is a pointer to the Texture
+        SetShaderTexture(shader, uniformLoc, *(Texture *)value);
+    }
+    else
+    {
+        // For other data types, update the uniform buffer
+        SetShaderUniformBufferData(shader, uniformLoc, value, size);
+    }
+}
+
+RGAPI void SetShaderValueV(Shader shader, int uniformLoc, const void *value, int uniformType, int count)
+{
+    if (uniformLoc == -1) return;
+
+    // Determine the size of a single element of the uniform data
+    size_t size = 0;
+    switch (uniformType) {
+        case SHADER_UNIFORM_FLOAT: size = sizeof(float); break;
+        case SHADER_UNIFORM_VEC2: size = sizeof(float)*2; break;
+        case SHADER_UNIFORM_VEC3: size = sizeof(float)*3; break;
+        case SHADER_UNIFORM_VEC4: size = sizeof(float)*4; break;
+        case SHADER_UNIFORM_INT: size = sizeof(int); break;
+        case SHADER_UNIFORM_IVEC2: size = sizeof(int)*2; break;
+        case SHADER_UNIFORM_IVEC3: size = sizeof(int)*3; break;
+        case SHADER_UNIFORM_IVEC4: size = sizeof(int)*4; break;
+        default: TRACELOG(LOG_WARNING, "SHADER: Unsupported uniform type for SetShaderValueV"); return;
+    }
+
+    // Update the uniform buffer with the array of values
+    SetShaderUniformBufferData(shader, uniformLoc, value, size*count);
+}
+
+
 RGAPI void rlSetLineWidth(float lineWidth){
     g_renderstate.currentSettings.lineWidth = (uint32_t)(lineWidth <= 0.0f ? 0.0f : lineWidth);
 }
@@ -793,7 +846,7 @@ RGAPI void ClearBackground(Color clearColor){
         EndRenderpassEx(g_renderstate.activeRenderpass);
     }
     
-    g_renderstate.clearPass.colorClear = CLITERAL(WGPUColor){
+    g_renderstate.clearPass.colorClear = CLITERAL(RGColor){
         clearColor.r / 255.0,
         clearColor.g / 255.0,
         clearColor.b / 255.0,
@@ -1649,13 +1702,19 @@ RGAPI Shader LoadShaderFromMemorySPIRV(ShaderSources sources){
     const uint32_t attributeCount = attribs.vertexAttributeCount;
     uint32_t offset = 0;
     for (uint32_t attribIndex = 0; attribIndex < attribs.vertexAttributeCount; attribIndex++) {
-        const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
+        const RGVertexFormat format = attribs.vertexAttributes[attribIndex].format;
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
-            .attr = {.nextInChain = NULL, .format = format, .offset = offset, .shaderLocation = location},
+            .attr = {
+                //.nextInChain = NULL,
+                .format = format,
+                .offset = offset,
+                .shaderLocation = location
+            },
             .bufferSlot = 0,
-            .stepMode = WGPUVertexStepMode_Vertex,
-            .enabled = true};
+            .stepMode = RGVertexStepMode_Vertex,
+            .enabled = true
+        };
         offset += attributeSize(format);
     }
     ResourceTypeDescriptor *values = (ResourceTypeDescriptor *)RL_CALLOC(bindings->current_size, sizeof(ResourceTypeDescriptor));
@@ -1692,17 +1751,17 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     const uint32_t attributeCount = attribs.vertexAttributeCount;
     uint32_t offset = 0;
     for(uint32_t attribIndex = 0;attribIndex < attribs.vertexAttributeCount;attribIndex++){
-        const WGPUVertexFormat format = attribs.vertexAttributes[attribIndex].format;
+        const RGVertexFormat format = attribs.vertexAttributes[attribIndex].format;
         const uint32_t location = attribs.vertexAttributes[attribIndex].location;
         allAttribsInOneBuffer[attribIndex] = CLITERAL(AttributeAndResidence){
             .attr = {
-                .nextInChain = NULL,
+                //.nextInChain = NULL,
                 .format = format,
                 .offset = offset,
                 .shaderLocation = location
             },
             .bufferSlot = 0,
-            .stepMode = WGPUVertexStepMode_Vertex,
+            .stepMode = RGVertexStepMode_Vertex,
             .enabled = true
         };
         offset += attributeSize(format);
@@ -1728,17 +1787,13 @@ Shader LoadShaderSingleSource(const char* shaderSource){
 }
 
 FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format){
-    FullSurface ret zeroinit;
-    ret.headless = 1;
-    ret.surfaceConfig.device = GetDevice();
-    ret.surfaceConfig.width = width;
-    ret.surfaceConfig.width = height;
-    #if SUPPORT_VULKAN_BACKEND == 1
-    ret.surfaceConfig.format = toWGPUPixelFormat(format);
-    #else
-    ret.surfaceConfig.format = toWGPUPixelFormat(format);
-    #endif
-    ret.renderTarget = LoadRenderTextureEx(width, height, format, 1, 1);
+    FullSurface ret = {
+        .headless = 1,
+        .width = width,
+        .height = height,
+        .format = format,
+        .renderTarget = LoadRenderTextureEx(width, height, format, 1, 1),
+    };
     return ret;
 }
 
@@ -1979,7 +2034,7 @@ void SetStorageBufferData         (uint32_t index, const void* data, size_t size
 }
 
 void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.buffer = buffer->buffer;
     entry.size = buffer->size;
@@ -1987,7 +2042,7 @@ void SetBindgroupUniformBuffer (DescribedBindGroup* bg, uint32_t index, Describe
 }
 
 void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, DescribedBuffer* buffer){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.buffer = buffer->buffer;
     entry.size = buffer->size;
@@ -1995,21 +2050,21 @@ void SetBindgroupStorageBuffer (DescribedBindGroup* bg, uint32_t index, Describe
 }
 
 void SetBindgroupTexture3D(DescribedBindGroup* bg, uint32_t index, Texture3D tex){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.textureView = tex.view;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
 void SetBindgroupTextureView(DescribedBindGroup* bg, uint32_t index, WGPUTextureView texView){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.textureView = texView;
     
     UpdateBindGroupEntry(bg, index, entry);
 }
 void SetBindgroupTexture(DescribedBindGroup* bg, uint32_t index, Texture tex){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.textureView = tex.view;
     
@@ -2017,7 +2072,7 @@ void SetBindgroupTexture(DescribedBindGroup* bg, uint32_t index, Texture tex){
 }
 
 void SetBindgroupSampler(DescribedBindGroup* bg, uint32_t index, DescribedSampler sampler){
-    WGPUBindGroupEntry entry = {0};
+    ResourceDescriptor entry = {0};
     entry.binding = index;
     entry.sampler = sampler.sampler;
     UpdateBindGroupEntry(bg, index, entry);
@@ -2070,11 +2125,10 @@ static inline uint64_t bgEntryHashBGE(const WGPUBindGroupEntry bge){
     return value;
 }
 
-DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const WGPUBindGroupEntry* entries, size_t entryCount){
+DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const ResourceDescriptor* entries, size_t entryCount){
     DescribedBindGroup ret zeroinit;
     if(entryCount > 0){
-
-        ret.entries = (WGPUBindGroupEntry*)RL_CALLOC(entryCount, sizeof(ResourceDescriptor));
+        ret.entries = (ResourceDescriptor*)RL_CALLOC(entryCount, sizeof(ResourceDescriptor));
         memcpy(ret.entries, entries, entryCount * sizeof(ResourceDescriptor));
     }
     ret.entryCount = entryCount;
@@ -2085,7 +2139,7 @@ DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const
 
 
     for(uint32_t i = 0;i < ret.entryCount;i++){
-        ret.descriptorHash ^= bgEntryHashBGE(ret.entries[i]);
+        ret.descriptorHash ^= bgEntryHash(ret.entries[i]);
     }
     //ret.bindGroup = wgpuDeviceCreateBindGroup((WGPUDevice)GetDevice(), &ret.desc);
     return ret;
@@ -2727,21 +2781,27 @@ uint32_t GetFPS(void) {
 
 
 RenderSettings GetDefaultSettings(){
-    RenderSettings ret zeroinit;
-    ret.lineWidth = 1;
-    ret.faceCull = 1;
-    ret.frontFace = WGPUFrontFace_CCW;
-    ret.depthTest = 1;
-    ret.depthCompare = WGPUCompareFunction_LessEqual;
-    ret.sampleCount = (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1;
+    RenderSettings ret = {
+        .lineWidth = 1,
+        .faceCull = 1,
+        .frontFace = RGFrontFace_CCW,
+        .depthTest = 1,
+        .depthCompare = RGCompareFunction_LessEqual,
+        .sampleCount = (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1,
+        .blendState = {
+            .alpha = {
+                .srcFactor = RGBlendFactor_One,
+                .dstFactor = RGBlendFactor_OneMinusSrcAlpha,
+                .operation = RGBlendOperation_Add,
+            },
+            .color = {
+                .srcFactor = RGBlendFactor_SrcAlpha,
+                .dstFactor = RGBlendFactor_OneMinusSrcAlpha,
+                .operation = RGBlendOperation_Add,
+            }
+        }
+    };
 
-    ret.blendState.alpha.srcFactor = (WGPUBlendFactor_One);
-    ret.blendState.alpha.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-    ret.blendState.alpha.operation = (WGPUBlendOperation_Add);
-    ret.blendState.color.srcFactor = (WGPUBlendFactor_SrcAlpha);
-    ret.blendState.color.dstFactor = (WGPUBlendFactor_OneMinusSrcAlpha);
-    ret.blendState.color.operation = (WGPUBlendOperation_Add);
-    
     return ret;
 }
 FILE* tracelogFile = NULL;

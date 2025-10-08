@@ -80,20 +80,20 @@ void UploadMesh(Mesh *mesh, bool dynamic){
             mesh->ibo = GenIndexBuffer(mesh->indices, mesh->triangleCount * 3 * sizeof(uint32_t));
         }
         mesh->vao = LoadVertexArray();
-        VertexAttribPointer(mesh->vao, mesh->vbos[0], 0, WGPUVertexFormat_Float32x3, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+        VertexAttribPointer(mesh->vao, mesh->vbos[0], 0, RGVertexFormat_Float32x3, sizeof(float) * 0, RGVertexStepMode_Vertex);
         EnableVertexAttribArray(mesh->vao, 0);
-        VertexAttribPointer(mesh->vao, mesh->vbos[1], 1, WGPUVertexFormat_Float32x2, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+        VertexAttribPointer(mesh->vao, mesh->vbos[1], 1, RGVertexFormat_Float32x2, sizeof(float) * 0, RGVertexStepMode_Vertex);
         EnableVertexAttribArray(mesh->vao, 1);
-        VertexAttribPointer(mesh->vao, mesh->vbos[2], 2, WGPUVertexFormat_Float32x3, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+        VertexAttribPointer(mesh->vao, mesh->vbos[2], 2, RGVertexFormat_Float32x3, sizeof(float) * 0, RGVertexStepMode_Vertex);
         EnableVertexAttribArray(mesh->vao, 2);
-        VertexAttribPointer(mesh->vao, mesh->vbos[3], 3, WGPUVertexFormat_Unorm8x4, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+        VertexAttribPointer(mesh->vao, mesh->vbos[3], 3, RGVertexFormat_Unorm8x4, sizeof(float) * 0, RGVertexStepMode_Vertex);
         EnableVertexAttribArray(mesh->vao, 3);
         if(mesh->boneWeights){
-            VertexAttribPointer(mesh->vao, mesh->vbos[4], 4, WGPUVertexFormat_Float32x4, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+            VertexAttribPointer(mesh->vao, mesh->vbos[4], 4, RGVertexFormat_Float32x4, sizeof(float) * 0, RGVertexStepMode_Vertex);
             EnableVertexAttribArray(mesh->vao, 4);
         }
         if(mesh->boneIds){
-            VertexAttribPointer(mesh->vao, mesh->vbos[5], 5, mesh->boneIDFormat, sizeof(float) * 0, WGPUVertexStepMode_Vertex);
+            VertexAttribPointer(mesh->vao, mesh->vbos[5], 5, mesh->boneIDFormat, sizeof(float) * 0, RGVertexStepMode_Vertex);
             EnableVertexAttribArray(mesh->vao, 5);
         }
         if(mesh->boneMatrices && mesh->boneCount){
@@ -146,6 +146,15 @@ RGAPI Model LoadModelFromMesh(Mesh mesh)
     model.meshMaterial[0] = 0;  // First material index
 
     return model;
+}
+
+RGAPI void DrawModel(Model model, Vector3 position, float scale, Color tint)
+{
+    Vector3 vScale = { scale, scale, scale };
+    Vector3 rotationAxis = { 0.0f, 1.0f, 0.0f };
+    float rotationAngle = 0.0f;
+
+    DrawModelEx(model, position, rotationAxis, rotationAngle, vScale, tint);
 }
 
 RGAPI void DrawModelEx(Model model, Vector3 position, Vector3 rotationAxis, float rotationAngle, Vector3 scale, Color tint)
@@ -1596,7 +1605,7 @@ Model LoadGLTF(const char *fileName)
 
                                 // Load attribute: vec4, u8 (unsigned char)
                                 LOAD_ATTRIBUTE(attribute, 4, unsigned char, model.meshes[meshIndex].boneIds)
-                                model.meshes[meshIndex].boneIDFormat = WGPUVertexFormat_Uint8x4;
+                                model.meshes[meshIndex].boneIDFormat = RGVertexFormat_Uint8x4;
                             }
                             else if (attribute->component_type == cgltf_component_type_r_16u)
                             {
@@ -1608,7 +1617,7 @@ Model LoadGLTF(const char *fileName)
                                 
                                 LOAD_ATTRIBUTE(attribute, 4, unsigned short, model.meshes[meshIndex].boneIds)
 
-                                model.meshes[meshIndex].boneIDFormat = WGPUVertexFormat_Uint16x4;
+                                model.meshes[meshIndex].boneIDFormat = RGVertexFormat_Uint16x4;
                             }
                             else TRACELOG(LOG_WARNING, "MODEL: [%s] Joint attribute data format not supported", fileName);
                         }
