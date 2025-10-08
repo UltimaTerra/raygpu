@@ -6,6 +6,8 @@
 #else
     //#include <webgpu/webgpu.h>
 #endif
+#include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <macros_and_constants.h>
@@ -1815,7 +1817,7 @@ static inline uint32_t attributeSize(const RGVertexFormat fmt){
         default:
             break;
     }
-    abort();
+    rg_trap();
     return 0;
 }
 
@@ -1825,5 +1827,4 @@ EXTERN_C_END
 
 typedef struct renderstate renderstate;
 externcvar renderstate g_renderstate;
-
 #endif

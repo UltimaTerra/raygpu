@@ -31,6 +31,7 @@
 #include <string>
 #include <unordered_map>
 #include <bit>
+#include <iostream>
 #include <fstream>
 #include <external/gl_corearb.h>
 #if SUPPORT_GLSL_PARSER == 1

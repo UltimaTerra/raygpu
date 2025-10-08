@@ -14,18 +14,6 @@
 #define EXTERN_C_BEGIN extern "C" {
 #define EXTERN_C_END }
 #define cwoid
-#include <cstdlib>
-#include <cstring>
-#include <cmath>
-#include <cstdio>
-#include <cstdint>
-using std::malloc;
-using std::fprintf;
-using std::calloc;
-using std::realloc;
-using std::memcpy;
-using std::memset;
-using std::free;
 #ifndef M_PI
 #define M_PI 3.14159265358979323
 #endif
@@ -34,12 +22,7 @@ constexpr float RAD2DEG = 180.0 / M_PI;
 #else
 #define zeroinit  = {0}
 #define CLITERAL(X) (X)
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-#include <stdint.h>
+
 #define EXTERN_C_BEGIN
 #define EXTERN_C_END
 #define cwoid void
@@ -150,13 +133,12 @@ do {                                                                            
         TRACELOG(LOG_ERROR, "Condition: %s", #Condition);                                         \
         TRACELOG(LOG_ERROR, "Location: %s:%d", __FILE__, __LINE__);                               \
         rg_trap();                                                                                \
-        abort();                                                                                  \
     }                                                                                             \
 } while (0)
 
 #endif
 
-typedef uint32_t Bool32;
+typedef unsigned Bool32;
 
 #pragma once
 #include <stdint.h>
