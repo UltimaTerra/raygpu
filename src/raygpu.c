@@ -559,7 +559,7 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
 
 DescribedShaderModule LoadShaderModule(ShaderSources sources){
     
-    DescribedShaderModule ret zeroinit;
+    DescribedShaderModule ret  = {0};
     
     
     if(sources.language == sourceTypeUnknown){
@@ -1736,7 +1736,7 @@ RGAPI Shader LoadShaderFromMemorySPIRV(ShaderSources sources){
 }
 
 Shader LoadShaderSingleSource(const char* shaderSource){
-    ShaderSources sources zeroinit;
+    ShaderSources sources  = {0};
     #if defined(SUPPORT_WGSL_PARSER) && SUPPORT_WGSL_PARSER == 1 
     sources.language = sourceTypeWGSL;
     ShaderStageSource* src = sources.sources + sources.sourceCount;
@@ -1853,7 +1853,7 @@ uint32_t rlGetLocationAttrib(const uint32_t shaderID, const char* attributeName)
 }
 // Load shader from code strings and bind default locations
 Shader LoadShaderFromMemory(const char *vsCode, const char *fsCode){
-    Shader shader zeroinit;
+    Shader shader  = {0};
     #if SUPPORT_GLSL_PARSER == 1
     //shader.id = LoadPipelineGLSL(vsCode, fsCode);
     
@@ -2126,7 +2126,7 @@ static inline uint64_t bgEntryHashBGE(const WGPUBindGroupEntry bge){
 }
 
 DescribedBindGroup LoadBindGroup(const DescribedBindGroupLayout* bglayout, const ResourceDescriptor* entries, size_t entryCount){
-    DescribedBindGroup ret zeroinit;
+    DescribedBindGroup ret  = {0};
     if(entryCount > 0){
         ret.entries = (ResourceDescriptor*)RL_CALLOC(entryCount, sizeof(ResourceDescriptor));
         memcpy(ret.entries, entries, entryCount * sizeof(ResourceDescriptor));
@@ -2281,7 +2281,7 @@ void UnloadImage(Image img){
     img.data = NULL;
 }
 Image LoadImageFromMemory(const char* extension, const void* data, size_t dataSize){
-    Image image zeroinit;
+    Image image  = {0};
     image.mipmaps = 1;
     uint32_t comp;
     image.data = stbi_load_from_memory((stbi_uc*)data, (int)(dataSize), (int*)&image.width, (int*)&image.height, (int*)&comp, 0);

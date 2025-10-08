@@ -465,7 +465,7 @@ Font LoadFontEx(const char *fileName, int fontSize, int *codepoints, int codepoi
 }
 Image ImageFromImage(Image image, Rectangle rec)
 {
-    Image result zeroinit;
+    Image result  = {0};
 
     int bytesPerPixel = ((image.format == GRAYSCALE) ? 2 : GetPixelSizeInBytes(image.format));
 
@@ -822,7 +822,7 @@ GlyphInfo *LoadFontData(const unsigned char *fileData, int dataSize, int fontSiz
 #if defined(SUPPORT_FILEFORMAT_TTF) || defined(SUPPORT_FILEFORMAT_BDF)
 Image GenImageFontAtlas(const GlyphInfo *glyphs, Rectangle **glyphRecs, int glyphCount, int fontSize, int padding, int packMethod)
 {
-    Image atlas zeroinit;
+    Image atlas  = {0};
     atlas.mipmaps = 1;
     if (glyphs == NULL)
     {

@@ -78,14 +78,14 @@ int main(){
     Mesh churchMesh = churchModel.meshes[0];
 
     ResourceTypeDescriptor uniforms[5] = {
-        CLITERAL(ResourceTypeDescriptor){uniform_buffer, 64, 0, readonly, format_or_sample_type(0)},
-        CLITERAL(ResourceTypeDescriptor){texture2d, 0, 1,       readonly, format_or_sample_type(0)},
-        CLITERAL(ResourceTypeDescriptor){texture_sampler, 0, 2,         readonly, format_or_sample_type(0)},
-        CLITERAL(ResourceTypeDescriptor){storage_buffer, 64, 3, readonly, format_or_sample_type(0)},
-        CLITERAL(ResourceTypeDescriptor){storage_buffer, 32, 4, readonly, format_or_sample_type(0)}
+        CLITERAL(ResourceTypeDescriptor){uniform_buffer, 64, 0, access_type_readonly, format_or_sample_type(0)},
+        CLITERAL(ResourceTypeDescriptor){texture2d, 0, 1,       access_type_readonly, format_or_sample_type(0)},
+        CLITERAL(ResourceTypeDescriptor){texture_sampler, 0, 2,         access_type_readonly, format_or_sample_type(0)},
+        CLITERAL(ResourceTypeDescriptor){storage_buffer, 64, 3, access_type_readonly, format_or_sample_type(0)},
+        CLITERAL(ResourceTypeDescriptor){storage_buffer, 32, 4, access_type_readonly, format_or_sample_type(0)}
     };
     
-    RenderSettings settings zeroinit;
+    RenderSettings settings  = {0};
     settings.depthTest = 1;
     settings.sampleCount = msaa ? 4 : 1;
     settings.depthCompare = RGCompareFunction_LessEqual;

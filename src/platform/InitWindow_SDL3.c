@@ -128,7 +128,7 @@ RGAPI SubWindow InitWindow_SDL3(int width, int height, const char *title) {
 }
 
 SurfaceAndSwapchainSupport QuerySurfaceAndSwapchainSupport(void* instanceHandle, void* adapterHandle, void* surfaceHandle){
-    SurfaceAndSwapchainSupport ret zeroinit;
+    SurfaceAndSwapchainSupport ret = {0};
 
     if(surfaceHandle == 0){
         return ret;
@@ -140,7 +140,7 @@ SurfaceAndSwapchainSupport QuerySurfaceAndSwapchainSupport(void* instanceHandle,
     VkSurfaceKHR surface = (VkSurfaceKHR)surfaceHandle; 
     
     ret.presentQueueIndex = GetPresentQueueIndex(instanceHandle, adapterHandle);
-    VkSurfaceCapabilitiesKHR capabilities zeroinit;
+    VkSurfaceCapabilitiesKHR capabilities = {0};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(adapter, surface, &capabilities);
     uint32_t formatCount;
 

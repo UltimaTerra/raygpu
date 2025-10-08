@@ -161,7 +161,7 @@ void UpdateTexture(Texture tex, void *data) {
 }
 RGAPI Texture3D LoadTexture3DPro(
     uint32_t width, uint32_t height, uint32_t depth, PixelFormat format, RGTextureUsage usage, uint32_t sampleCount) {
-    Texture3D ret zeroinit;
+    Texture3D ret  = {0};
     ret.width = width;
     ret.height = height;
     ret.depth = depth;
@@ -180,7 +180,7 @@ RGAPI Texture3D LoadTexture3DPro(
     assert(tDesc.size.width > 0);
     assert(tDesc.size.height > 0);
 
-    WGPUTextureViewDescriptor textureViewDesc zeroinit;
+    WGPUTextureViewDescriptor textureViewDesc  = {0};
     textureViewDesc.aspect =
         ((format == PIXELFORMAT_DEPTH_24_PLUS || format == PIXELFORMAT_DEPTH_32_FLOAT) ? WGPUTextureAspect_DepthOnly
                                                                                        : WGPUTextureAspect_All);
@@ -268,7 +268,7 @@ void ResizeBuffer(DescribedBuffer *buffer, size_t newSize) {
     DescribedBuffer newbuffer = {0};
     newbuffer.usage = buffer->usage;
     newbuffer.size = newSize;
-    WGPUBufferDescriptor desc zeroinit;
+    WGPUBufferDescriptor desc  = {0};
     desc.usage = newbuffer.usage;
     desc.size = newbuffer.size;
     desc.mappedAtCreation = false;
@@ -312,7 +312,7 @@ void ResizeBufferAndConserve(DescribedBuffer *buffer, size_t newSize) {
 
     newbuffer.usage = buffer->usage;
     newbuffer.size = newSize;
-    WGPUBufferDescriptor desc zeroinit;
+    WGPUBufferDescriptor desc  = {0};
     desc.usage = newbuffer.usage;
     desc.size = newbuffer.size;
     desc.mappedAtCreation = false;
@@ -331,11 +331,11 @@ void ResizeBufferAndConserve(DescribedBuffer *buffer, size_t newSize) {
 
 static inline WGPUStorageTextureAccess toStorageTextureAccess(access_type acc) {
     switch (acc) {
-    case readonly:
+    case access_type_readonly:
         return WGPUStorageTextureAccess_ReadOnly;
-    case readwrite:
+    case access_type_readwrite:
         return WGPUStorageTextureAccess_ReadWrite;
-    case writeonly:
+    case access_type_writeonly:
         return WGPUStorageTextureAccess_WriteOnly;
     default:
         rg_unreachable();
@@ -344,11 +344,11 @@ static inline WGPUStorageTextureAccess toStorageTextureAccess(access_type acc) {
 }
 static inline WGPUBufferBindingType toStorageBufferAccess(access_type acc) {
     switch (acc) {
-    case readonly:
+    case access_type_readonly:
         return WGPUBufferBindingType_ReadOnlyStorage;
-    case readwrite:
+    case access_type_readwrite:
         return WGPUBufferBindingType_Storage;
-    case writeonly:
+    case access_type_writeonly:
         return WGPUBufferBindingType_Storage;
     default:
         rg_unreachable();
@@ -644,7 +644,7 @@ void UpdateBindGroup(DescribedBindGroup *bg) {
     // std::cout << "Updating bindgroup with " << bg->desc.entryCount << " entries" << std::endl;
     // std::cout << "Updating bindgroup with " << bg->desc.entries[1].binding << " entries" << std::endl;
     if (bg->needsUpdate) {
-        WGPUBindGroupDescriptor desc zeroinit;
+        WGPUBindGroupDescriptor desc  = {0};
         WGPUBindGroupEntry* aswgpu = (WGPUBindGroupEntry*)RL_CALLOC(bg->entryCount, sizeof(WGPUBindGroupEntry));
         for (uint32_t i = 0; i < bg->entryCount; i++) {
             WGPUBindGroupEntry* to = aswgpu + i;
@@ -1496,7 +1496,7 @@ Texture LoadTexturePro(uint32_t width, uint32_t height, PixelFormat format, RGTe
     textureViewDesc.mipLevelCount = mipmaps;
     textureViewDesc.dimension = WGPUTextureViewDimension_2D;
     textureViewDesc.format = tDesc.format;
-    Texture ret zeroinit;
+    Texture ret  = {0};
     ret.id = wgpuDeviceCreateTexture(GetDevice(), &tDesc);
     ret.view = wgpuTextureCreateView(ret.id, &textureViewDesc);
     ret.format = format;
@@ -1586,7 +1586,7 @@ void UnloadBuffer(DescribedBuffer *buffer) {
     RL_FREE(buffer);
 }
 Texture LoadTextureFromImage(Image img) {
-    Texture ret zeroinit;
+    Texture ret  = {0};
     ret.sampleCount = 1;
     Color *altdata = NULL;
     if (img.format == GRAYSCALE) {
@@ -1702,11 +1702,11 @@ void BeginRenderpassEx(DescribedRenderpass *renderPass) {
 
     renderPass->cmdEncoder = wgpuDeviceCreateCommandEncoder((WGPUDevice)GetDevice(), &desc);
 
-    WGPURenderPassDescriptor renderPassDesc zeroinit;
+    WGPURenderPassDescriptor renderPassDesc  = {0};
     renderPassDesc.colorAttachmentCount = 1;
 
-    WGPURenderPassColorAttachment colorAttachment zeroinit;
-    WGPURenderPassDepthStencilAttachment depthAttachment zeroinit;
+    WGPURenderPassColorAttachment colorAttachment  = {0};
+    WGPURenderPassDepthStencilAttachment depthAttachment  = {0};
     if (RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample.view) {
         colorAttachment.view = (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->colorMultisample.view;
         colorAttachment.resolveTarget = (WGPUTextureView)RenderTexture_stack_cpeek(&g_renderstate.renderTargetStack)->texture.view;
@@ -1899,7 +1899,7 @@ RenderTexture LoadRenderTexture(uint32_t width, uint32_t height) {
 }
 
 DescribedShaderModule LoadShaderModuleSPIRV(ShaderSources sourcesSpirv) {
-    DescribedShaderModule ret zeroinit;
+    DescribedShaderModule ret  = {0};
 #ifndef __EMSCRIPTEN__
     for (uint32_t i = 0; i < sourcesSpirv.sourceCount; i++) {
 
@@ -1983,7 +1983,7 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst,
                                           const DescribedShaderModule* shaderModule,
                                           const DescribedBindGroupLayout* bglayout,
                                           const DescribedPipelineLayout* pllayout) {
-    WGPURenderPipelineDescriptor pipelineDesc zeroinit;
+    WGPURenderPipelineDescriptor pipelineDesc  = {0};
 
     const RenderSettings* settings = &mst->settings;
     pipelineDesc.multisample.count = settings->sampleCount ? settings->sampleCount : 1;
@@ -1991,9 +1991,9 @@ WGPURenderPipeline createSingleRenderPipe(const ModifiablePipelineState* mst,
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
     pipelineDesc.layout = (WGPUPipelineLayout)pllayout->layout;
 
-    WGPUVertexState vertexState zeroinit;
-    WGPUFragmentState fragmentState zeroinit;
-    WGPUBlendState blendState zeroinit;
+    WGPUVertexState vertexState  = {0};
+    WGPUFragmentState fragmentState  = {0};
+    WGPUBlendState blendState  = {0};
 
     vertexState.module = (WGPUShaderModule)shaderModule->stages[RGShaderStageEnum_Vertex].module;
 
@@ -2235,7 +2235,7 @@ LoadComputePipelineEx(const char *shaderCode, const ResourceTypeDescriptor *unif
 }
 
 Shader LoadShaderFromMemoryOld(const char *vertexSource, const char *fragmentSource) {
-    Shader shader zeroinit;
+    Shader shader  = {0};
 
 #if SUPPORT_GLSL_PARSER == 1
 
@@ -2516,9 +2516,9 @@ static inline access_type access_from_binding(const SpvReflectDescriptorBinding 
     case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
     case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
     case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-        return readwrite;
+        return access_type_readwrite;
     default:
-        return readonly;
+        return access_type_readonly;
     }
 }
 

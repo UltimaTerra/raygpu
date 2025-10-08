@@ -515,7 +515,7 @@ target_include_directories(raygpu PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>  
     $<INSTALL_INTERFACE:include/>
 )
-
+target_include_directories(${raygpu_core_library_name} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/src/internal_include")
 get_target_property(core_compile_defs ${raygpu_core_library_name} INTERFACE_COMPILE_DEFINITIONS)
 if(core_compile_defs)
     target_compile_definitions(raygpu PUBLIC ${core_compile_defs})

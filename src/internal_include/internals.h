@@ -222,6 +222,7 @@ static inline RGPresentMode WGPU_to_RG_PresentMode(WGPUPresentMode pm){
         case WGPUPresentMode_FifoRelaxed: return RGPresentMode_FifoRelaxed;
         case WGPUPresentMode_Immediate: return RGPresentMode_Immediate;
         case WGPUPresentMode_Mailbox: return RGPresentMode_Mailbox;
+        default: return RGPresentMode_Undefined;
     }
 }
 
@@ -232,6 +233,7 @@ static inline WGPUPresentMode RG_to_WGPU_PresentMode(RGPresentMode pm){
         case RGPresentMode_FifoRelaxed: return WGPUPresentMode_FifoRelaxed;
         case RGPresentMode_Immediate: return WGPUPresentMode_Immediate;
         case RGPresentMode_Mailbox: return WGPUPresentMode_Mailbox;
+        default: return WGPUPresentMode_Undefined;
     }
 }
 
@@ -1021,7 +1023,7 @@ static inline uint32_t getReflectionAttributeLocation(const InOutAttributeInfo* 
 }
 
 static inline ShaderSources singleStage(const char* code, ShaderSourceType language, RGShaderStageEnum stage){
-    ShaderSources sources zeroinit;
+    ShaderSources sources  = {0};
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
@@ -1031,7 +1033,7 @@ static inline ShaderSources singleStage(const char* code, ShaderSourceType langu
 }
 
 static inline ShaderSources dualStage(const char* code, ShaderSourceType language, RGShaderStageEnum stage1, RGShaderStageEnum stage2){
-    ShaderSources sources zeroinit;
+    ShaderSources sources  = {0};
     sources.language = language;
     sources.sourceCount = 1;
     sources.sources[0].data = code;
@@ -1042,7 +1044,7 @@ static inline ShaderSources dualStage(const char* code, ShaderSourceType languag
 
 
 static inline ShaderSources dualStageDualSource(const char* code1, const char* code2, ShaderSourceType language, RGShaderStageEnum stage1, RGShaderStageEnum stage2){
-    ShaderSources sources zeroinit;
+    ShaderSources sources  = {0};
     sources.language = language;
     sources.sourceCount = 2;
     sources.sources[0].data = code1;

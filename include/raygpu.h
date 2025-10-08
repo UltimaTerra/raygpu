@@ -1,11 +1,7 @@
 #ifndef RAYGPU_H
-#define RAYGPU_H
+#define RAYGPU_H 1
+
 #include <config.h>
-#if SUPPORT_WGPU_BACKEND == 1
-    //#include <webgpu/webgpu.h>
-#else
-    //#include <webgpu/webgpu.h>
-#endif
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -444,12 +440,13 @@ typedef enum uniform_type {
     acceleration_structure,
     combined_image_sampler,
     uniform_type_enumcount,
-    uniform_type_force32 = 0x7fffffff} uniform_type;
+    uniform_type_force32 = 0x7fffffff
+} uniform_type;
 
 typedef enum access_type {
-    readonly,
-    readwrite,
-    writeonly
+    access_type_readonly,
+    access_type_readwrite,
+    access_type_writeonly
 } access_type;
 
 typedef enum format_or_sample_type {
@@ -1178,7 +1175,7 @@ typedef enum windowType {
     windowType_sdl3
 }windowType;
 
-typedef struct {
+typedef struct PenInputState{
     float axes[16];
     Vector2 position;
 } PenInputState;
@@ -1189,11 +1186,16 @@ typedef struct {
 #define CHARQ_MAX 256
 #define PEN_MAX 16
 
-typedef struct {
+typedef struct TouchPoint {
     int64_t id;
     Vector2 pos;
 } TouchPoint;
 
+typedef struct PenState{
+    unsigned int key;
+    PenInputState value;
+    int used;
+}PenState;
 typedef struct window_input_state{
     Rectangle windowPosition;
 
@@ -1217,11 +1219,7 @@ typedef struct window_input_state{
     int charQueue[CHARQ_MAX];
     size_t charQueueHead, charQueueTail, charQueueCount;
 
-    struct {
-        unsigned int key;
-        PenInputState value;
-        int used;
-    } penStates[PEN_MAX];
+    PenState penStates[PEN_MAX];
     size_t penStatesCount;
 } window_input_state;
 

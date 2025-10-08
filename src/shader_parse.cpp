@@ -323,8 +323,8 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     rassert(sources.language == sourceTypeWGSL, "Source language must be wgsl for this function");
     
     for(uint32_t i = 0;i < sources.sourceCount;i++){
-        WGPUShaderModuleDescriptor mDesc zeroinit;
-        WGPUShaderSourceWGSL source zeroinit;
+        WGPUShaderModuleDescriptor mDesc  = {0};
+        WGPUShaderSourceWGSL source  = {0};
         mDesc.nextInChain = &source.chain;
         source.chain.sType = WGPUSType_ShaderSourceWGSL;
 

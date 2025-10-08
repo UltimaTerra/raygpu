@@ -24,7 +24,7 @@
  */
 
 
-#include "config.h"
+#include <config.h>
 #include "macros_and_constants.h"
 #include <memory>
 #include <map>
@@ -533,7 +533,7 @@ StringToUniformMap* getBindingsGLSL(ShaderSources sources){
                 //std::cout << set->bindings[i]->name << ": " <<  set->bindings[i]->descriptor_type << "\n";
                 
                 if(set->bindings[i]->descriptor_type != SpvReflectDescriptorType::SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER && set->bindings[i]->descriptor_type != SpvReflectDescriptorType::SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER){
-                    ResourceTypeDescriptor insert zeroinit;
+                    ResourceTypeDescriptor insert = {};
                     auto& binding = set->bindings[i];
                     
                     insert.type = spvdsToResourceType(set->bindings[i]->descriptor_type);
@@ -574,7 +574,7 @@ StringToUniformMap* getBindingsGLSL(ShaderSources sources){
             .type = uniform ? uniform_buffer : storage_buffer,
             .minBindingSize = (uint32_t)program.getUniformBlock(i).size,
             .location = (uint32_t)program.getUniformBlock(i).getBinding(),
-            .access = program.getUniformBlock(i).getType()->getQualifier().isWriteOnly() ? writeonly : (program.getUniformBlock(i).getType()->getQualifier().isReadOnly() ? readonly : readwrite),
+            .access = program.getUniformBlock(i).getType()->getQualifier().isWriteOnly() ? access_type_writeonly : (program.getUniformBlock(i).getType()->getQualifier().isReadOnly() ? access_type_readonly : access_type_readwrite),
         };
         
         BindingIdentifier id = BIfromCString(name);
@@ -587,7 +587,7 @@ StringToUniformMap* getBindingsGLSL(ShaderSources sources){
     return ret;
 }
 ShaderSources glsl_to_spirv(ShaderSources sources){
-    ShaderSources ret zeroinit;
+    ShaderSources ret  = {0};
     rassert(sources.language == sourceTypeGLSL, "Must be GLSL here");
     ret.sourceCount = sources.sourceCount;
     ret.language = sourceTypeSPIRV;
@@ -615,7 +615,7 @@ DescribedShaderModule LoadShaderModuleGLSL(ShaderSources sourcesGLSL){
     return ret;
 }
 Shader LoadShaderGLSL(const char* vs, const char* fs){
-    ShaderSources glslSources zeroinit;
+    ShaderSources glslSources  = {0};
     glslSources.language = sourceTypeGLSL;
     
     glslSources.sourceCount = 2;

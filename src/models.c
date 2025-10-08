@@ -229,14 +229,14 @@ void ProcessMaterialsOBJ(Material *materials, tinyobj_material_t *mats, int mate
 
 
 Model LoadOBJ(const char *fileName){
-    tinyobj_attrib_t objAttributes zeroinit;
+    tinyobj_attrib_t objAttributes  = {0};
     tinyobj_shape_t *objShapes = NULL;
     unsigned int objShapeCount = 0;
 
     tinyobj_material_t *objMaterials = NULL;
     unsigned int objMaterialCount = 0;
 
-    Model model zeroinit;
+    Model model  = {0};
     model.transform = MatrixIdentity();
 
     char *fileText = LoadFileText(fileName);
@@ -455,7 +455,7 @@ Model LoadOBJ(const char *fileName){
 }
 static Image LoadImageFromCgltfImage(cgltf_image *cgltfImage, const char *texPath)
 {
-    Image image zeroinit;
+    Image image  = {0};
 
     if (cgltfImage == NULL) return image;
 
@@ -528,8 +528,8 @@ static Image LoadImageFromCgltfImage(cgltf_image *cgltfImage, const char *texPat
 }
 
 Model LoadGLTFFromMemory(const void* fileData, size_t size){
-    Model ret zeroinit;
-    cgltf_options options zeroinit;
+    Model ret  = {0};
+    cgltf_options options  = {0};
     cgltf_data* data = NULL;
     cgltf_result result = cgltf_parse(&options, fileData, size, &data);
     if (result == cgltf_result_success){
@@ -577,7 +577,7 @@ void UnloadMaterial(Material mat){
     RL_FREE(mat.maps);
 }
 Material LoadMaterialDefault(void){
-    Material material zeroinit;
+    Material material  = {0};
     material.maps = (MaterialMap*) RL_CALLOC(MAX_MATERIAL_MAPS, sizeof(MaterialMap));
 
     // Using default pipeline
@@ -767,7 +767,7 @@ ModelAnimation *LoadModelAnimationsGLTF(const char *fileName, int *animCount){
     ModelAnimation *animations = NULL;
 
     // glTF data loading
-    cgltf_options options zeroinit;
+    cgltf_options options  = {0};
     options.file.read = LoadFileGLTFCallback;
     options.file.release = ReleaseFileGLTFCallback;
     cgltf_data *data = NULL;
@@ -999,7 +999,7 @@ Model LoadGLTF(const char *fileName)
         }\
     }
 
-    Model model zeroinit;
+    Model model  = {0};
 
     // glTF file loading
     size_t dataSize = 0;
@@ -1008,7 +1008,7 @@ Model LoadGLTF(const char *fileName)
     if (fileData == NULL) return model;
 
     // glTF data loading
-    cgltf_options options zeroinit;
+    cgltf_options options  = {0};
     options.file.read =    NULL;//LoadFileGLTFCallback;
     options.file.release = NULL;//ReleaseFileGLTFCallback;
     cgltf_data *data = NULL;
@@ -1788,8 +1788,8 @@ void UpdateModelAnimation(Model model, ModelAnimation anim, int frame)
     for (int m = 0; m < model.meshCount; m++)
     {
         Mesh mesh = model.meshes[m];
-        Vector3 animVertex zeroinit;
-        Vector3 animNormal zeroinit;
+        Vector3 animVertex  = {0};
+        Vector3 animNormal  = {0};
         int boneId = 0;
         int boneCounter = 0;
         float boneWeight = 0.0;
@@ -1865,7 +1865,7 @@ ModelAnimation *LoadModelAnimations(const char *fileName, int *animCount){
 
 Model LoadModel(const char *fileName){
     
-    Model model zeroinit;
+    Model model  = {0};
 
     if (IsFileExtension(fileName, ".obj")) model = LoadOBJ(fileName);
     else if (IsFileExtension(fileName, ".glb")) model = LoadGLTF(fileName);
@@ -1886,7 +1886,7 @@ Model LoadModel(const char *fileName){
 
 Mesh GenMeshPoly(int sides, float radius)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if (sides < 3) return mesh; // Security check
 
@@ -1955,7 +1955,7 @@ Mesh GenMeshPoly(int sides, float radius)
 // Generate plane mesh (with subdivisions)
 Mesh GenMeshPlane(float width, float length, int resX, int resZ)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
 #define CUSTOM_MESH_GEN_PLANE
 #if defined(CUSTOM_MESH_GEN_PLANE)
@@ -2088,7 +2088,7 @@ Mesh GenMeshPlane(float width, float length, int resX, int resZ)
 // Generated cuboid mesh
 Mesh GenMeshCube(float width, float height, float length)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
 #define CUSTOM_MESH_GEN_CUBE
 #if defined(CUSTOM_MESH_GEN_CUBE)
@@ -2253,7 +2253,7 @@ par_shapes_mesh *par_shapes_create_icosahedron();       // 20 sides polyhedron
 // Generate sphere mesh (standard sphere)
 Mesh GenMeshSphere(float radius, int rings, int slices)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if ((rings >= 3) && (slices >= 3))
     {
@@ -2296,7 +2296,7 @@ Mesh GenMeshSphere(float radius, int rings, int slices)
 // Generate hemisphere mesh (half sphere, no bottom cap)
 Mesh GenMeshHemiSphere(float radius, int rings, int slices)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if ((rings >= 3) && (slices >= 3))
     {
@@ -2340,7 +2340,7 @@ Mesh GenMeshHemiSphere(float radius, int rings, int slices)
 // Generate cylinder mesh
 Mesh GenMeshCylinder(float radius, float height, int slices)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if (slices >= 3)
     {
@@ -2404,7 +2404,7 @@ Mesh GenMeshCylinder(float radius, float height, int slices)
 // Generate cone/pyramid mesh
 Mesh GenMeshCone(float radius, float height, int slices)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if (slices >= 3)
     {
@@ -2459,7 +2459,7 @@ Mesh GenMeshCone(float radius, float height, int slices)
 // Generate torus mesh
 Mesh GenMeshTorus(float radius, float size, int radSeg, int sides)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if ((sides >= 3) && (radSeg >= 3))
     {
@@ -2505,7 +2505,7 @@ Mesh GenMeshTorus(float radius, float size, int radSeg, int sides)
 // Generate trefoil knot mesh
 Mesh GenMeshKnot(float radius, float size, int radSeg, int sides)
 {
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     if ((sides >= 3) && (radSeg >= 3))
     {
@@ -2552,7 +2552,7 @@ Mesh GenMeshHeightmap(Image heightmap, Vector3 size)
 {
     #define GRAY_VALUE(c) ((float)(c.r + c.g + c.b)/3.0f)
 
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     int mapX = heightmap.width;
     int mapZ = heightmap.height;
@@ -2575,10 +2575,10 @@ Mesh GenMeshHeightmap(Image heightmap, Vector3 size)
 
     Vector3 scaleFactor = { size.x/(mapX - 1), size.y/255.0f, size.z/(mapZ - 1) };
 
-    Vector3 vA zeroinit;
-    Vector3 vB zeroinit;
-    Vector3 vC zeroinit;
-    Vector3 vN zeroinit;
+    Vector3 vA  = {0};
+    Vector3 vB  = {0};
+    Vector3 vC  = {0};
+    Vector3 vN  = {0};
 
     for (int z = 0; z < mapZ-1; z++)
     {
@@ -2684,7 +2684,7 @@ Mesh GenMeshCubicmap(Image cubicmap, Vector3 cubeSize)
 {
     #define COLOR_EQUAL(col1, col2) ((col1.r == col2.r)&&(col1.g == col2.g)&&(col1.b == col2.b)&&(col1.a == col2.a))
 
-    Mesh mesh zeroinit;
+    Mesh mesh  = {0};
 
     Color *pixels = LoadImageColors(cubicmap);
 

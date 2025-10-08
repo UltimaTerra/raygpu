@@ -267,10 +267,10 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
 
 
     const ResourceTypeDescriptor uniforms[4] = {
-        {uniform_buffer , 64, 0, readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
-        {texture2d,        0, 1, readonly, sample_f32,   (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
-        {texture_sampler,  0, 2, readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
-        {storage_buffer , 64, 3, readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)}
+        {uniform_buffer , 64, 0, access_type_readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
+        {texture2d,        0, 1, access_type_readonly, sample_f32,   (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
+        {texture_sampler,  0, 2, access_type_readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)},
+        {storage_buffer , 64, 3, access_type_readonly, we_dont_know, (RGShaderStage)(RGShaderStage_Vertex | RGShaderStage_Fragment)}
     };
 
     const AttributeAndResidence attrs[4] = {
@@ -326,7 +326,7 @@ void* InitWindowEx_ContinuationPoint(InitContext_Impl _ctx){
     g_renderstate.clearPass = LoadRenderpassEx(GetDefaultSettings(), true, opaqueBlack, true, 1.0f);
 
     #if SUPPORT_GLSL_PARSER == 1
-    ShaderSources defaultGLSLSource zeroinit;
+    ShaderSources defaultGLSLSource = {0};
     defaultGLSLSource.sourceCount = 2;
     defaultGLSLSource.sources[0].data = vertexSourceGLSL;
     defaultGLSLSource.sources[0].sizeInBytes = strlen(vertexSourceGLSL);

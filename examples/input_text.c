@@ -1,5 +1,4 @@
 #include <raygpu.h>
-#include <stdio.h>
 #define RAYGUI_IMPLEMENTATION
 #include <external/raygui.h>
 char buffer[100] = {0};

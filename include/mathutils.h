@@ -3,17 +3,18 @@
 #define MATHUTILS_H
 
 #include <macros_and_constants.h>
+#include <stdbool.h>
 #ifdef __cplusplus
-#include <cmath>
-#include <iostream>
-using std::sqrt;
-using std::tan;
+    #include <cmath>
+    #include <iostream>
+    using std::sqrt;
+    using std::tan;
 #else
-#include <math.h>
+    #include <math.h>
 #endif
 #define MAPI static inline
 #ifndef M_PI
-#define M_PI 3.1415926
+    #define M_PI 3.1415926536
 #endif
 
 typedef struct Vector4{
@@ -71,20 +72,20 @@ typedef struct Vector2{
 }Vector2;
 
 MAPI Vector2 Vector2Normalize(Vector2 vec){
-    float one_by_nrm = 1.0f / sqrt(vec.x * vec.x + vec.y * vec.y);
+    float one_by_nrm = 1.0f / sqrtf(vec.x * vec.x + vec.y * vec.y);
     vec.x *= one_by_nrm;
     vec.y *= one_by_nrm;
     return vec;
 }
 MAPI Vector3 Vector3Normalize(Vector3 vec){
-    float one_by_nrm = 1.0f / sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+    float one_by_nrm = 1.0f / sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
     vec.x *= one_by_nrm;
     vec.y *= one_by_nrm;
     vec.z *= one_by_nrm;
     return vec;
 }
 MAPI Vector4 Vector4Normalize(Vector4 vec){
-    float one_by_nrm = 1.0f / sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z + vec.w * vec.w);
+    float one_by_nrm = 1.0f / sqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z + vec.w * vec.w);
     vec.x *= one_by_nrm;
     vec.y *= one_by_nrm;
     vec.z *= one_by_nrm;
@@ -137,7 +138,7 @@ typedef struct Matrix{
     };
     #ifdef __cplusplus
     Matrix operator*(const Matrix& o)const noexcept{
-        Matrix ret zeroinit;
+        Matrix ret  = {0};
         for(int i = 0;i < 4;i++){
             for(int j = 0;j < 4;j++){
                 for(int k = 0;k < 4;k++){
@@ -173,7 +174,7 @@ MAPI Matrix MatrixIdentity(void){
 
 
 MAPI Matrix MatrixMultiply(Matrix A, Matrix B){
-    Matrix ret zeroinit;
+    Matrix ret  = {0};
     for(int i = 0;i < 4;i++){
         for(int j = 0;j < 4;j++){
             for(int k = 0;k < 4;k++){
@@ -216,7 +217,7 @@ MAPI Matrix MatrixLookAt(Vector3 eye, Vector3 target, Vector3 up){
 
     // Vector3Normalize(vz)
     Vector3 v = vz;
-    length = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+    length = sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
     if (length == 0.0f) length = 1.0f;
     ilength = 1.0f/length;
     vz.x *= ilength;
@@ -268,7 +269,7 @@ MAPI Matrix MatrixLookAt(Vector3 eye, Vector3 target, Vector3 up){
     @brief Perspective (radians arguments)
 */
 MAPI Matrix MatrixPerspective(double fovY, double aspect, double nearPlane, double farPlane){
-    Matrix result zeroinit;
+    Matrix result  = {0};
 
     double top = nearPlane * tan(fovY * 0.5);
     double bottom = -top;
@@ -313,7 +314,7 @@ MAPI Matrix ScreenMatrixBottomY(int width, int height) {
 }
 
 MAPI Matrix MatrixTranspose(Matrix mat){
-    Matrix ret zeroinit;
+    Matrix ret  = {0};
     for(int i = 0;i < 4;i++){
         for(int j = 0;j < 4;j++){
             ret.data[j * 4 + i] = mat.data[i * 4 + j];
@@ -394,7 +395,7 @@ MAPI Matrix QuaternionToMatrix(Quaternion q)
 // Get a quaternion for a given rotation matrix
 MAPI Quaternion QuaternionFromMatrix(Matrix mat)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     float fourWSquaredMinus1 = mat.data[0 ] + mat.data[5] + mat.data[10];
     float fourXSquaredMinus1 = mat.data[0 ] - mat.data[5] - mat.data[10];
@@ -450,6 +451,9 @@ MAPI Quaternion QuaternionFromMatrix(Matrix mat)
             result.x = (mat.data[8] + mat.data[2])*mult;
             result.y = (mat.data[6] + mat.data[9])*mult;
             break;
+        default: 
+        rg_unreachable();
+        break;
     }
 
     return result;
@@ -567,7 +571,7 @@ MAPI Vector4 Vector4Divide(Vector4 v1, Vector4 v2)
 // Get min value for each pair of components
 MAPI Vector4 Vector4Min(Vector4 v1, Vector4 v2)
 {
-    Vector4 result zeroinit;
+    Vector4 result  = {0};
 
     result.x = fminf(v1.x, v2.x);
     result.y = fminf(v1.y, v2.y);
@@ -580,7 +584,7 @@ MAPI Vector4 Vector4Min(Vector4 v1, Vector4 v2)
 // Get max value for each pair of components
 MAPI Vector4 Vector4Max(Vector4 v1, Vector4 v2)
 {
-    Vector4 result zeroinit;
+    Vector4 result  = {0};
 
     result.x = fmaxf(v1.x, v2.x);
     result.y = fmaxf(v1.y, v2.y);
@@ -593,7 +597,7 @@ MAPI Vector4 Vector4Max(Vector4 v1, Vector4 v2)
 // Calculate linear interpolation between two vectors
 MAPI Vector4 Vector4Lerp(Vector4 v1, Vector4 v2, float amount)
 {
-    Vector4 result zeroinit;
+    Vector4 result  = {0};
 
     result.x = v1.x + amount*(v2.x - v1.x);
     result.y = v1.y + amount*(v2.y - v1.y);
@@ -606,7 +610,7 @@ MAPI Vector4 Vector4Lerp(Vector4 v1, Vector4 v2, float amount)
 // Move Vector towards target
 MAPI Vector4 Vector4MoveTowards(Vector4 v, Vector4 target, float maxDistance)
 {
-    Vector4 result zeroinit;
+    Vector4 result  = {0};
 
     float dx = target.x - v.x;
     float dy = target.y - v.y;
@@ -649,7 +653,7 @@ MAPI int Vector4Equals(Vector4 p, Vector4 q)
 //Calculate the projection of the vector v1 on to v2
 MAPI Vector3 Vector3Project(Vector3 v1, Vector3 v2)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float v1dv2 = (v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
     float v2dv2 = (v2.x*v2.x + v2.y*v2.y + v2.z*v2.z);
@@ -666,7 +670,7 @@ MAPI Vector3 Vector3Project(Vector3 v1, Vector3 v2)
 //Calculate the rejection of the vector v1 on to v2
 MAPI Vector3 Vector3Reject(Vector3 v1, Vector3 v2)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float v1dv2 = (v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
     float v2dv2 = (v2.x*v2.x + v2.y*v2.y + v2.z*v2.z);
@@ -718,7 +722,7 @@ MAPI void Vector3OrthoNormalize(Vector3 *v1, Vector3 *v2)
 // Transforms a Vector3 by a given Matrix
 MAPI Vector3 Vector3Transform(Vector3 v, Matrix mat)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float x = v.x;
     float y = v.y;
@@ -731,7 +735,7 @@ MAPI Vector3 Vector3Transform(Vector3 v, Matrix mat)
     return result;
 }
 MAPI Vector3 Vector3TransformNoTranslation(Vector3 v, Matrix mat){
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float x = v.x;
     float y = v.y;
@@ -747,7 +751,7 @@ MAPI Vector3 Vector3TransformNoTranslation(Vector3 v, Matrix mat){
 // Transform a vector by quaternion rotation
 MAPI Vector3 Vector3RotateByQuaternion(Vector3 v, Quaternion q)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     result.x = v.x*(q.x*q.x + q.w*q.w - q.y*q.y - q.z*q.z) + v.y*(2*q.x*q.y - 2*q.w*q.z) + v.z*(2*q.x*q.z + 2*q.w*q.y);
     result.y = v.x*(2*q.w*q.z + 2*q.x*q.y) + v.y*(q.w*q.w - q.x*q.x + q.y*q.y - q.z*q.z) + v.z*(-2*q.w*q.x + 2*q.y*q.z);
@@ -811,7 +815,7 @@ MAPI Vector3 Vector3RotateByAxisAngle(Vector3 v, Vector3 axis, float angle)
 // Move Vector towards target
 MAPI Vector3 Vector3MoveTowards(Vector3 v, Vector3 target, float maxDistance)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float dx = target.x - v.x;
     float dy = target.y - v.y;
@@ -832,7 +836,7 @@ MAPI Vector3 Vector3MoveTowards(Vector3 v, Vector3 target, float maxDistance)
 // Calculate linear interpolation between two vectors
 MAPI Vector3 Vector3Lerp(Vector3 v1, Vector3 v2, float amount)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     result.x = v1.x + amount*(v2.x - v1.x);
     result.y = v1.y + amount*(v2.y - v1.y);
@@ -864,7 +868,7 @@ MAPI Vector3 Vector3Divide(Vector3 v1, Vector3 v2)
 // as described in the GLTF 2.0 specification: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#interpolation-cubic
 MAPI Vector3 Vector3CubicHermite(Vector3 v1, Vector3 tangent1, Vector3 v2, Vector3 tangent2, float amount)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float amountPow2 = amount*amount;
     float amountPow3 = amount*amount*amount;
@@ -879,7 +883,7 @@ MAPI Vector3 Vector3CubicHermite(Vector3 v1, Vector3 tangent1, Vector3 v2, Vecto
 // Calculate reflected vector to normal
 MAPI Vector3 Vector3Reflect(Vector3 v, Vector3 normal)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     // I is the original vector
     // N is the normal of the incident plane
@@ -897,7 +901,7 @@ MAPI Vector3 Vector3Reflect(Vector3 v, Vector3 normal)
 // Get min value for each pair of components
 MAPI Vector3 Vector3Min(Vector3 v1, Vector3 v2)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     result.x = fminf(v1.x, v2.x);
     result.y = fminf(v1.y, v2.y);
@@ -909,7 +913,7 @@ MAPI Vector3 Vector3Min(Vector3 v1, Vector3 v2)
 // Get max value for each pair of components
 MAPI Vector3 Vector3Max(Vector3 v1, Vector3 v2)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     result.x = fmaxf(v1.x, v2.x);
     result.y = fmaxf(v1.y, v2.y);
@@ -922,7 +926,7 @@ MAPI Vector3 Vector3Max(Vector3 v1, Vector3 v2)
 // NOTE: Assumes P is on the plane of the triangle
 MAPI Vector3 Vector3Barycenter(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     Vector3 v0 = { b.x - a.x, b.y - a.y, b.z - a.z };   // Vector3Subtract(b, a)
     Vector3 v1 = { c.x - a.x, c.y - a.y, c.z - a.z };   // Vector3Subtract(c, a)
@@ -956,7 +960,7 @@ MAPI Vector3 Vector3CrossProduct(Vector3 a, Vector3 b){
 // NOTE: We are avoiding calling other raymath functions despite available
 MAPI Vector3 Vector3Unproject(Vector3 source, Matrix projection, Matrix view)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     // Calculate unprojected matrix (multiply view matrix by projection matrix) and invert it
     Matrix matViewProj = MatrixMultiplySwap(view, projection);
@@ -1032,7 +1036,7 @@ MAPI Vector3 Vector3Invert(Vector3 v)
 // min and max values specified by the given vectors
 MAPI Vector3 Vector3Clamp(Vector3 v, Vector3 min, Vector3 max)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     result.x = fminf(max.x, fmaxf(min.x, v.x));
     result.y = fminf(max.y, fmaxf(min.y, v.y));
@@ -1090,7 +1094,7 @@ MAPI int Vector3Equals(Vector3 p, Vector3 q)
 //    to the refractive index of the medium on the other side of the surface
 MAPI Vector3 Vector3Refract(Vector3 v, Vector3 n, float r)
 {
-    Vector3 result zeroinit;
+    Vector3 result  = {0};
 
     float dot = v.x*n.x + v.y*n.y + v.z*n.z;
     float d = 1.0f - r*r*(1.0f - dot*dot);
@@ -1158,7 +1162,7 @@ MAPI float QuaternionLength(Quaternion q)
 // Normalize provided quaternion
 MAPI Quaternion QuaternionNormalize(Quaternion q)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     float length = sqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w);
     if (length == 0.0f) length = 1.0f;
@@ -1195,7 +1199,7 @@ MAPI Quaternion QuaternionInvert(Quaternion q)
 // Calculate two quaternion multiplication
 MAPI Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     float qax = q1.x, qay = q1.y, qaz = q1.z, qaw = q1.w;
     float qbx = q2.x, qby = q2.y, qbz = q2.z, qbw = q2.w;
@@ -1211,7 +1215,7 @@ MAPI Quaternion QuaternionMultiply(Quaternion q1, Quaternion q2)
 // Scale quaternion by float value
 MAPI Quaternion QuaternionScale(Quaternion q, float mul)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     result.x = q.x*mul;
     result.y = q.y*mul;
@@ -1232,7 +1236,7 @@ MAPI Quaternion QuaternionDivide(Quaternion q1, Quaternion q2)
 // Calculate linear interpolation between two quaternions
 MAPI Quaternion QuaternionLerp(Quaternion q1, Quaternion q2, float amount)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     result.x = q1.x + amount*(q2.x - q1.x);
     result.y = q1.y + amount*(q2.y - q1.y);
@@ -1245,7 +1249,7 @@ MAPI Quaternion QuaternionLerp(Quaternion q1, Quaternion q2, float amount)
 // Calculate slerp-optimized interpolation between two quaternions
 MAPI Quaternion QuaternionNlerp(Quaternion q1, Quaternion q2, float amount)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     // QuaternionLerp(q1, q2, amount)
     result.x = q1.x + amount*(q2.x - q1.x);
@@ -1270,7 +1274,7 @@ MAPI Quaternion QuaternionNlerp(Quaternion q1, Quaternion q2, float amount)
 // Calculates spherical linear interpolation between two quaternions
 MAPI Quaternion QuaternionSlerp(Quaternion q1, Quaternion q2, float amount)
 {
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
 #if !defined(EPSILON)
     #define EPSILON 0.000001f
@@ -1383,7 +1387,7 @@ MAPI Quaternion QuaternionCubicHermiteSpline(Quaternion q1, Quaternion outTangen
     Quaternion p1 = QuaternionScale(q2, h01);
     Quaternion m1 = QuaternionScale(inTangent2, h11);
 
-    Quaternion result zeroinit;
+    Quaternion result  = {0};
 
     result = QuaternionAdd(p0, m0);
     result = QuaternionAdd(result, p1);
@@ -1393,7 +1397,7 @@ MAPI Quaternion QuaternionCubicHermiteSpline(Quaternion q1, Quaternion outTangen
     return result;
 }
 MAPI Matrix MatrixInvert(Matrix mat){
-    Matrix result zeroinit;
+    Matrix result  = {0};
 
     float a00 = mat.data[0 ], a01 = mat.data[1 ], a02 = mat.data[2 ], a03 = mat.data[3 ];
     float a10 = mat.data[4 ], a11 = mat.data[5 ], a12 = mat.data[6 ], a13 = mat.data[7 ];
@@ -1451,7 +1455,7 @@ MAPI Matrix MatrixScale(float x, float y, float z){
     };
 }
 MAPI Matrix MatrixRotate(Vector3 axis, float angle){
-    Matrix result zeroinit;
+    Matrix result  = {0};
 
     float x = axis.x, y = axis.y, z = axis.z;
 
@@ -1465,8 +1469,8 @@ MAPI Matrix MatrixRotate(Vector3 axis, float angle){
         z *= ilength;
     }
 
-    float sinres = sinf(angle * DEG2RAD);
-    float cosres = cosf(angle * DEG2RAD);
+    float sinres = sinf(angle * 1.745329e-02f);
+    float cosres = cosf(angle * 1.745329e-02f);
     float t = 1.0f - cosres;
 
     result.data[0 ] = x * x * t + cosres;
@@ -1494,7 +1498,7 @@ MAPI Matrix GetCameraMatrix3D(Camera3D camera, float aspect){
 }
 
 MAPI Matrix GetCameraMatrix2D(Camera2D camera){
-    Matrix matTransform zeroinit;
+    Matrix matTransform  = {0};
     // The camera in world-space is set by
     //   1. Move it to target
     //   2. Rotate by -rotation and scale by (1/zoom)
@@ -1521,7 +1525,7 @@ MAPI Matrix GetCameraMatrix2D(Camera2D camera){
 
 #ifdef __cplusplus
 MAPI Vector3 operator*(const Matrix& m, const Vector3 v){
-    Vector3 ret zeroinit;
+    Vector3 ret  = {0};
     ret.x += v.x * m.data[0]; //First column 
     ret.y += v.x * m.data[1]; //First column 
     ret.z += v.x * m.data[2]; //First column

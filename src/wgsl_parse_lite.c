@@ -97,11 +97,11 @@ static inline format_or_sample_type sw_parse_format_token(const char* tkn) {
 }
 
 static inline access_type sw_parse_access_token(const char* tkn) {
-    if (!tkn) return readwrite;
-    if (strcmp(tkn, "read") == 0)        return readonly;
-    if (strcmp(tkn, "write") == 0)       return writeonly;
-    if (strcmp(tkn, "read_write") == 0)  return readwrite;
-    return readwrite;
+    if (!tkn) return access_type_readwrite;
+    if (strcmp(tkn, "read") == 0)        return access_type_readonly;
+    if (strcmp(tkn, "write") == 0)       return access_type_writeonly;
+    if (strcmp(tkn, "read_write") == 0)  return access_type_readwrite;
+    return access_type_readwrite;
 }
 
 typedef struct SW_ParsedTextureMeta {
@@ -267,16 +267,16 @@ StringToUniformMap* getBindingsWGSL_Simple(ShaderSources sources) {
             } else if (gv->address_space && strcmp(gv->address_space, "storage") == 0) {
                 desc.type = storage_buffer;
                 if(gv->access_modifier && strcmp(gv->access_modifier, "read") == 0){
-                    desc.access = readonly;
+                    desc.access = access_type_readonly;
                 }
                 else if(gv->access_modifier && strcmp(gv->access_modifier, "write") == 0){
-                    desc.access = writeonly;
+                    desc.access = access_type_writeonly;
                 }
                 else if(gv->access_modifier && strcmp(gv->access_modifier, "read_write") == 0){
-                    desc.access = readwrite;
+                    desc.access = access_type_readwrite;
                 }
                 else{
-                    desc.access = readonly;
+                    desc.access = access_type_readonly;
                 }
             } else {
                 continue; // non-bindable
