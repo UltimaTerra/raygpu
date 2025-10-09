@@ -607,7 +607,8 @@ size_t GetPixelSizeInBytes(PixelFormat format) {
         case PIXELFORMAT_DEPTH_24_PLUS:
         case PIXELFORMAT_DEPTH_32_FLOAT:
         return 4;
-        case PixelFormat_Force32:
+        case PIXELFORMAT_INVALID:
+        default:
         return 0;
     }
     return 0;

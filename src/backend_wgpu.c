@@ -1397,6 +1397,9 @@ void negotiateSurfaceFormatAndPresentMode(const void *SurfaceHandle) {
         }
     }
 found:
+    #ifdef __EMSCRIPTEN__
+    //selectedFormat = WGPUTextureFormat_BGRA8Unorm;
+    #endif
     g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if (format_index == capabilities.formatCount) {
         TRACELOG(LOG_WARNING, "No RGBA8 / BGRA8 Unorm framebuffer format found, colors might be off");

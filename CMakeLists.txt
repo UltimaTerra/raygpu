@@ -544,9 +544,13 @@ if(RAYGPU_ENABLE_INSTALL)
   set(RAYGPU_NAMESPACE raygpu::)
 
   # 1) Install libraries
+  if(SUPPORT_GLFW)
+    set(GLFW_MAYBE glfw)
+  endif()
+  
   install(
     TARGETS
-      raygpu raygpu_core wgvk glslang
+      raygpu raygpu_core wgvk glslang ${GLFW_MAYBE}
     EXPORT ${RAYGPU_INSTALL_EXPORT}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib

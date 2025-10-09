@@ -2,7 +2,6 @@
 #ifdef __EMSCRIPTEN__
 #define RGFW_WASM
 #endif
-#include <external/RGFW.h>
 #include <webgpu/webgpu.h> // Make sure this is included
 #include <stdio.h>         // For fprintf, potentially NULL
 
@@ -24,7 +23,7 @@
     #endif
 #endif
 
-WGPUSurface RGFW_GetWGPUSurface(WGPUInstance instance, RGFW_window* window) {
+WGPUSurface RGFW_GetWGPUSurface(void* instance, RGFW_window* window) {
     if (!instance || !window) {
         fprintf(stderr, "Error: Invalid WGPUInstance or RGFW_window pointer.\n");
         return NULL;
