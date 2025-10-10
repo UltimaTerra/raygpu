@@ -5,8 +5,8 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_error.h>
 #include <raygpu.h>
-#include <internals.h>
-#include <renderstate.h>
+#include "../internal_include/internals.h"
+#include "../internal_include/renderstate.h"
 #if SUPPORT_VULKAN_BACKEND == 1
     #include <external/volk.h>
     #include <vulkan/vulkan.h>
