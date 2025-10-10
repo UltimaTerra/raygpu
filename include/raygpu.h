@@ -1563,6 +1563,9 @@ void rlTexCoord2f(float u, float v);
 RGAPI void rlSetLineWidth(float lineWidth);
 RGAPI void rlBegin(PrimitiveType mode);
 RGAPI void rlEnd(cwoid);
+RGAPI void rlPushMatrix(cwoid);
+RGAPI void rlLoadIdentity(cwoid);
+RGAPI void rlPopMatrix(cwoid);
 
 RGAPI void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl);
 RGAPI void EndTextureAndPipelineMode(cwoid);

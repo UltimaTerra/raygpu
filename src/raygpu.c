@@ -727,6 +727,33 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
             break;
     }
 }
+
+RGAPI void rlLoadIdentity(void){
+    LoadIdentity();
+}
+RGAPI void rlPushMatrix(void) {
+    MatrixBufferPair* currentTop = MatrixBufferPair_stack_peek(&g_renderstate.matrixStack);
+
+    if (currentTop != NULL) {
+        MatrixBufferPair newTop = *currentTop;
+        MatrixBufferPair_stack_push(&g_renderstate.matrixStack, newTop);
+    }
+}
+RGAPI void rlPopMatrix(void) {
+    if (g_renderstate.matrixStack.current_pos > 1) {
+        MatrixBufferPair_stack_pop(&g_renderstate.matrixStack);
+
+        MatrixBufferPair* newTop = MatrixBufferPair_stack_peek(&g_renderstate.matrixStack);
+        if (newTop != NULL) {
+            uint32_t location = GetUniformLocation(GetActiveShader(), RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION_VIEW);
+            if (location != LOCATION_NOT_FOUND) {
+                SetUniformBufferData(location, &newTop->matrix, sizeof(Matrix));
+            }
+        }
+    } else {
+        TRACELOG(LOG_WARNING, "Matrix stack underflow. Cannot pop the last matrix.");
+    }
+}
 RGAPI void EndBlendMode(void){
     g_renderstate.currentSettings.blendState = GetDefaultSettings().blendState;
 }
