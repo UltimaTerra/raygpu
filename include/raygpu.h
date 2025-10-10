@@ -1565,6 +1565,16 @@ RGAPI void rlBegin(PrimitiveType mode);
 RGAPI void rlEnd(cwoid);
 RGAPI void rlPushMatrix(cwoid);
 RGAPI void rlLoadIdentity(cwoid);
+RGAPI void rlTranslatef(float x, float y, float z);
+RGAPI void rlRotatef(float angle, float x, float y, float z);
+RGAPI void rlScalef(float x, float y, float z);
+RGAPI void rlMultMatrixf(const float *matf);
+RGAPI void rlFrustum(double left, double right, double bottom, double top, double znear, double zfar);
+RGAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar);
+RGAPI void rlViewport(int x, int y, int width, int height);
+RGAPI void rlSetClipPlanes(double nearPlane, double farPlane);
+RGAPI double rlGetCullDistanceNear(void);
+RGAPI double rlGetCullDistanceFar(void);
 RGAPI void rlPopMatrix(cwoid);
 
 RGAPI void BeginTextureAndPipelineMode(RenderTexture rtex, Shader pl);

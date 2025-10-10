@@ -728,6 +728,129 @@ RGAPI void BeginBlendMode(rlBlendMode blendMode) {
     }
 }
 
+static inline Matrix MatrixFrustum(double left, double right, double bottom, double top, double nearVal, double farVal){
+    
+    float rl = (float)(right - left);
+    float tb = (float)(top - bottom);
+    float fn = (float)(farVal - nearVal);
+    
+    Matrix result = { 
+        .m0 = ((float)nearVal*2.0f)/rl,
+        .m1 = 0.0f,
+        .m2 = 0.0f,
+        .m3 = 0.0f,
+        .m4 = 0.0f,
+        .m5 = ((float)nearVal*2.0f)/tb,
+        .m6 = 0.0f,
+        .m7 = 0.0f,
+        .m8 = ((float)right + (float)left)/rl,
+        .m9 = ((float)top + (float)bottom)/tb,
+        .m10 = -(((float)farVal + (float)nearVal)/fn),
+        .m11 = -1.0f,
+        .m12 = 0.0f,
+        .m13 = 0.0f,
+        .m14 = -(((float)farVal*(float)nearVal*2.0f)/fn),
+        .m15 = 0.0f,
+    };
+
+    return result;
+}
+
+static inline Matrix MatrixOrtho(double left, double right, double bottom, double top, double nearVal, double farVal){
+    float rl = (float)(right - left);
+    float tb = (float)(top - bottom);
+    float fn = (float)(farVal - nearVal);
+    
+    Matrix result = {
+        .m0 = 2.0f/rl,
+        .m1 = 0.0f,
+        .m2 = 0.0f,
+        .m3 = 0.0f,
+        .m4 = 0.0f,
+        .m5 = 2.0f/tb,
+        .m6 = 0.0f,
+        .m7 = 0.0f,
+        .m8 = 0.0f,
+        .m9 = 0.0f,
+        .m10 = -2.0f/fn,
+        .m11 = 0.0f,
+        .m12 = -((float)left + (float)right)/rl,
+        .m13 = -((float)top + (float)bottom)/tb,
+        .m14 = -((float)farVal + (float)nearVal)/fn,
+        .m15 = 1.0f,
+    };
+
+    return result;
+}
+
+RGAPI void rlTranslatef(float x, float y, float z){
+    Matrix* mat = GetMatrixPtr();
+    Matrix matTranslation = MatrixTranslate(x, y, z);
+    *mat = MatrixMultiply(matTranslation, *mat);
+}
+
+RGAPI void rlRotatef(float angle, float x, float y, float z){
+    Matrix* mat = GetMatrixPtr();
+    Matrix matRotation = MatrixRotate(CLITERAL(Vector3){ x, y, z }, (float)(angle * DEG2RAD));
+    *mat = MatrixMultiply(matRotation, *mat);
+}
+
+RGAPI void rlScalef(float x, float y, float z){
+    Matrix* mat = GetMatrixPtr();
+    Matrix matScaling = MatrixScale(x, y, z);
+    *mat = MatrixMultiply(matScaling, *mat);
+}
+
+RGAPI void rlMultMatrixf(const float *matf){
+    Matrix* mat = GetMatrixPtr();
+    *mat = MatrixMultiply(*(Matrix*)matf, *mat);
+}
+
+RGAPI void rlFrustum(double left, double right, double bottom, double top, double znear, double zfar){
+    Matrix* mat = GetMatrixPtr();
+    Matrix matFrustum = MatrixFrustum(left, right, bottom, top, znear, zfar);
+    *mat = MatrixMultiply(matFrustum, *mat);
+}
+
+RGAPI void rlOrtho(double left, double right, double bottom, double top, double znear, double zfar){
+    Matrix* mat = GetMatrixPtr();
+    Matrix matOrtho = MatrixOrtho(left, right, bottom, top, znear, zfar);
+    *mat = MatrixMultiply(matOrtho, *mat);
+}
+
+RGAPI void rlViewport(int x, int y, int width, int height){
+    DescribedRenderpass* pass = GetActiveRenderPass();
+    if (pass && pass->rpEncoder) {
+        wgpuRenderPassEncoderSetViewport(pass->rpEncoder, (float)x, (float)y, (float)width, (float)height, 0.0f, 1.0f);
+        wgpuRenderPassEncoderSetScissorRect(pass->rpEncoder, (uint32_t)x, (uint32_t)y, (uint32_t)width, (uint32_t)height);
+    }
+}
+
+RGAPI void rlSetClipPlanes(double nearPlane, double farPlane){
+    // NOTE: In modern graphics APIs like WebGPU, near and far planes are part of the projection matrix.
+    // This function is provided for API compatibility with legacy OpenGL.
+    // We will store these values in the global renderstate to be potentially used by rlOrtho/rlFrustum.
+    // This requires adding `clipNear` and `clipFar` to the `renderstate` struct.
+    // g_renderstate.clipNear = nearPlane;
+    // g_renderstate.clipFar = farPlane;
+    // As the definition of renderstate is not provided, this is a placeholder implementation.
+    TRACELOG(LOG_WARNING, "rlSetClipPlanes() has no direct effect in this WebGPU backend; near/far planes are set by projection matrices (rlOrtho, rlFrustum).");
+}
+
+RGAPI double rlGetCullDistanceNear(void){
+    // This would return the globally stored near clip plane distance.
+    // return g_renderstate.clipNear;
+    // As the definition of renderstate is not provided, returning a default value.
+    return 0.01;
+}
+
+RGAPI double rlGetCullDistanceFar(void){
+    // This would return the globally stored far clip plane distance.
+    // return g_renderstate.clipFar;
+    // As the definition of renderstate is not provided, returning a default value.
+    return 1000.0;
+}
+
 RGAPI void rlLoadIdentity(void){
     LoadIdentity();
 }
