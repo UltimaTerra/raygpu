@@ -989,7 +989,7 @@ void uncapturedErrorCallback(
         // rg_unreachable();
     }
     char* snprintfCompatibleMessage = NullTerminatedStringFromView_(message);
-    TRACELOG(LOG_ERROR, "%s error: %s", errorTypeName, snprintfCompatibleMessage);
+    TRACELOG(LOG_ERROR, ">> %s error: %s", errorTypeName, snprintfCompatibleMessage);
     RL_FREE(snprintfCompatibleMessage);
     
     //assert(false);
@@ -1239,7 +1239,20 @@ void InitBackend(InitContext_Impl _ctx) {
         WGPUInstanceFeatureName_TimedWaitAny,
         WGPUInstanceFeatureName_ShaderSourceSPIRV
     };
+    #if SUPPORT_VULKAN_BACKEND == 1
+    const static char* const vlayername = "VK_LAYER_KHRONOS_validation";
+    WGPUInstanceLayerSelection isl = {
+        .chain = {
+            .sType = WGPUSType_InstanceLayerSelection
+        },
+        .instanceLayers = &vlayername,
+        .instanceLayerCount = 1
+    };
+    #endif
     WGPUInstanceDescriptor idesc = {
+        #if SUPPORT_VULKAN_BACKEND == 1 && !defined(NDEBUG)
+        .nextInChain = &isl.chain,
+        #endif
         #if !defined(__EMSCRIPTEN__) || defined(ASSUME_EM_ASYNCIFY) 
         .requiredFeatureCount = 1,
         .requiredFeatures = instanceFeatures

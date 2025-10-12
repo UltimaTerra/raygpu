@@ -1942,7 +1942,7 @@ FullSurface CreateHeadlessSurface(int width, int height, PixelFormat format){
         .width = width,
         .height = height,
         .format = format,
-        .renderTarget = LoadRenderTextureEx(width, height, format, 1, 1),
+        .renderTarget = LoadRenderTextureEx(width, height, format, (g_renderstate.windowFlags & FLAG_MSAA_4X_HINT) ? 4 : 1, 1),
     };
     return ret;
 }
