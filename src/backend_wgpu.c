@@ -1403,15 +1403,14 @@ void negotiateSurfaceFormatAndPresentMode(const void *SurfaceHandle) {
         }
     }
     for (format_index = 0; format_index < capabilities.formatCount; format_index++) {
-        if (capabilities.formats[format_index] ==
-            WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/) {
+        if (capabilities.formats[format_index] == WGPUTextureFormat_BGRA8Unorm /*|| capabilities.formats[format_index] == WGPUTextureFormat_RGBA8Unorm*/) {
             selectedFormat = (capabilities.formats[format_index]);
             goto found;
         }
     }
 found:
     #ifdef __EMSCRIPTEN__
-    //selectedFormat = WGPUTextureFormat_BGRA8Unorm;
+    selectedFormat = WGPUTextureFormat_BGRA8Unorm;
     #endif
     g_renderstate.frameBufferFormat = fromWGPUPixelFormat(selectedFormat);
     if (format_index == capabilities.formatCount) {
