@@ -307,7 +307,9 @@ getBindingsWGSL_Tint(ShaderSources sources) {
 }
 
 #endif // tint backend
-#if SUPPORT_VULKAN_BACKEND == 1
+
+
+#if SUPPORT_VULKAN_BACKEND == 1 && SUPPORT_WGSL_PARSER == 1
 
 
 

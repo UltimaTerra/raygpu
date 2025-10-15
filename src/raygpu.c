@@ -499,7 +499,7 @@ void FillReflectionInfo(DescribedShaderModule* module){
 DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     
     DescribedShaderModule ret = {0};
-    #if SUPPORT_WGPU_BACKEND == 1
+    #if SUPPORT_WGPU_BACKEND == 1 || SUPPORT_WGPU_BACKEND == 0
 
     rassert(sources.language == sourceTypeWGSL, "Source language must be wgsl for this function");
     
@@ -544,7 +544,7 @@ DescribedShaderModule LoadShaderModuleWGSL(ShaderSources sources) {
     }
     ret.reflectionInfo.attributes = getAttributesWGSL(sources);
     ret.reflectionInfo.uniforms = getBindingsWGSL(sources);
-    #elif SUPPORT_TINT_WGSL_PARSER == 1
+    #elif SUPPORT_VULKAN_BACKEND == 1 && SUPPORT_WGSL_PARSER == 1
     ShaderSources spirvSources = wgsl_to_spirv(sources);
     ret = LoadShaderModuleSPIRV(spirvSources);
     
@@ -1901,6 +1901,14 @@ Shader LoadShaderSingleSource(const char* shaderSource){
             TRACELOG(LOG_INFO, "  Shader uniform with name: %s @ %d", kvp->key.name, kvp->value.location);
         }
     }
+    //const char testname[] = "boneMatrices";
+    //BindingIdentifier test = {
+    //    .name = {},
+    //    .length = strlen(testname),
+    //};
+    //memcpy(test.name, testname, strlen(testname) + 1);
+    //ResourceTypeDescriptor* rtd = StringToUniformMap_get(bindings, test);
+    
     InOutAttributeInfo attribs = getAttributes(sources);
     
     AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];
@@ -1932,10 +1940,14 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     
     quickSort_ResourceTypeDescriptor(values, values + bindings->current_size);
     DescribedShaderModule module = LoadShaderModuleWGSL(sources);
+    if(module.reflectionInfo.uniforms == NULL){
+        module.reflectionInfo.uniforms = bindings;
+    }
     Shader ret = LoadPipelineFromModule(module, allAttribsInOneBuffer, attributeCount, values, insertIndex, GetDefaultSettings());
+    
     RL_FREE(values);
-    StringToUniformMap_free(bindings);
-    RL_FREE(bindings);
+    //StringToUniformMap_free(bindings);
+    //RL_FREE(bindings);
     return ret;
     #else
     return CLITERAL(Shader){0};
@@ -1969,7 +1981,7 @@ RGAPI uint32_t GetUniformLocation(Shader shader, const char* uniformName){
     BindingIdentifier identifier = {
         .length = (uint32_t)strlen(uniformName)
     };
-    rassert(identifier.length <= MAX_BINDING_NAME_LENGTH, "Identifier too short");
+    rassert(identifier.length <= MAX_BINDING_NAME_LENGTH, "Identifier too long");
     memcpy(identifier.name, uniformName, identifier.length < MAX_BINDING_NAME_LENGTH ? identifier.length : MAX_BINDING_NAME_LENGTH);
     const ResourceTypeDescriptor* desc = StringToUniformMap_get(impl->shaderModule.reflectionInfo.uniforms, identifier);
     return desc ? desc->location : LOCATION_NOT_FOUND;

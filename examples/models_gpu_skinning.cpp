@@ -80,19 +80,18 @@ fn fs_main(@location(0) fragTexCoord: vec2<f32>,
 }
 )";
 
-//------------------------------------------------------------------------------------
-// Program main entry point
-//------------------------------------------------------------------------------------
-int main(void){
-    // Initialization
-    //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 600;
-    //SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(screenWidth, screenHeight, "Models example - GPU skinning");
 
-    // Define the camera to look into our 3d world
-    Camera camera = {0};
+Camera camera = {0};
+Model characterModel;
+Shader skinningShader;
+DescribedSampler sampler;
+ModelAnimation *modelAnimations;
+int animsCount;
+unsigned int animIndex;
+unsigned int animCurrentFrame;
+Vector3 position;
+
+void setup(){
     camera.position = CLITERAL(Vector3){ 5.0f, 5.0f, 5.0f }; // Camera position
     camera.target = CLITERAL(Vector3){ 0.0f, 0.0f, 0.0f };   // Camera looking at point
     camera.up = CLITERAL(Vector3){ 0.0f, 1.0f, 0.0f };       // Camera up vector (rotation towards target)
@@ -100,83 +99,89 @@ int main(void){
     //camera.projection = CAMERA_PERSPECTIVE;                // Camera projection type
 
     // Load gltf model
+    #ifdef __EMSCRIPTEN__
+    characterModel = LoadModel("resources/greenman.glb"); // Load character model
+    #else
     const char* dp = FindDirectory("resources", 3);
-    Model characterModel = LoadModel(TextFormat("%s/greenman.glb", dp)); // Load character model
+    characterModel = LoadModel(TextFormat("%s/greenman.glb", dp)); // Load character model
+    #endif
     for(int i = 0;i < characterModel.meshCount;i++){
         UploadMesh(characterModel.meshes + i, true);
     }
     // Load skinning shader
-    Shader skinningShader = LoadShaderSingleSource(shaderSource);
-    Mesh& mr = characterModel.meshes[0];
-    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
+    skinningShader = LoadShaderSingleSource(shaderSource);
+    sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
     SetShaderSampler(skinningShader, 2, sampler);
     characterModel.materials[1].shader = skinningShader;
     
     // Load gltf model animations
-    int animsCount = 0;
-    unsigned int animIndex = 0;
-    unsigned int animCurrentFrame = 0;
-    ModelAnimation *modelAnimations = LoadModelAnimations(TextFormat("%s/greenman.glb", dp), &animsCount);
-
+    animsCount = 0;
+    animIndex = 0;
+    animCurrentFrame = 0;
+    #ifdef __EMSCRIPTEN__
+    modelAnimations = LoadModelAnimations("resources/greenman.glb", &animsCount);
+    #else
+    modelAnimations = LoadModelAnimations(TextFormat("%s/greenman.glb", dp), &animsCount);
+    #endif
     SetShaderTexture(skinningShader, GetUniformLocation(skinningShader, "texture0"), GetDefaultTexture());
-    Vector3 position = { 0.0f, 0.0f, 0.0f }; // Set model position
-    
+    position = Vector3{ 0.0f, 0.0f, 0.0f }; // Set model position
 
-    SetTargetFPS(60);                   // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
-
-    // Main game loop
-    while (!WindowShouldClose())        // Detect window close button or ESC key
-    {
-        // Update
-        //----------------------------------------------------------------------------------
-        //UpdateCamera(&camera, CAMERA_THIRD_PERSON);
-        
-        // Select current animation
-        if (IsKeyPressed(KEY_T)) {animIndex = (animIndex + 1)%animsCount;TRACELOG(LOG_INFO, "advanced");}
-        else if (IsKeyPressed(KEY_G)) animIndex = (animIndex + animsCount - 1)%animsCount;
-        
-        // Update model animation
-        ModelAnimation anim = modelAnimations[animIndex];
-        animCurrentFrame = (animCurrentFrame + 1)%anim.frameCount;
-        characterModel.transform = MatrixTranslate(position.x, position.y, position.z);
-        UpdateModelAnimationBones(characterModel, anim, animCurrentFrame);
-        //----------------------------------------------------------------------------------
-
-        // Draw
-        //----------------------------------------------------------------------------------
-        BeginDrawing();
-
-            ClearBackground(DARKBROWN);
-            BeginMode3D(camera);
-            BeginShaderMode(skinningShader);
-                
-                // Draw character mesh, pose calculation is done in shader (GPU skinning)
-                BufferData(characterModel.meshes[0].boneMatrixBuffer, characterModel.meshes[0].boneMatrices, sizeof(Matrix) * characterModel.meshes[0].boneCount);
-                SetShaderStorageBuffer(skinningShader, 4, characterModel.meshes[0].boneMatrixBuffer);
-                SetTexture(1, GetDefaultTexture());
-                //DrawMesh(cb, Material{}, MatrixIdentity());
-                DrawMesh(characterModel.meshes[0], characterModel.materials[1], MatrixIdentity());
-                //std::cout << characterModel.transform << "\n";
-
-                
-                
-            EndShaderMode();
-            DrawGrid(10, 1.0f);
-            EndMode3D();
-            DrawText("Use the T/G to switch animation", 10, 10, 30, LIGHTGRAY);
-
-        EndDrawing();
-        //----------------------------------------------------------------------------------
+    SetTargetFPS(60);
+}
+void render(){
+    if (IsKeyPressed(KEY_T)) {
+        animIndex = (animIndex + 1) % animsCount;
     }
+    else if (IsKeyPressed(KEY_G)){
+        animIndex = (animIndex + animsCount - 1) % animsCount;
+    }
+    
+    // Update model animation
+    ModelAnimation anim = modelAnimations[animIndex];
+    animCurrentFrame = (animCurrentFrame + 1)%anim.frameCount;
+    characterModel.transform = MatrixTranslate(position.x, position.y, position.z);
+    UpdateModelAnimationBones(characterModel, anim, animCurrentFrame);
 
-    // De-Initialization
+    //----------------------------------------------------------------------------------
+    // Draw
+    //----------------------------------------------------------------------------------
+    BeginDrawing();
+        ClearBackground(DARKBROWN);
+        BeginMode3D(camera);
+        BeginShaderMode(skinningShader);
+            
+            // Draw character mesh, pose calculation is done in shader (GPU skinning)
+            BufferData(characterModel.meshes[0].boneMatrixBuffer, characterModel.meshes[0].boneMatrices, sizeof(Matrix) * characterModel.meshes[0].boneCount);
+            
+            
+            // Here we are first getting the uniform's (actually Storage Buffer) location, then setting that location
+            // This could be cached, however GetUniformLocation is not expensive
+            const uint32_t loc = GetUniformLocation(skinningShader, "boneMatrices");
+            SetShaderStorageBuffer(skinningShader, loc, characterModel.meshes[0].boneMatrixBuffer);
+
+            SetTexture(1, GetDefaultTexture());
+            DrawMesh(characterModel.meshes[0], characterModel.materials[1], MatrixIdentity());
+
+        EndShaderMode();
+        DrawGrid(10, 1.0f);
+        EndMode3D();
+        DrawText("Use the T/G to switch animation", 10, 10, 30, LIGHTGRAY);
+    EndDrawing();
+}
+//------------------------------------------------------------------------------------
+// Program main entry point
+//------------------------------------------------------------------------------------
+int main(void){
+    // Initialization
     //--------------------------------------------------------------------------------------
-    //UnloadModelAnimations(modelAnimations, animsCount); // Unload model animation
-    //UnloadModel(characterModel);    // Unload model and meshes/material
-    //UnloadShader(skinningShader);   // Unload GPU skinning shader
-    //CloseWindow();                  // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
+    ProgramInfo progInfo{
+        /*.windowTitle = */"Animation example",
+        /*.windowWidth = */800,
+        /*.windowHeight = */600,
+        /*.setupFunction = */setup,
+        /*.renderFunction = */render
+    };
+    InitProgram(progInfo);
 
     return 0;
 }
