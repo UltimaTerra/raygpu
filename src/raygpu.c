@@ -1895,6 +1895,12 @@ Shader LoadShaderSingleSource(const char* shaderSource){
     src->sizeInBytes = strlen(shaderSource);
     src->stageMask = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
     StringToUniformMap* bindings = getBindings(sources);
+    for(size_t i = 0; i < bindings->current_capacity;i++){
+        StringToUniformMap_kv_pair* kvp = bindings->table + i;
+        if(kvp->key.length != 0){
+            TRACELOG(LOG_INFO, "  Shader uniform with name: %s @ %d", kvp->key.name, kvp->value.location);
+        }
+    }
     InOutAttributeInfo attribs = getAttributes(sources);
     
     AttributeAndResidence allAttribsInOneBuffer[MAX_VERTEX_ATTRIBUTES];

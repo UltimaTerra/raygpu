@@ -92,7 +92,7 @@ int main(void){
     InitWindow(screenWidth, screenHeight, "Models example - GPU skinning");
 
     // Define the camera to look into our 3d world
-    Camera camera zeroinit;
+    Camera camera = {0};
     camera.position = CLITERAL(Vector3){ 5.0f, 5.0f, 5.0f }; // Camera position
     camera.target = CLITERAL(Vector3){ 0.0f, 0.0f, 0.0f };   // Camera looking at point
     camera.up = CLITERAL(Vector3){ 0.0f, 1.0f, 0.0f };       // Camera up vector (rotation towards target)
@@ -106,10 +106,11 @@ int main(void){
         UploadMesh(characterModel.meshes + i, true);
     }
     // Load skinning shader
-    DescribedPipeline* skinningShader = LoadPipelineForVAO(shaderSource, characterModel.meshes[0].vao);
+    Shader skinningShader = LoadShaderSingleSource(shaderSource);
     Mesh& mr = characterModel.meshes[0];
-    SetPipelineSampler(skinningShader, 2, LoadSampler(repeat, linear));
-    characterModel.materials[1].pipeline = skinningShader;
+    DescribedSampler sampler = LoadSampler(TEXTURE_WRAP_REPEAT, TEXTURE_FILTER_BILINEAR);
+    SetShaderSampler(skinningShader, 2, sampler);
+    characterModel.materials[1].shader = skinningShader;
     
     // Load gltf model animations
     int animsCount = 0;
@@ -117,7 +118,7 @@ int main(void){
     unsigned int animCurrentFrame = 0;
     ModelAnimation *modelAnimations = LoadModelAnimations(TextFormat("%s/greenman.glb", dp), &animsCount);
 
-    SetPipelineTexture(skinningShader, GetUniformLocation(skinningShader, "texture0"), GetDefaultTexture());
+    SetShaderTexture(skinningShader, GetUniformLocation(skinningShader, "texture0"), GetDefaultTexture());
     Vector3 position = { 0.0f, 0.0f, 0.0f }; // Set model position
     
 
@@ -148,11 +149,11 @@ int main(void){
 
             ClearBackground(DARKBROWN);
             BeginMode3D(camera);
-            BeginPipelineMode(skinningShader);
+            BeginShaderMode(skinningShader);
                 
                 // Draw character mesh, pose calculation is done in shader (GPU skinning)
                 BufferData(characterModel.meshes[0].boneMatrixBuffer, characterModel.meshes[0].boneMatrices, sizeof(Matrix) * characterModel.meshes[0].boneCount);
-                SetStorageBuffer(4, characterModel.meshes[0].boneMatrixBuffer);
+                SetShaderStorageBuffer(skinningShader, 4, characterModel.meshes[0].boneMatrixBuffer);
                 SetTexture(1, GetDefaultTexture());
                 //DrawMesh(cb, Material{}, MatrixIdentity());
                 DrawMesh(characterModel.meshes[0], characterModel.materials[1], MatrixIdentity());
@@ -160,7 +161,7 @@ int main(void){
 
                 
                 
-            EndPipelineMode();
+            EndShaderMode();
             DrawGrid(10, 1.0f);
             EndMode3D();
             DrawText("Use the T/G to switch animation", 10, 10, 30, LIGHTGRAY);

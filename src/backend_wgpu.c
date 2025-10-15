@@ -1615,6 +1615,20 @@ Texture LoadTextureFromImage(Image img) {
             ((Color *)altdata)[i].a = gscv >> 8;
         }
     }
+    if (img.format == RGB8) {
+        altdata = (Color *)calloc(((size_t)img.width) * img.height, sizeof(Color));
+        for (size_t i = 0; i < ((size_t)img.width) * img.height; i++) {
+            struct rgb8color{
+                uint8_t r;
+                uint8_t g;
+                uint8_t b;
+            }* cols = img.data;
+            ((Color *)altdata)[i].r = cols[i].r;
+            ((Color *)altdata)[i].g = cols[i].g;
+            ((Color *)altdata)[i].b = cols[i].g;
+            ((Color *)altdata)[i].a = 255;
+        }
+    }
 
     WGPUTextureDescriptor tDesc = {
         .nextInChain = NULL,
@@ -1622,7 +1636,7 @@ Texture LoadTextureFromImage(Image img) {
         .usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst | WGPUTextureUsage_CopySrc,
         .dimension = WGPUTextureDimension_2D,
         .size = {img.width, img.height, 1},
-        .format = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format),
+        .format = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : ((img.format == RGB8) ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format)),
         .mipLevelCount = 1,
         .sampleCount = 1,
         .viewFormatCount = 1,
@@ -1632,7 +1646,7 @@ Texture LoadTextureFromImage(Image img) {
     assert(tDesc.size.width > 0);
     assert(tDesc.size.height > 0);
 
-    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format);
+    WGPUTextureFormat resulting_tf = img.format == GRAYSCALE ? WGPUTextureFormat_RGBA8Unorm : ((img.format == RGB8) ? WGPUTextureFormat_RGBA8Unorm : toWGPUPixelFormat(img.format));
     tDesc.viewFormats = (WGPUTextureFormat *)&resulting_tf;
     ret.id = wgpuDeviceCreateTexture((WGPUDevice)GetDevice(), &tDesc);
     
